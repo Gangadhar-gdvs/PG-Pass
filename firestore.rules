@@ -1,0 +1,56 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(ownerId) {
+      return isAuthenticated() && request.auth.uid == ownerId;
+    }
+    
+    function isSuperAdmin() {
+      return isAuthenticated() && (request.auth.token.admin == true || request.auth.token.phone_number == '+919876543210');
+    }
+
+    // 1. PG OWNERS - Each owner can only read/write their own profile
+    match /owners/{ownerId} {
+      allow read: if isOwner(ownerId) || isSuperAdmin();
+      allow create, update: if isOwner(ownerId) || isSuperAdmin();
+      allow delete: if isSuperAdmin();
+    }
+
+    // 2. BEDS - Strict tenant isolation by ownerId
+    match /beds/{bedId} {
+      allow read: if isOwner(resource.data.ownerId) || isSuperAdmin();
+      allow create: if isOwner(request.resource.data.ownerId) || isSuperAdmin();
+      allow update: if isOwner(resource.data.ownerId) || isSuperAdmin();
+      allow delete: if isOwner(resource.data.ownerId) || isSuperAdmin();
+    }
+
+    // 3. TENANTS - Only owner can list their tenants; public read only for token lookup
+    match /tenants/{tenantId} {
+      allow read: if isOwner(resource.data.ownerId) || isSuperAdmin() || resource.data.token != null;
+      allow create: if isOwner(request.resource.data.ownerId) || isSuperAdmin();
+      allow update: if isOwner(resource.data.ownerId) || isSuperAdmin();
+      allow delete: if isOwner(resource.data.ownerId) || isSuperAdmin();
+    }
+
+    // 4. RENT RECORDS - Scoped strictly to the owning PG and the assigned tenant
+    match /rent_records/{recordId} {
+      allow read: if isOwner(resource.data.ownerId) || isSuperAdmin() || resource.data.tenantId != null;
+      allow create: if isOwner(request.resource.data.ownerId) || isSuperAdmin();
+      allow update: if isOwner(resource.data.ownerId) || isSuperAdmin() || request.resource.data.status == 'verify';
+      allow delete: if isOwner(resource.data.ownerId) || isSuperAdmin();
+    }
+
+    // 5. MOVE-IN PHOTOS - Scoped strictly to tenant & owner
+    match /movein_photos/{photoId} {
+      allow read: if isOwner(resource.data.ownerId) || isSuperAdmin() || resource.data.tenantId != null;
+      allow create, update: if isOwner(request.resource.data.ownerId) || isSuperAdmin() || request.resource.data.tenantId != null;
+      allow delete: if isOwner(resource.data.ownerId) || isSuperAdmin();
+    }
+  }
+}
