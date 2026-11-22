@@ -3,38 +3,32 @@
 import React, { useState, useRef, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import {
-  Phone,
-  Lock,
-  ArrowLeft,
-  ShieldCheck,
-  ShieldAlert,
-  Building2,
-} from 'lucide-react';
+import { ArrowLeft, ShieldCheck, CheckCircle2, Building, RefreshCw, Sparkles } from 'lucide-react';
 import { RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { PhoneInput } from '@/components/ui/phone-input';
+import { OtpInput } from '@/components/ui/otp-input';
 import { config } from '@/lib/config';
 import { validatePhone } from '@/lib/security';
-import { useAuth } from '@/hooks/useAuth';
 import toast from 'react-hot-toast';
 
 function LoginFormContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const role = searchParams.get('role') || 'owner';
-  const { loginWithPhone } = useAuth();
+  const isExpired = searchParams.get('expired') === 'true';
 
   const [step, setStep] = useState<'phone' | 'otp'>('phone');
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const [otpCode, setOtpCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [countdown, setCountdown] = useState(0);
+  const [phoneError, setPhoneError] = useState('');
+  const [otpError, setOtpError] = useState('');
 
   const confirmResultRef = useRef<ConfirmationResult | null>(null);
   const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
-  const otpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   useEffect(() => {
     if (countdown > 0) {
@@ -59,9 +53,11 @@ function LoginFormContent() {
 
   const handleSendOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    setPhoneError('');
+
     const phoneValidation = validatePhone(phoneNumber);
     if (!phoneValidation.valid) {
-      toast.error(phoneValidation.error || 'Please enter a valid 10-digit mobile number');
+      setPhoneError(phoneValidation.error || 'Please enter a valid 10-digit mobile number');
       return;
     }
     const cleanNumber = phoneValidation.cleaned;
@@ -69,14 +65,8 @@ function LoginFormContent() {
     setLoading(true);
 
     if (!config.firebase.isConfigured()) {
-      // Standard local phone authentication flow for zero-cost operation
-      setTimeout(() => {
-        setLoading(false);
-        setStep('otp');
-        setCountdown(30);
-        setOtp(['1', '2', '3', '4', '5', '6']);
-        toast.success(`Verification code generated for +91 ${cleanNumber}`);
-      }, 500);
+      setPhoneError('Authentication service is currently unavailable. Please check system configuration.');
+      setLoading(false);
       return;
     }
 
@@ -89,11 +79,13 @@ function LoginFormContent() {
       confirmResultRef.current = result;
 
       setStep('otp');
+      setOtpCode('');
+      setOtpError('');
       setCountdown(30);
-      toast.success('Verification code sent to your mobile phone');
+      toast.success('6-digit code sent via SMS');
     } catch (err: any) {
       console.error(err);
-      toast.error(err.message || 'Failed to send SMS code. Please try again.');
+      setPhoneError(err.message || 'Failed to send SMS code. Please try again.');
       recaptchaVerifierRef.current = null;
     } finally {
       setLoading(false);
@@ -102,168 +94,214 @@ function LoginFormContent() {
 
   const handleVerifyOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    const code = otp.join('');
+    setOtpError('');
 
-    if (code.length !== 6) {
-      toast.error('Please enter all 6 digits of the verification code');
+    if (otpCode.length !== 6) {
+      setOtpError('Please enter all 6 digits of the verification code');
+      return;
+    }
+
+    if (!confirmResultRef.current) {
+      setOtpError('Session expired. Please request a new code.');
+      setStep('phone');
       return;
     }
 
     setLoading(true);
 
-    if (confirmResultRef.current) {
-      try {
-        await confirmResultRef.current.confirm(code);
-        toast.success('Authentication successful! Welcome.');
-        router.push(role === 'owner' ? '/dashboard' : '/');
-      } catch (err: any) {
-        toast.error('Invalid OTP. Please check or request a new code.');
-        setLoading(false);
-      }
-    } else {
-      // Real authenticated session tied strictly to this unique phone number
-      setTimeout(() => {
-        const cleanNumber = phoneNumber.replace(/\D/g, '');
-        loginWithPhone(cleanNumber);
-        toast.success('Signed in successfully!');
-        router.push(role === 'owner' ? '/dashboard' : '/');
-      }, 400);
-    }
-  };
-
-  const handleOtpChange = (index: number, val: string) => {
-    if (!/^\d*$/.test(val)) return;
-    const nextOtp = [...otp];
-    nextOtp[index] = val.slice(-1);
-    setOtp(nextOtp);
-
-    if (val && index < 5) {
-      otpInputRefs.current[index + 1]?.focus();
-    }
-  };
-
-  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent) => {
-    if (e.key === 'Backspace' && !otp[index] && index > 0) {
-      otpInputRefs.current[index - 1]?.focus();
+    try {
+      await confirmResultRef.current.confirm(otpCode);
+      toast.success('Signed in successfully');
+      router.push(role === 'owner' ? '/dashboard' : '/');
+    } catch (err: any) {
+      setOtpError('Invalid verification code. Please check and try again.');
+      setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#070913] text-slate-100 flex flex-col justify-center items-center px-4 py-8 relative">
+    <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center p-4 sm:p-6 lg:p-8">
       <div id="recaptcha-container" />
 
-      {/* Background glow */}
-      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[550px] h-[350px] bg-indigo-600/15 blur-[130px] pointer-events-none rounded-full" />
-
-      <div className="w-full max-w-sm relative z-10">
-        {/* Header Links */}
-        <div className="flex items-center justify-between mb-6">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Back to Home</span>
-          </Link>
-
-          <Link
-            href="/admin"
-            className="inline-flex items-center gap-1 text-[11px] text-rose-400 hover:text-rose-300 font-bold bg-rose-500/10 border border-rose-500/25 px-2.5 py-1 rounded-full transition-colors"
-          >
-            <ShieldAlert className="w-3 h-3" />
-            <span>Super Admin Portal</span>
-          </Link>
-        </div>
-
-        {/* Auth Card */}
-        <div className="bg-slate-900/85 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl backdrop-blur-xl">
-          <div className="text-center mb-6">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 to-indigo-500 text-white font-black text-2xl flex items-center justify-center mx-auto mb-3 shadow-lg shadow-indigo-600/30">
-              P
+      {/* Main Container Card */}
+      <div className="w-full max-w-4xl bg-white border border-[#E2E8F0] rounded-[14px] shadow-[0_20px_50px_rgba(0,0,0,0.06)] overflow-hidden grid grid-cols-1 md:grid-cols-2">
+        {/* Left Brand Panel (Desktop) */}
+        <div className="hidden md:flex flex-col justify-between p-10 bg-[#0F172A] text-white">
+          <div>
+            <div className="flex items-center gap-2.5">
+              <div className="h-9 w-9 rounded-[8px] bg-[#D97706] flex items-center justify-center text-white shadow-xs">
+                <Building className="h-5 w-5" />
+              </div>
+              <span className="text-xl font-bold tracking-tight text-white">PGPass</span>
             </div>
-            <h1 className="text-2xl font-black text-white tracking-tight">PG Owner Sign In</h1>
-            <p className="text-xs text-slate-400 mt-1">
-              Enter your mobile number to securely access or set up your PG
-            </p>
+
+            <div className="mt-12 space-y-3">
+              <h1 className="text-2xl font-bold leading-snug tracking-tight text-white">
+                Bento-grade PG bed management & rent settlement.
+              </h1>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Streamline bed inventory, collect rents with 1-tap WhatsApp reminders, and issue compliant HRA tax receipts without app downloads.
+              </p>
+            </div>
+
+            <div className="mt-10 space-y-3.5">
+              <div className="flex items-center gap-2.5 text-xs font-semibold text-slate-200">
+                <CheckCircle2 className="h-4 w-4 text-[#F59E0B] shrink-0" />
+                <span>Zero cost, no app installation required</span>
+              </div>
+              <div className="flex items-center gap-2.5 text-xs font-semibold text-slate-200">
+                <CheckCircle2 className="h-4 w-4 text-[#F59E0B] shrink-0" />
+                <span>Personalized resident links for rent & photos</span>
+              </div>
+              <div className="flex items-center gap-2.5 text-xs font-semibold text-slate-200">
+                <CheckCircle2 className="h-4 w-4 text-[#F59E0B] shrink-0" />
+                <span>Live occupancy HUD tracking across floors</span>
+              </div>
+            </div>
           </div>
 
-          {step === 'phone' ? (
-            <form onSubmit={handleSendOtp} className="space-y-4">
-              <Input
-                label="Mobile Number"
-                type="tel"
-                inputMode="numeric"
-                maxLength={10}
-                placeholder="Enter 10-digit mobile number"
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-                prefix={<span className="text-slate-400 font-bold">+91</span>}
-                suffix={<Phone className="w-4 h-4 text-slate-500" />}
-                autoFocus
-              />
-
-              <Button type="submit" size="full" loading={loading} className="py-3 font-bold">
-                Send 6-Digit Verification Code
-              </Button>
-            </form>
-          ) : (
-            <form onSubmit={handleVerifyOtp} className="space-y-5">
-              <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
-                <span>Code sent to +91 {phoneNumber}</span>
-                <button
-                  type="button"
-                  onClick={() => setStep('phone')}
-                  className="text-indigo-400 hover:underline"
-                >
-                  Edit
-                </button>
-              </div>
-
-              {/* 6 Digit Input Boxes */}
-              <div className="flex justify-between gap-2">
-                {otp.map((digit, i) => (
-                  <input
-                    key={i}
-                    ref={(el) => {
-                      otpInputRefs.current[i] = el;
-                    }}
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={1}
-                    value={digit}
-                    onChange={(e) => handleOtpChange(i, e.target.value)}
-                    onKeyDown={(e) => handleOtpKeyDown(i, e)}
-                    className="w-11 h-13 text-center text-xl font-bold bg-slate-950 border border-slate-700/80 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
-                  />
-                ))}
-              </div>
-
-              <Button type="submit" size="full" loading={loading} className="py-3 font-bold">
-                <Lock className="w-4 h-4 mr-1.5" />
-                Verify & Enter Dashboard
-              </Button>
-
-              <div className="text-center text-xs text-slate-400">
-                {countdown > 0 ? (
-                  <span>Resend code in {countdown}s</span>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => handleSendOtp()}
-                    className="text-indigo-400 hover:underline font-semibold"
-                  >
-                    Resend Code
-                  </button>
-                )}
-              </div>
-            </form>
-          )}
+          <div className="pt-8 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-400 font-mono">
+            <span>PGPass Production</span>
+            <span>Secured via Firebase</span>
+          </div>
         </div>
 
-        {/* Security Assurance */}
-        <div className="flex items-center justify-center gap-1.5 mt-5 text-[11px] text-slate-500">
-          <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-          <span>Strict Multi-Tenant Security • Zero Cross-PG Data Access</span>
+        {/* Right Form Panel */}
+        <div className="p-6 sm:p-10 flex flex-col justify-between bg-white text-left">
+          <div>
+            {/* Top Navigation */}
+            <div className="flex items-center justify-between mb-8">
+              <Link
+                href="/"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#64748B] hover:text-[#09090B] transition-colors"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                <span>Back to Home</span>
+              </Link>
+
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-[#D97706] bg-[#FEF3C7] px-2.5 py-0.5 rounded-[6px]">
+                {role === 'owner' ? 'PG Owner Portal' : 'Resident Portal'}
+              </span>
+            </div>
+
+            {isExpired && (
+              <div className="mb-6 p-3 rounded-[8px] bg-[#FFFBEB] border border-[#FDE68A] text-xs text-[#92400E]">
+                Your session has expired. Please verify your phone number to continue.
+              </div>
+            )}
+
+            {step === 'phone' ? (
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-xl font-bold text-[#09090B] tracking-tight">
+                    Sign in with mobile
+                  </h2>
+                  <p className="mt-1 text-xs text-[#64748B]">
+                    We will send a 6-digit one-time password to your phone.
+                  </p>
+                </div>
+
+                <form onSubmit={handleSendOtp} className="space-y-4">
+                  <PhoneInput
+                    label="Mobile Number"
+                    value={phoneNumber}
+                    onChange={setPhoneNumber}
+                    error={phoneError}
+                    placeholder="98765 43210"
+                    disabled={loading}
+                  />
+
+                  <Button
+                    type="submit"
+                    size="lg"
+                    loading={loading}
+                    variant="solid"
+                    className="w-full text-[13px]"
+                  >
+                    Send Verification Code
+                  </Button>
+                </form>
+
+                <p className="text-[11px] text-center text-[#94A3B8] leading-relaxed">
+                  By continuing, you agree to receive SMS verification codes. Standard carrier rates apply.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-xl font-bold text-[#09090B] tracking-tight">
+                    Enter verification code
+                  </h2>
+                  <p className="mt-1 text-xs text-[#64748B]">
+                    Enter the 6-digit code sent to{" "}
+                    <span className="font-bold text-[#09090B] font-mono-numbers">
+                      +91 {phoneNumber}
+                    </span>
+                  </p>
+                </div>
+
+                <form onSubmit={handleVerifyOtp} className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-semibold uppercase tracking-wider text-[#475569]">
+                      6-Digit SMS Code
+                    </label>
+                    <OtpInput
+                      value={otpCode}
+                      onChange={setOtpCode}
+                      disabled={loading}
+                      error={!!otpError}
+                    />
+                    {otpError && (
+                      <p className="text-xs font-semibold text-[#EF4444] animate-shake">
+                        {otpError}
+                      </p>
+                    )}
+                  </div>
+
+                  <Button
+                    type="submit"
+                    size="lg"
+                    loading={loading}
+                    variant="solid"
+                    className="w-full text-[13px]"
+                  >
+                    Verify & Continue
+                  </Button>
+                </form>
+
+                <div className="pt-2 flex items-center justify-between text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setStep('phone')}
+                    className="text-[#64748B] hover:text-[#09090B] font-medium transition-colors cursor-pointer"
+                  >
+                    Change phone number
+                  </button>
+
+                  {countdown > 0 ? (
+                    <span className="text-[#94A3B8] font-mono-numbers">
+                      Resend in {countdown}s
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleSendOtp()}
+                      disabled={loading}
+                      className="inline-flex items-center gap-1 font-bold text-[#D97706] hover:text-[#B45309] transition-colors cursor-pointer disabled:cursor-not-allowed"
+                    >
+                      <RefreshCw className="h-3 w-3" />
+                      Resend SMS
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-8 pt-4 border-t border-[#E2E8F0] flex items-center justify-center gap-1.5 text-[11px] text-[#94A3B8]">
+            <ShieldCheck className="h-3.5 w-3.5 text-[#10B981]" />
+            <span>End-to-end encrypted session</span>
+          </div>
         </div>
       </div>
     </div>
@@ -274,8 +312,8 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-[#070913] flex items-center justify-center">
-          <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+        <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">
+          <div className="h-8 w-8 rounded-full border-2 border-[#D97706] border-t-transparent animate-spin" />
         </div>
       }
     >

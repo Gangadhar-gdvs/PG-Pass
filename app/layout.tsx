@@ -1,20 +1,33 @@
 import type { Metadata, Viewport } from "next";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import { Toaster } from "react-hot-toast";
 import "./globals.css";
 
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-mono",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
-  title: "PGPass — PG Rent, Bed & HRA Manager",
-  description: "Zero-cost PG Rent, Bed Occupancy and Instant HRA Tax Receipt Manager. No app download needed.",
+  title: "PGPass — Luxury PG Inventory & Instant Rent Settlement",
+  description: "Bento-grade PG bed inventory management, 1-tap WhatsApp rent settlement, and compliant HRA tax receipts.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "black-translucent",
+    statusBarStyle: "default",
     title: "PGPass",
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#6366f1",
+  themeColor: "#D97706",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -27,24 +40,25 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark h-full">
+    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable} h-full`}>
       <head>
         <link rel="icon" href="/icon.svg" type="image/svg+xml" />
         <link rel="apple-touch-icon" href="/icon.svg" />
       </head>
-      <body className="min-h-full bg-[#090d16] text-slate-100 antialiased selection:bg-indigo-500/30 selection:text-indigo-200">
+      <body className="min-h-full antialiased text-[#09090B] bg-[#F8FAFC] selection:bg-[#FEF3C7] selection:text-[#B45309]">
         {children}
         <Toaster
           position="top-center"
           toastOptions={{
             duration: 3500,
             style: {
-              background: "#1e293b",
-              color: "#f8fafc",
-              border: "1px solid rgba(255, 255, 255, 0.1)",
-              borderRadius: "14px",
-              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.5)",
-              fontSize: "14px",
+              background: "#FFFFFF",
+              color: "#09090B",
+              border: "1px solid #E2E8F0",
+              borderRadius: "8px",
+              boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04)",
+              fontSize: "13px",
+              fontWeight: 500,
             },
           }}
         />

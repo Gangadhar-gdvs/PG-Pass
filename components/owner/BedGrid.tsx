@@ -3,7 +3,9 @@
 import React, { useState } from 'react';
 import { Bed, RentRecord } from '@/types';
 import { BedCard } from './BedCard';
-import { Search, Filter, Layers, Home } from 'lucide-react';
+import { Search, Layers } from 'lucide-react';
+import { TabBar } from '@/components/ui/tab-bar';
+import { EmptyState } from '@/components/ui/empty-state';
 
 interface BedGridProps {
   beds: Bed[];
@@ -15,6 +17,7 @@ interface BedGridProps {
   onMarkPaid: (bed: Bed, record?: RentRecord) => void;
   onVerifyProof: (bed: Bed, record: RentRecord) => void;
   onVacate: (bed: Bed) => void;
+  onSelectBed?: (bed: Bed) => void;
 }
 
 export function BedGrid({
@@ -27,16 +30,31 @@ export function BedGrid({
   onMarkPaid,
   onVerifyProof,
   onVacate,
+  onSelectBed,
 }: BedGridProps) {
+  const [selectedFloor, setSelectedFloor] = useState<string>('all');
   const [activeFilter, setActiveFilter] = useState<'all' | 'paid' | 'pending' | 'verify' | 'vacant'>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Map rent records by bedId
   const recordMap = new Map<string, RentRecord>();
   rentRecords.forEach((r) => recordMap.set(r.bedId, r));
 
-  // Filter beds based on active tab & search
+  const uniqueFloors = Array.from(new Set(beds.map((b) => b.floor))).sort((a, b) => a - b);
+
+  const floorTabs = [
+    { id: 'all', label: 'All Floors', count: beds.length },
+    ...uniqueFloors.map((fl) => ({
+      id: String(fl),
+      label: `Floor ${fl}`,
+      count: beds.filter((b) => b.floor === fl).length,
+    })),
+  ];
+
   const filteredBeds = beds.filter((b) => {
+    if (selectedFloor !== 'all' && String(b.floor) !== selectedFloor) {
+      return false;
+    }
+
     const record = recordMap.get(b.id);
     const isPaid = b.status === 'paid' || record?.status === 'paid';
     const isVerify = b.status === 'verify' || record?.status === 'verify';
@@ -59,112 +77,72 @@ export function BedGrid({
     return true;
   });
 
-  // Group filtered beds by Floor
-  const floors = Array.from(new Set(filteredBeds.map((b) => b.floor))).sort((a, b) => a - b);
+  const displayFloors =
+    selectedFloor === 'all'
+      ? Array.from(new Set(filteredBeds.map((b) => b.floor))).sort((a, b) => a - b)
+      : [Number(selectedFloor)];
 
   return (
-    <div className="space-y-6">
-      {/* Controls Bar: Filter Chips + Search */}
-      <div className="flex flex-col sm:flex-row gap-3 justify-between items-stretch sm:items-center bg-slate-900/60 p-3 rounded-2xl border border-slate-800">
-        {/* Filter Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
-          <button
-            onClick={() => setActiveFilter('all')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-              activeFilter === 'all'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
-            }`}
-          >
-            All Beds ({beds.length})
-          </button>
-          <button
-            onClick={() => setActiveFilter('pending')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-              activeFilter === 'pending'
-                ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
-            }`}
-          >
-            Pending
-          </button>
-          <button
-            onClick={() => setActiveFilter('verify')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-              activeFilter === 'verify'
-                ? 'bg-amber-600 text-white shadow-md shadow-amber-600/30'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
-            }`}
-          >
-            Verify Proof
-          </button>
-          <button
-            onClick={() => setActiveFilter('paid')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-              activeFilter === 'paid'
-                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
-            }`}
-          >
-            Paid
-          </button>
-          <button
-            onClick={() => setActiveFilter('vacant')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-              activeFilter === 'vacant'
-                ? 'bg-slate-700 text-white'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
-            }`}
-          >
-            Vacant
-          </button>
-        </div>
+    <div className="space-y-4 text-left">
+      {/* Top Filter HUD Control Bar */}
+      <div className="bg-white border border-[#E2E8F0] rounded-[12px] p-3 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+        {/* Floor Pills */}
+        <TabBar
+          tabs={floorTabs}
+          activeTab={selectedFloor}
+          onChange={setSelectedFloor}
+          variant="pill"
+        />
 
-        {/* Quick Search Input */}
-        <div className="relative min-w-[200px]">
-          <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            placeholder="Search bed or resident..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-slate-950/80 border border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
-          />
+        {/* Filter Controls */}
+        <div className="flex items-center gap-2">
+          <select
+            value={activeFilter}
+            onChange={(e) => setActiveFilter(e.target.value as any)}
+            className="h-9 rounded-[8px] border border-[#E2E8F0] bg-white px-3 text-xs font-semibold text-[#09090B] focus:border-[#D97706] focus:outline-none"
+          >
+            <option value="all">All Units</option>
+            <option value="pending">Pending Rent</option>
+            <option value="verify">Proof Verification</option>
+            <option value="paid">Settled</option>
+            <option value="vacant">Available Beds</option>
+          </select>
+
+          <div className="relative flex-1 sm:w-52">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8]" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search bed, room, resident..."
+              className="w-full h-9 pl-8 pr-3 rounded-[8px] border border-[#E2E8F0] text-xs text-[#09090B] placeholder:text-[#94A3B8] bg-white focus:border-[#D97706] focus:outline-none"
+            />
+          </div>
         </div>
       </div>
 
-      {/* Bed Grid Display */}
+      {/* Bento Bed Layout Grid */}
       {filteredBeds.length === 0 ? (
-        <div className="text-center py-12 bg-slate-900/30 border border-slate-800/80 rounded-2xl p-6">
-          <Layers className="w-10 h-10 text-slate-600 mx-auto mb-3" />
-          <h4 className="text-sm font-bold text-white mb-1">No beds matching your criteria</h4>
-          <p className="text-xs text-slate-400">Try switching your filter or clearing the search query.</p>
-        </div>
+        <EmptyState
+          icon={<Layers className="w-6 h-6 text-[#64748B]" />}
+          title="No units match the filter"
+          description="Adjust the floor selection or search filter to see more beds."
+        />
       ) : (
-        <div className="space-y-8">
-          {floors.map((floorNum) => {
+        <div className="space-y-6">
+          {displayFloors.map((floorNum) => {
             const floorBeds = filteredBeds.filter((b) => b.floor === floorNum);
-
-            // Group floor beds by room
-            const rooms = Array.from(new Set(floorBeds.map((b) => b.roomNumber))).sort();
+            if (floorBeds.length === 0) return null;
 
             return (
-              <div key={floorNum} className="space-y-4">
-                {/* Floor Header */}
-                <div className="flex items-center gap-2 border-b border-slate-800/80 pb-2">
-                  <div className="w-6 h-6 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-xs font-black">
-                    F{floorNum}
-                  </div>
-                  <h3 className="font-extrabold text-sm text-slate-200 tracking-wide">
-                    Floor {floorNum}
+              <div key={floorNum} className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-[11px] font-bold uppercase tracking-wider text-[#64748B]">
+                    Floor {floorNum} · {floorBeds.length} Units
                   </h3>
-                  <span className="text-xs text-slate-500">
-                    ({floorBeds.length} {floorBeds.length === 1 ? 'bed' : 'beds'})
-                  </span>
                 </div>
 
-                {/* Rooms & Beds */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                   {floorBeds.map((bed) => (
                     <BedCard
                       key={bed.id}
@@ -177,6 +155,7 @@ export function BedGrid({
                       onMarkPaid={onMarkPaid}
                       onVerifyProof={onVerifyProof}
                       onVacate={onVacate}
+                      onSelectBed={onSelectBed}
                     />
                   ))}
                 </div>

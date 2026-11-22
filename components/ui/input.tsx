@@ -1,53 +1,45 @@
-import * as React from 'react';
-import { cn } from '@/lib/utils';
+import * as React from "react";
 
-export interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'prefix'> {
-  label?: string;
+export interface InputProps
+  extends React.InputHTMLAttributes<HTMLInputElement> {
+  label?: React.ReactNode;
   error?: string;
-  prefix?: React.ReactNode;
-  suffix?: React.ReactNode;
+  helperText?: string;
 }
 
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, label, error, prefix, suffix, id, ...props }, ref) => {
-    const inputId = id || (label ? label.toLowerCase().replace(/\s+/g, '-') : undefined);
+  ({ className = "", type = "text", label, error, helperText, id, ...props }, ref) => {
+    const generatedId = React.useId();
+    const inputId = id || generatedId;
 
     return (
-      <div className="w-full">
+      <div className="w-full flex flex-col gap-1.5 text-left">
         {label && (
-          <label htmlFor={inputId} className="block text-xs font-semibold text-slate-300 mb-1.5 uppercase tracking-wider">
+          <label
+            htmlFor={inputId}
+            className="text-[11px] font-semibold uppercase tracking-wider text-[#475569]"
+          >
             {label}
           </label>
         )}
-        <div className="relative flex items-center">
-          {prefix && (
-            <div className="absolute left-3.5 flex items-center pointer-events-none text-slate-400 text-sm">
-              {prefix}
-            </div>
-          )}
-          <input
-            id={inputId}
-            ref={ref}
-            className={cn(
-              'w-full bg-slate-900/80 border border-slate-700/80 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500',
-              'focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all duration-150',
-              'disabled:opacity-50 disabled:bg-slate-900/40',
-              prefix && 'pl-11',
-              suffix && 'pr-11',
-              error && 'border-red-500/80 focus:ring-red-500/40',
-              className
-            )}
-            {...props}
-          />
-          {suffix && (
-            <div className="absolute right-3.5 flex items-center pointer-events-none text-slate-400 text-sm">
-              {suffix}
-            </div>
-          )}
-        </div>
-        {error && <p className="mt-1 text-xs text-red-400">{error}</p>}
+        <input
+          id={inputId}
+          type={type}
+          ref={ref}
+          className={`h-10 w-full rounded-[8px] border bg-white px-3.5 py-2 text-[13px] text-[#09090B] placeholder:text-[#94A3B8] transition-colors focus-visible:outline-none focus-visible:ring-1 disabled:cursor-not-allowed disabled:bg-[#F1F5F9] disabled:text-[#94A3B8] shadow-xs ${
+            error
+              ? "border-[#EF4444] focus-visible:border-[#EF4444] focus-visible:ring-[#EF4444]"
+              : "border-[#E2E8F0] hover:border-[#CBD5E1] focus-visible:border-[#D97706] focus-visible:ring-[#D97706]"
+          } ${className}`}
+          {...props}
+        />
+        {error && <p className="text-xs font-medium text-[#EF4444]">{error}</p>}
+        {!error && helperText && (
+          <p className="text-xs text-[#64748B]">{helperText}</p>
+        )}
       </div>
     );
   }
 );
-Input.displayName = 'Input';
+
+Input.displayName = "Input";

@@ -1,10 +1,49 @@
 @import "tailwindcss";
 
 :root {
-  --background: #070913;
-  --foreground: #f8fafc;
-  --card-bg: rgba(15, 23, 42, 0.7);
-  --border-color: rgba(255, 255, 255, 0.08);
+  /* Fonts */
+  --font-inter: var(--font-inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
+  --font-mono: var(--font-mono, "JetBrains Mono", ui-monospace, monospace);
+
+  /* High-Tech Apple/Stripe-Grade Pure Light Palette */
+  --bg-main: #F8FAFC;
+  --bg-surface: #FFFFFF;
+  --bg-subtle: #F1F5F9;
+  --border-subtle: #E2E8F0;
+  --border-strong: #CBD5E1;
+  --border-focus: #F59E0B;
+
+  /* Typography */
+  --text-primary: #09090B;
+  --text-secondary: #475569;
+  --text-muted: #94A3B8;
+
+  /* Solar Amber & Platinum Brand Accents */
+  --amber-primary: #D97706;
+  --amber-hover: #B45309;
+  --amber-light: #FEF3C7;
+  --amber-border: #FDE68A;
+
+  /* Status Colors */
+  --paid: #10B981;
+  --paid-bg: #ECFDF5;
+  --paid-border: #A7F3D0;
+
+  --pending: #F59E0B;
+  --pending-bg: #FFFBEB;
+  --pending-border: #FDE68A;
+
+  --verify: #6366F1;
+  --verify-bg: #EEF2FF;
+  --verify-border: #C7D2FE;
+
+  --vacant: #94A3B8;
+  --vacant-bg: #F8FAFC;
+  --vacant-border: #E2E8F0;
+
+  --danger: #EF4444;
+  --danger-bg: #FEF2F2;
+  --danger-border: #FECACA;
 }
 
 * {
@@ -12,85 +51,127 @@
 }
 
 body {
-  color: var(--foreground);
-  background-color: var(--background);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  min-height: 100vh;
+  font-family: var(--font-inter);
+  background-color: var(--bg-main);
+  color: var(--text-primary);
   margin: 0;
   padding: 0;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Glassmorphism Panels */
-.glass-panel {
-  background: rgba(15, 23, 42, 0.75);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+.font-mono-numbers {
+  font-family: var(--font-mono);
+  font-feature-settings: "tnum";
+  font-variant-numeric: tabular-nums;
 }
 
-.glass-card {
-  background: rgba(15, 23, 42, 0.65);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 1.25rem;
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+/* Animations */
+@keyframes error-shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-4px); }
+  40%, 80% { transform: translateX(4px); }
 }
 
-.glass-card:hover {
-  border-color: rgba(99, 102, 241, 0.35);
-  box-shadow: 0 12px 30px -10px rgba(99, 102, 241, 0.2);
+.animate-shake {
+  animation: error-shake 0.3s ease-in-out;
 }
 
-/* Gradient Titles & Badges */
-.gradient-title {
-  background: linear-gradient(135deg, #c7d2fe 0%, #818cf8 50%, #6366f1 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 }
 
-.gradient-emerald {
-  background: linear-gradient(135deg, #a7f3d0 0%, #34d399 50%, #10b981 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+.animate-shimmer {
+  background: linear-gradient(90deg, rgba(241, 245, 249, 0.4) 25%, rgba(226, 232, 240, 0.8) 50%, rgba(241, 245, 249, 0.4) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
 }
 
-/* Status Glows */
-.glow-paid {
-  border-color: rgba(16, 185, 129, 0.4);
-  background: rgba(6, 78, 59, 0.2);
-  box-shadow: 0 0 25px -5px rgba(16, 185, 129, 0.25);
-}
-
-.glow-pending {
-  border-color: rgba(244, 63, 94, 0.4);
-  background: rgba(136, 19, 55, 0.2);
-  box-shadow: 0 0 25px -5px rgba(244, 63, 94, 0.25);
-}
-
-.glow-verify {
-  border-color: rgba(245, 158, 11, 0.5);
-  background: rgba(120, 53, 15, 0.2);
-  box-shadow: 0 0 25px -5px rgba(245, 158, 11, 0.3);
-}
-
-/* Custom Scrollbar */
+/* Crisp Clean Scrollbars */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #070913;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(99, 102, 241, 0.35);
-  border-radius: 9999px;
+  background: #CBD5E1;
+  border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(99, 102, 241, 0.65);
+  background: #94A3B8;
+}
+
+/* ==========================================================================
+   Universal Cursor System (20+ Year UI/UX Professional Standard)
+   Ensures every interactive element across the entire web application
+   reliably displays the hand pointer cursor, text beam, or not-allowed icon.
+   ========================================================================== */
+
+/* 1. All Interactive & Clickable Elements */
+button,
+[role="button"],
+a,
+select,
+summary,
+input[type="button"],
+input[type="submit"],
+input[type="reset"],
+input[type="checkbox"],
+input[type="radio"],
+input[type="file"],
+label[for],
+.cursor-pointer {
+  cursor: pointer !important;
+}
+
+/* 2. Disabled Interactive Elements */
+button:disabled,
+button[disabled],
+[role="button"]:disabled,
+[role="button"][aria-disabled="true"],
+input:disabled,
+select:disabled,
+textarea:disabled,
+.disabled,
+.cursor-not-allowed {
+  cursor: not-allowed !important;
+}
+
+/* 3. Text & Editable Inputs */
+input[type="text"],
+input[type="password"],
+input[type="email"],
+input[type="number"],
+input[type="tel"],
+input[type="url"],
+input[type="search"],
+textarea {
+  cursor: text;
+}
+
+input[type="text"]:disabled,
+input[type="password"]:disabled,
+input[type="email"]:disabled,
+input[type="number"]:disabled,
+input[type="tel"]:disabled,
+input[type="url"]:disabled,
+input[type="search"]:disabled,
+textarea:disabled {
+  cursor: not-allowed !important;
+}
+
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  .no-print {
+    display: none !important;
+  }
 }

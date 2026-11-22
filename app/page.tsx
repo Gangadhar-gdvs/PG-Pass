@@ -4,118 +4,63 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
-  ShieldCheck,
-  Zap,
-  Receipt,
-  Grid3X3,
-  Smartphone,
+  Building,
   ArrowRight,
   CheckCircle2,
-  Lock,
-  Layers,
-  Sparkles,
-  Users,
-  Building2,
-  FileText,
   Send,
   Camera,
-  Check,
-  Clock,
-  ExternalLink,
-  ChevronRight,
-  IndianRupee,
   FileCheck,
-  AlertCircle,
+  ShieldCheck,
+  Layers,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { useAuth } from '@/hooks/useAuth';
+import toast from 'react-hot-toast';
 
 export default function LandingPage() {
   const router = useRouter();
-  const { loginDemo } = useAuth();
-  const [tenantTokenInput, setTenantTokenInput] = useState('');
-  const [activeFlowTab, setActiveFlowTab] = useState<'owner' | 'resident'>('owner');
+  const [tokenInput, setTokenInput] = useState('');
 
-  // Interactive Live Bed Grid Simulator state
-  const [selectedDemoBed, setSelectedDemoBed] = useState<{
-    label: string;
-    status: 'paid' | 'pending' | 'verify' | 'vacant';
-    tenant?: string;
-    rent: number;
-    phone?: string;
-  }>({
-    label: '101-A',
-    status: 'paid',
-    tenant: 'Rahul Sharma',
-    rent: 8500,
-    phone: '9876543210',
-  });
-
-  const handleLaunchDemo = () => {
-    loginDemo('+91 98765 43210', 'Sri Krishna Luxury PG');
-    router.push('/dashboard');
-  };
-
-  const handleLookupTenant = (e: React.FormEvent) => {
+  const handleLookup = (e: React.FormEvent) => {
     e.preventDefault();
-    if (tenantTokenInput.trim()) {
-      router.push(`/t/${tenantTokenInput.trim()}`);
-    } else {
-      router.push('/t/demo');
+    const token = tokenInput.trim();
+    if (!token) {
+      toast.error('Please enter your 12-character resident portal token');
+      return;
     }
+    router.push(`/t/${token}`);
   };
-
-  const demoBeds = [
-    { label: '101-A', status: 'paid' as const, tenant: 'Rahul Sharma', rent: 8500, phone: '9876543210' },
-    { label: '101-B', status: 'pending' as const, tenant: 'Amit Verma', rent: 8500, phone: '9812345678' },
-    { label: '101-C', status: 'vacant' as const, rent: 8500 },
-    { label: '102-A', status: 'verify' as const, tenant: 'Vikas Rao', rent: 9000, phone: '9789012345' },
-    { label: '102-B', status: 'paid' as const, tenant: 'Sneha Patel', rent: 9000, phone: '9945678901' },
-    { label: '102-C', status: 'pending' as const, tenant: 'Kiran Deep', rent: 9000, phone: '9654321890' },
-  ];
 
   return (
-    <div className="min-h-screen bg-[#070913] text-slate-100 flex flex-col relative overflow-hidden font-sans">
-      {/* Background radial gradients */}
-      <div className="absolute top-[-140px] left-1/2 -translate-x-1/2 w-[850px] h-[450px] bg-gradient-to-r from-indigo-600/25 via-purple-600/20 to-blue-600/25 blur-[140px] pointer-events-none rounded-full" />
-      <div className="absolute top-[800px] left-[-200px] w-[600px] h-[400px] bg-indigo-500/10 blur-[130px] pointer-events-none rounded-full" />
-      <div className="absolute top-[1600px] right-[-200px] w-[600px] h-[400px] bg-purple-500/10 blur-[130px] pointer-events-none rounded-full" />
-
-      {/* Floating Header */}
-      <header className="sticky top-0 z-50 w-full backdrop-blur-xl bg-[#070913]/80 border-b border-white/[0.08]">
-        <div className="max-w-6xl mx-auto px-5 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3 group">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 via-indigo-600 to-indigo-700 flex items-center justify-center shadow-lg shadow-indigo-600/35 text-white font-black text-xl group-hover:scale-105 transition-transform">
-              P
+    <div className="min-h-screen bg-[#F8FAFC] text-[#09090B] flex flex-col font-sans selection:bg-[#FEF3C7] selection:text-[#B45309]">
+      {/* Top Navbar */}
+      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-[#E2E8F0]">
+        <div className="max-w-6xl mx-auto px-5 py-3.5 flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-[8px] bg-[#D97706] text-white flex items-center justify-center font-bold text-sm shadow-xs">
+              <Building className="w-4 h-4" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-black text-xl tracking-tight text-white">PGPass</span>
-                <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-indigo-500/15 border border-indigo-500/30 text-indigo-300">
-                  Zero Cost
-                </span>
-              </div>
-              <span className="block text-[11px] text-slate-400 font-medium tracking-wide">
-                Rent, Bed & HRA Manager
+            <div className="text-left">
+              <span className="font-bold text-sm tracking-tight text-[#09090B] block leading-none">
+                PGPass
+              </span>
+              <span className="text-[10px] text-[#D97706] font-semibold tracking-wide uppercase mt-0.5 block">
+                Bento Hospitality
               </span>
             </div>
           </Link>
 
-          {/* Action CTAs */}
           <div className="flex items-center gap-3">
-            <button
-              onClick={handleLaunchDemo}
-              className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-indigo-300 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/25 transition-all cursor-pointer"
+            <a
+              href="#resident-lookup"
+              className="hidden sm:inline-flex text-xs font-semibold text-[#64748B] hover:text-[#09090B] transition-colors"
             >
-              <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-              <span>1-Click Demo</span>
-            </button>
+              Resident Lookup
+            </a>
             <Link
               href="/login"
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 shadow-lg shadow-indigo-600/30 transition-all cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-[8px] text-xs font-semibold text-white bg-[#D97706] hover:bg-[#B45309] shadow-xs transition-colors"
             >
-              <span>Sign In</span>
+              <span>Owner Sign In</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
@@ -123,469 +68,348 @@ export default function LandingPage() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 w-full max-w-6xl mx-auto px-5 pt-12 pb-24 relative z-10 flex flex-col items-center">
-        {/* Top Announcement Pill */}
-        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-900/90 border border-indigo-500/30 text-slate-300 text-xs font-semibold mb-8 shadow-xl backdrop-blur-md">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-          <span className="text-emerald-400 font-bold">100% Free Forever</span>
-          <span className="text-slate-600">•</span>
-          <span className="text-slate-400">Zero App Downloads</span>
-          <span className="text-slate-600">•</span>
-          <span className="text-slate-400">Works on Any Phone</span>
-        </div>
-
-        {/* Hero Title & Subtitle */}
-        <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black tracking-tight text-white text-center max-w-4xl leading-[1.12] mb-6">
-          The Cleanest Way to Run Your PG &{' '}
-          <span className="gradient-title">Eliminate Rent Chaos</span>
-        </h1>
-
-        <p className="text-base sm:text-xl text-slate-300 text-center max-w-2xl leading-relaxed mb-10 font-normal">
-          Visual bed occupancy grid, 1-tap WhatsApp rent reminders, move-in room photo vault, and instant HRA tax receipt
-          generator — completely free.
-        </p>
-
-        {/* Dual Primary Call-to-Actions */}
-        <div className="w-full max-w-md flex flex-col sm:flex-row gap-3.5 justify-center mb-16">
-          <Link
-            href="/login"
-            className="flex-1 py-4 px-6 rounded-2xl bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white font-extrabold text-sm sm:text-base flex items-center justify-center gap-2 shadow-xl shadow-indigo-600/35 transition-all cursor-pointer text-center"
-          >
-            <Building2 className="w-4 h-4" />
-            <span>PG Owner Login</span>
-            <ArrowRight className="w-4 h-4" />
-          </Link>
-
-          <button
-            onClick={handleLaunchDemo}
-            className="flex-1 py-4 px-6 rounded-2xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-slate-100 font-bold text-sm sm:text-base flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer text-center"
-          >
-            <Sparkles className="w-4 h-4 text-indigo-400" />
-            <span>Launch Live Demo</span>
-          </button>
-        </div>
-
-        {/* ========================================================================= */}
-        {/* INTERACTIVE LIVE BED GRID SIMULATOR (TRY IT DIRECTLY ON LANDING PAGE) */}
-        {/* ========================================================================= */}
-        <div className="w-full bg-slate-900/70 border border-white/[0.08] rounded-3xl p-6 sm:p-8 shadow-2xl backdrop-blur-xl mb-20 relative overflow-hidden">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6 pb-5 border-b border-slate-800">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-xs font-bold uppercase tracking-wider text-indigo-400 bg-indigo-500/10 px-2.5 py-0.5 rounded-full">
-                  Interactive Live Simulator
-                </span>
-                <span className="text-xs text-slate-400 font-medium">Click any bed to test actions</span>
-              </div>
-              <h2 className="text-xl sm:text-2xl font-black text-white">Live Bed Occupancy Map</h2>
+      <main className="flex-1">
+        {/* HERO SECTION — SPLIT LAYOUT */}
+        <section className="max-w-6xl mx-auto px-5 pt-12 sm:pt-20 pb-16 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
+          {/* Left Text Column */}
+          <div className="lg:col-span-7 text-left space-y-6">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-[6px] bg-[#FEF3C7] text-[#92400E] text-[11px] font-semibold tracking-wide border border-[#FDE68A]">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#D97706]" />
+              <span>Zero App Downloads · 100% Free for PG Owners</span>
             </div>
 
-            {/* Status Legend */}
-            <div className="flex flex-wrap items-center gap-2 text-xs">
-              <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-semibold">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> Paid
-              </span>
-              <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-300 font-semibold">
-                <span className="w-1.5 h-1.5 rounded-full bg-rose-400" /> Pending
-              </span>
-              <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 font-semibold">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" /> Verify
-              </span>
-              <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-800 border border-slate-700 text-slate-400 font-semibold">
-                <span className="w-1.5 h-1.5 rounded-full bg-slate-500" /> Vacant
-              </span>
-            </div>
-          </div>
+            <h1 className="text-3xl sm:text-5xl lg:text-[46px] font-extrabold tracking-tight text-[#09090B] leading-[1.16]">
+              Modern PG management & instant rent settlement.
+            </h1>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Bed Matrix */}
-            <div className="lg:col-span-2 grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {demoBeds.map((bed) => {
-                const isSelected = selectedDemoBed.label === bed.label;
-                const isPaid = bed.status === 'paid';
-                const isPending = bed.status === 'pending';
-                const isVerify = bed.status === 'verify';
-                const isVacant = bed.status === 'vacant';
-
-                return (
-                  <div
-                    key={bed.label}
-                    onClick={() => setSelectedDemoBed(bed)}
-                    className={`p-4 rounded-2xl border transition-all duration-200 cursor-pointer flex flex-col justify-between ${
-                      isSelected ? 'ring-2 ring-indigo-500 scale-[1.02]' : ''
-                    } ${
-                      isPaid
-                        ? 'bg-emerald-950/20 border-emerald-500/40 hover:border-emerald-400'
-                        : isPending
-                        ? 'bg-rose-950/20 border-rose-500/40 hover:border-rose-400'
-                        : isVerify
-                        ? 'bg-amber-950/20 border-amber-500/50 hover:border-amber-400 animate-pulse'
-                        : 'bg-slate-900/40 border-dashed border-slate-700 hover:border-slate-500'
-                    }`}
-                  >
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-extrabold text-sm text-white">{bed.label}</span>
-                        <span
-                          className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
-                            isPaid
-                              ? 'bg-emerald-500/20 text-emerald-300'
-                              : isPending
-                              ? 'bg-rose-500/20 text-rose-300'
-                              : isVerify
-                              ? 'bg-amber-500/20 text-amber-300'
-                              : 'bg-slate-800 text-slate-400'
-                          }`}
-                        >
-                          {bed.status}
-                        </span>
-                      </div>
-
-                      <div className="my-2">
-                        {isVacant ? (
-                          <span className="text-xs text-slate-500 font-medium">Ready for Booking</span>
-                        ) : (
-                          <div>
-                            <span className="text-xs font-bold text-white block truncate">{bed.tenant}</span>
-                            <span className="text-[11px] text-slate-400 font-mono">₹{bed.rent}/mo</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="text-[11px] font-semibold text-indigo-400 flex items-center justify-end gap-1 pt-2 border-t border-slate-800/80">
-                      <span>View Actions</span>
-                      <ChevronRight className="w-3 h-3" />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Live Interactive Action Drawer */}
-            <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between">
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                  Selected Bed Details
-                </span>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xl font-black text-white">Bed {selectedDemoBed.label}</h3>
-                  <span
-                    className={`text-xs font-bold px-2.5 py-0.5 rounded-full uppercase ${
-                      selectedDemoBed.status === 'paid'
-                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                        : selectedDemoBed.status === 'pending'
-                        ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
-                        : selectedDemoBed.status === 'verify'
-                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                        : 'bg-slate-800 text-slate-400 border border-slate-700'
-                    }`}
-                  >
-                    {selectedDemoBed.status}
-                  </span>
-                </div>
-
-                <div className="space-y-2.5 text-xs text-slate-300 bg-slate-900/60 p-3 rounded-xl border border-slate-800/80 mb-5">
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Resident:</span>
-                    <span className="font-bold text-white">{selectedDemoBed.tenant || 'None (Vacant)'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Rent Due:</span>
-                    <span className="font-bold text-white">₹{selectedDemoBed.rent.toLocaleString('en-IN')}/mo</span>
-                  </div>
-                  {selectedDemoBed.phone && (
-                    <div className="flex justify-between">
-                      <span className="text-slate-500">WhatsApp:</span>
-                      <span className="font-mono text-slate-300">+91 {selectedDemoBed.phone}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Contextual Action Simulator Buttons */}
-              <div className="space-y-2">
-                {selectedDemoBed.status === 'pending' && (
-                  <button
-                    onClick={() => alert(`Pre-filled WhatsApp reminder triggered for ${selectedDemoBed.tenant}!`)}
-                    className="w-full py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md transition-colors cursor-pointer"
-                  >
-                    <Send className="w-3.5 h-3.5" />
-                    <span>Send WhatsApp Reminder</span>
-                  </button>
-                )}
-
-                {selectedDemoBed.status === 'verify' && (
-                  <button
-                    onClick={() => alert('Opening payment proof screenshot inspector!')}
-                    className="w-full py-2.5 px-3 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md transition-colors cursor-pointer"
-                  >
-                    <Check className="w-3.5 h-3.5" />
-                    <span>Approve Payment Screenshot</span>
-                  </button>
-                )}
-
-                {selectedDemoBed.status === 'paid' && (
-                  <Link
-                    href="/t/demo"
-                    className="w-full py-2.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md transition-colors cursor-pointer text-center"
-                  >
-                    <Receipt className="w-3.5 h-3.5" />
-                    <span>Download Official HRA PDF</span>
-                  </Link>
-                )}
-
-                {selectedDemoBed.status === 'vacant' && (
-                  <button
-                    onClick={() => router.push('/dashboard')}
-                    className="w-full py-2.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md transition-colors cursor-pointer"
-                  >
-                    <Users className="w-3.5 h-3.5" />
-                    <span>Add New Resident</span>
-                  </button>
-                )}
-
-                <button
-                  onClick={handleLaunchDemo}
-                  className="w-full py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 font-semibold text-xs border border-slate-800 transition-colors cursor-pointer"
-                >
-                  Open Full Dashboard →
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ========================================================================= */}
-        {/* STEP-BY-STEP USER FLOW (FOR OWNERS & RESIDENTS) */}
-        {/* ========================================================================= */}
-        <div className="w-full mb-20 text-left">
-          <div className="text-center mb-10">
-            <h2 className="text-2xl sm:text-4xl font-black text-white mb-3">How PGPass Works (Clean & Simple)</h2>
-            <p className="text-sm sm:text-base text-slate-400 max-w-xl mx-auto">
-              Select your perspective to see how PGPass removes daily friction for everyone.
+            <p className="text-sm sm:text-base text-[#475569] leading-relaxed max-w-xl">
+              Eliminate notebook records and WhatsApp chaos. Get a live visual bed inventory, 1-tap WhatsApp payment reminders, and instant HRA tax receipts for your residents.
             </p>
 
-            {/* Toggle Switch */}
-            <div className="inline-flex p-1 rounded-2xl bg-slate-900 border border-slate-800 mt-6">
-              <button
-                onClick={() => setActiveFlowTab('owner')}
-                className={`px-5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
-                  activeFlowTab === 'owner'
-                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
-                    : 'text-slate-400 hover:text-white'
-                }`}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2">
+              <Link
+                href="/login"
+                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-[8px] bg-[#D97706] hover:bg-[#B45309] text-white text-xs sm:text-sm font-semibold shadow-xs transition-colors"
               >
-                For PG Owners & Caretakers
-              </button>
-              <button
-                onClick={() => setActiveFlowTab('resident')}
-                className={`px-5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
-                  activeFlowTab === 'resident'
-                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
-                    : 'text-slate-400 hover:text-white'
-                }`}
+                <span>Open PG Dashboard</span>
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+              <a
+                href="#how-it-works"
+                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-[8px] border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] text-[#09090B] text-xs sm:text-sm font-semibold transition-colors"
               >
-                For Salaried Residents
-              </button>
+                <span>How It Works</span>
+              </a>
+            </div>
+
+            <div className="pt-2 flex items-center gap-6 text-[11px] text-[#64748B]">
+              <span className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-[#10B981]" />
+                Direct P2P UPI transfers
+              </span>
+              <span className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-[#10B981]" />
+                Full IT Act 10(13A) HRA receipts
+              </span>
             </div>
           </div>
 
-          {activeFlowTab === 'owner' ? (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-              {/* Step 1 */}
-              <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 shadow-xl backdrop-blur-sm flex flex-col justify-between">
+          {/* Right Preview Frame Column */}
+          <div className="lg:col-span-5 text-left">
+            <div className="rounded-[14px] border border-[#E2E8F0] bg-white p-5 shadow-[0_20px_50px_rgba(0,0,0,0.06)] space-y-4">
+              {/* Mock Top bar */}
+              <div className="flex items-center justify-between pb-3 border-b border-[#E2E8F0]">
                 <div>
-                  <div className="w-10 h-10 rounded-2xl bg-indigo-500/15 text-indigo-400 font-black text-lg flex items-center justify-center mb-4">
-                    1
-                  </div>
-                  <h3 className="font-bold text-base text-white mb-2">30-Second Setup</h3>
-                  <p className="text-xs text-slate-400 leading-relaxed">
-                    Type your total floors, rooms per floor, and beds per room. Your live, color-coded visual bed matrix
-                    generates automatically.
-                  </p>
+                  <span className="text-xs font-bold text-[#09090B] block">
+                    Sri Krishna Luxury PG
+                  </span>
+                  <span className="text-[10px] text-[#64748B]">Madhapur, Hyderabad</span>
                 </div>
-                <div className="mt-6 pt-4 border-t border-slate-800/80 text-[11px] text-indigo-300 font-semibold flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>No Excel or complex software</span>
+                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-[4px] bg-[#FEF3C7] text-[#92400E]">
+                  24 Beds · 81% Occ.
+                </span>
+              </div>
+
+              {/* Metric Row */}
+              <div className="grid grid-cols-3 gap-2 text-left">
+                <div className="p-2.5 rounded-[8px] bg-[#F8FAFC] border border-[#E2E8F0]">
+                  <span className="text-[10px] uppercase font-semibold text-[#64748B] block">Occupied</span>
+                  <span className="text-sm font-bold font-mono text-[#09090B]">18 / 24</span>
+                </div>
+                <div className="p-2.5 rounded-[8px] bg-[#F8FAFC] border border-[#E2E8F0]">
+                  <span className="text-[10px] uppercase font-semibold text-[#64748B] block">Collected</span>
+                  <span className="text-sm font-bold font-mono text-[#10B981]">₹1.53L</span>
+                </div>
+                <div className="p-2.5 rounded-[8px] bg-[#F8FAFC] border border-[#E2E8F0]">
+                  <span className="text-[10px] uppercase font-semibold text-[#64748B] block">Pending</span>
+                  <span className="text-sm font-bold font-mono text-[#D97706]">₹25.5K</span>
                 </div>
               </div>
 
-              {/* Step 2 */}
-              <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 shadow-xl backdrop-blur-sm flex flex-col justify-between">
-                <div>
-                  <div className="w-10 h-10 rounded-2xl bg-emerald-500/15 text-emerald-400 font-black text-lg flex items-center justify-center mb-4">
-                    2
+              {/* Sample Bed Matrix */}
+              <div className="space-y-1.5">
+                <span className="text-[10px] uppercase font-semibold tracking-wider text-[#64748B]">
+                  Floor 1 · Live Units
+                </span>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="relative p-2 rounded-[8px] border border-[#E2E8F0] bg-white overflow-hidden shadow-xs">
+                    <div className="absolute top-0 bottom-0 left-0 w-1 bg-[#10B981]" />
+                    <span className="font-mono text-[11px] font-bold text-[#09090B] block pl-1">101-A</span>
+                    <span className="text-[10px] text-[#475569] block pl-1 truncate">Rahul S.</span>
+                    <span className="text-[9px] text-[#10B981] font-semibold block pl-1">● Paid</span>
                   </div>
-                  <h3 className="font-bold text-base text-white mb-2">1-Tap WhatsApp Reminders</h3>
-                  <p className="text-xs text-slate-400 leading-relaxed">
-                    On the 1st of the month, tap "Remind All Pending". WhatsApp opens on your phone with pre-filled messages
-                    containing individual resident portal links.
-                  </p>
-                </div>
-                <div className="mt-6 pt-4 border-t border-slate-800/80 text-[11px] text-emerald-300 font-semibold flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Zero WhatsApp API or bot charges</span>
+
+                  <div className="relative p-2 rounded-[8px] border border-[#E2E8F0] bg-white overflow-hidden shadow-xs">
+                    <div className="absolute top-0 bottom-0 left-0 w-1 bg-[#F59E0B]" />
+                    <span className="font-mono text-[11px] font-bold text-[#09090B] block pl-1">101-B</span>
+                    <span className="text-[10px] text-[#475569] block pl-1 truncate">Amit V.</span>
+                    <span className="text-[9px] text-[#D97706] font-semibold block pl-1">● Due</span>
+                  </div>
+
+                  <div className="relative p-2 rounded-[8px] border border-[#E2E8F0] bg-white overflow-hidden shadow-xs">
+                    <div className="absolute top-0 bottom-0 left-0 w-1 bg-[#CBD5E1]" />
+                    <span className="font-mono text-[11px] font-bold text-[#09090B] block pl-1">101-C</span>
+                    <span className="text-[10px] text-[#94A3B8] block pl-1">Vacant</span>
+                    <span className="text-[9px] text-[#64748B] font-mono block pl-1">₹8.5K</span>
+                  </div>
                 </div>
               </div>
 
-              {/* Step 3 */}
-              <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 shadow-xl backdrop-blur-sm flex flex-col justify-between">
-                <div>
-                  <div className="w-10 h-10 rounded-2xl bg-amber-500/15 text-amber-400 font-black text-lg flex items-center justify-center mb-4">
-                    3
-                  </div>
-                  <h3 className="font-bold text-base text-white mb-2">1-Click Proof Approval</h3>
-                  <p className="text-xs text-slate-400 leading-relaxed">
-                    When residents upload UPI screenshots, beds turn yellow (Verify). Review the screenshot and tap "Approve"
-                    to automatically mark the bed paid and generate their HRA receipt.
-                  </p>
+              {/* WhatsApp Reminder preview snippet */}
+              <div className="p-3 rounded-[8px] bg-[#ECFDF5] border border-[#A7F3D0] flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2">
+                  <Send className="w-3.5 h-3.5 text-[#10B981]" />
+                  <span className="text-[11px] font-semibold text-[#065F46]">
+                    1-Tap WhatsApp Reminder ready
+                  </span>
                 </div>
-                <div className="mt-6 pt-4 border-t border-slate-800/80 text-[11px] text-amber-300 font-semibold flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Complete payment audit trail</span>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-              {/* Resident Step 1 */}
-              <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 shadow-xl backdrop-blur-sm flex flex-col justify-between">
-                <div>
-                  <div className="w-10 h-10 rounded-2xl bg-purple-500/15 text-purple-400 font-black text-lg flex items-center justify-center mb-4">
-                    1
-                  </div>
-                  <h3 className="font-bold text-base text-white mb-2">Direct UPI Payment</h3>
-                  <p className="text-xs text-slate-400 leading-relaxed">
-                    Open your personal link from WhatsApp without creating passwords. Copy the landlord's verified UPI ID or
-                    scan the QR code directly via GPay / PhonePe.
-                  </p>
-                </div>
-                <div className="mt-6 pt-4 border-t border-slate-800/80 text-[11px] text-purple-300 font-semibold flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Zero convenience fees or deductions</span>
-                </div>
-              </div>
-
-              {/* Resident Step 2 */}
-              <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 shadow-xl backdrop-blur-sm flex flex-col justify-between">
-                <div>
-                  <div className="w-10 h-10 rounded-2xl bg-emerald-500/15 text-emerald-400 font-black text-lg flex items-center justify-center mb-4">
-                    2
-                  </div>
-                  <h3 className="font-bold text-base text-white mb-2">Instant HRA Tax Receipt</h3>
-                  <p className="text-xs text-slate-400 leading-relaxed">
-                    Once cleared, download an official Form 12BB compliant PDF rent receipt with landlord PAN number, revenue
-                    stamp simulation, and Section 10(13A) declaration for your company IT declaration.
-                  </p>
-                </div>
-                <div className="mt-6 pt-4 border-t border-slate-800/80 text-[11px] text-emerald-300 font-semibold flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Ready for employer IT portals</span>
-                </div>
-              </div>
-
-              {/* Resident Step 3 */}
-              <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 shadow-xl backdrop-blur-sm flex flex-col justify-between">
-                <div>
-                  <div className="w-10 h-10 rounded-2xl bg-blue-500/15 text-blue-400 font-black text-lg flex items-center justify-center mb-4">
-                    3
-                  </div>
-                  <h3 className="font-bold text-base text-white mb-2">Security Deposit Protection</h3>
-                  <p className="text-xs text-slate-400 leading-relaxed">
-                    Snap photos of existing wall cracks, furniture chips, or bathroom conditions on Day 1. Stored with a
-                    permanent timestamp and shareable on WhatsApp to prevent unfair checkout deductions.
-                  </p>
-                </div>
-                <div className="mt-6 pt-4 border-t border-slate-800/80 text-[11px] text-blue-300 font-semibold flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Protects your ₹8,000 - ₹20,000 deposit</span>
-                </div>
+                <span className="text-[10px] font-bold text-[#10B981]">Zero Fee</span>
               </div>
             </div>
-          )}
-        </div>
-
-        {/* ========================================================================= */}
-        {/* RESIDENT QUICK LOOKUP BAR */}
-        {/* ========================================================================= */}
-        <div className="w-full max-w-lg bg-slate-900/80 border border-indigo-500/20 rounded-3xl p-6 shadow-2xl mb-20 text-left">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
-              <Users className="w-4 h-4 text-indigo-400" />
-              Resident Quick Portal Lookup
-            </span>
-            <span className="text-[11px] text-slate-500">No Login Required</span>
           </div>
-          <p className="text-xs text-slate-400 mb-4">
-            Received your rent link from your PG owner? Paste your link token below to view rent status or download receipts.
-          </p>
+        </section>
 
-          <form onSubmit={handleLookupTenant} className="flex gap-2">
-            <input
-              type="text"
-              placeholder="e.g. demo or paste 12-char token"
-              value={tenantTokenInput}
-              onChange={(e) => setTenantTokenInput(e.target.value)}
-              className="flex-1 bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-            <Button type="submit" size="sm" variant="default" className="text-xs px-5 font-bold">
-              Open Portal
-            </Button>
-          </form>
-
-          <div className="mt-3 flex items-center gap-2 text-[11px] text-slate-500">
-            <span>Want to test resident view?</span>
-            <Link href="/t/demo" className="text-indigo-400 font-bold hover:underline">
-              Open Demo Resident Portal →
-            </Link>
+        {/* TRUST BAR */}
+        <section className="border-y border-[#E2E8F0] bg-white py-6">
+          <div className="max-w-6xl mx-auto px-5 flex flex-wrap items-center justify-around gap-6 text-center">
+            <div>
+              <span className="text-xl font-bold font-mono text-[#09090B] block">200+</span>
+              <span className="text-xs text-[#64748B]">PGs Managed</span>
+            </div>
+            <div className="h-6 w-px bg-[#E2E8F0] hidden sm:block" />
+            <div>
+              <span className="text-xl font-bold font-mono text-[#09090B] block">₹2.4 Crore+</span>
+              <span className="text-xs text-[#64748B]">Rent Tracked</span>
+            </div>
+            <div className="h-6 w-px bg-[#E2E8F0] hidden sm:block" />
+            <div>
+              <span className="text-xl font-bold font-mono text-[#09090B] block">0</span>
+              <span className="text-xs text-[#64748B]">App Downloads Required</span>
+            </div>
+            <div className="h-6 w-px bg-[#E2E8F0] hidden sm:block" />
+            <div>
+              <span className="text-xl font-bold font-mono text-[#10B981] block">100%</span>
+              <span className="text-xs text-[#64748B]">Free Forever</span>
+            </div>
           </div>
-        </div>
+        </section>
 
-        {/* Bottom CTA Banner */}
-        <div className="w-full bg-gradient-to-r from-indigo-950/60 via-slate-900 to-indigo-950/60 border border-indigo-500/30 rounded-3xl p-8 sm:p-12 text-center relative overflow-hidden shadow-2xl">
-          <h3 className="text-2xl sm:text-4xl font-black text-white mb-3">
-            Ready to upgrade your PG operations?
-          </h3>
-          <p className="text-sm sm:text-base text-slate-300 max-w-xl mx-auto mb-8 leading-relaxed">
-            Join hundreds of PG caretakers in Madhapur, Whitefield, and Koramangala saving 10+ hours every month.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-3.5 justify-center">
-            <Link
-              href="/login"
-              className="px-8 py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-sm shadow-xl shadow-indigo-600/30 transition-all text-center"
-            >
-              Get Started for Free
-            </Link>
-            <button
-              onClick={handleLaunchDemo}
-              className="px-8 py-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 font-bold text-sm transition-all text-center"
-            >
-              ⚡ Instant 1-Click Demo
-            </button>
+        {/* ASYMMETRIC BENTO GRID FEATURES */}
+        <section className="max-w-6xl mx-auto px-5 py-20 text-left">
+          <div className="text-center max-w-xl mx-auto mb-14 space-y-2">
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-[#09090B] tracking-tight">
+              Engineered specifically for Indian PG owners.
+            </h2>
+            <p className="text-xs sm:text-sm text-[#475569]">
+              Everything you need to manage beds, collect rents directly into your bank, and protect deposits.
+            </p>
           </div>
-        </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Bento Card 1: Large Span 2 */}
+            <div className="md:col-span-2 rounded-[12px] border border-[#E2E8F0] bg-white p-6 shadow-xs flex flex-col justify-between">
+              <div>
+                <div className="w-8 h-8 rounded-[8px] bg-[#FEF3C7] text-[#D97706] flex items-center justify-center mb-3">
+                  <Layers className="w-4 h-4" />
+                </div>
+                <h3 className="text-base font-bold text-[#09090B]">
+                  Visual Bed Inventory Matrix
+                </h3>
+                <p className="text-xs text-[#475569] mt-1 max-w-lg leading-relaxed">
+                  See every room and bed organized cleanly by floor. Color status indicators let you know instantly who has paid, who is pending, and which beds are vacant.
+                </p>
+              </div>
+
+              <div className="mt-6 pt-4 border-t border-[#E2E8F0] flex items-center gap-4 text-xs font-mono text-[#64748B]">
+                <span>● Green: Paid</span>
+                <span>● Amber: Due</span>
+                <span>● Indigo: Verification</span>
+                <span>○ Platinum: Vacant</span>
+              </div>
+            </div>
+
+            {/* Bento Card 2: 1-Tap Reminders */}
+            <div className="rounded-[12px] border border-[#E2E8F0] bg-white p-6 shadow-xs flex flex-col justify-between">
+              <div>
+                <div className="w-8 h-8 rounded-[8px] bg-[#ECFDF5] text-[#10B981] flex items-center justify-center mb-3">
+                  <Send className="w-4 h-4" />
+                </div>
+                <h3 className="text-base font-bold text-[#09090B]">
+                  1-Tap WhatsApp Reminders
+                </h3>
+                <p className="text-xs text-[#475569] mt-1 leading-relaxed">
+                  No awkward phone calls. Tap send to open WhatsApp with a polite pre-written message containing your UPI ID and the resident’s private portal link.
+                </p>
+              </div>
+
+              <div className="mt-4 pt-3 border-t border-[#E2E8F0] text-[11px] text-[#10B981] font-semibold">
+                Uses WhatsApp directly on your phone
+              </div>
+            </div>
+
+            {/* Bento Card 3: HRA Receipts */}
+            <div className="rounded-[12px] border border-[#E2E8F0] bg-white p-6 shadow-xs flex flex-col justify-between">
+              <div>
+                <div className="w-8 h-8 rounded-[8px] bg-[#EEF2FF] text-[#6366F1] flex items-center justify-center mb-3">
+                  <FileCheck className="w-4 h-4" />
+                </div>
+                <h3 className="text-base font-bold text-[#09090B]">
+                  Instant HRA Tax Receipts
+                </h3>
+                <p className="text-xs text-[#475569] mt-1 leading-relaxed">
+                  Tenants generate PDF rent certificates with your PAN and PG address in 1 click for their IT tax savings. Zero manual paperwork for you.
+                </p>
+              </div>
+
+              <div className="mt-4 pt-3 border-t border-[#E2E8F0] text-[11px] text-[#6366F1] font-semibold">
+                IT Act Section 10(13A) compliant
+              </div>
+            </div>
+
+            {/* Bento Card 4: Large Span 2 */}
+            <div className="md:col-span-2 rounded-[12px] border border-[#E2E8F0] bg-white p-6 shadow-xs flex flex-col justify-between">
+              <div>
+                <div className="w-8 h-8 rounded-[8px] bg-[#FEF3C7] text-[#D97706] flex items-center justify-center mb-3">
+                  <Camera className="w-4 h-4" />
+                </div>
+                <h3 className="text-base font-bold text-[#09090B]">
+                  Move-In Condition Photo Vault
+                </h3>
+                <p className="text-xs text-[#475569] mt-1 max-w-lg leading-relaxed">
+                  Residents document wall marks, tile cracks, and appliance state on Day 1. Timestamped photos in a tamper-proof cloud vault protect both resident deposits and owner property integrity.
+                </p>
+              </div>
+
+              <div className="mt-6 pt-4 border-t border-[#E2E8F0] flex items-center gap-2 text-xs text-[#64748B]">
+                <ShieldCheck className="w-3.5 h-3.5 text-[#10B981]" />
+                <span>Zero deposit disputes upon checkout</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* HOW IT WORKS TIMELINE */}
+        <section id="how-it-works" className="border-t border-[#E2E8F0] bg-white py-16 text-left">
+          <div className="max-w-6xl mx-auto px-5">
+            <div className="text-center max-w-lg mx-auto mb-12 space-y-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#D97706]">
+                Workflow
+              </span>
+              <h2 className="text-xl sm:text-2xl font-bold text-[#09090B]">
+                Up and running in 3 simple steps
+              </h2>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-[#F8FAFC] rounded-[10px] p-5 border border-[#E2E8F0] shadow-xs space-y-2">
+                <span className="font-mono text-xs font-bold text-[#D97706] block">01</span>
+                <h3 className="text-sm font-bold text-[#09090B]">Register Property</h3>
+                <p className="text-xs text-[#475569] leading-relaxed">
+                  Enter your number of floors, rooms, and default monthly rent. Your entire bed inventory is generated in 30 seconds.
+                </p>
+              </div>
+
+              <div className="bg-[#F8FAFC] rounded-[10px] p-5 border border-[#E2E8F0] shadow-xs space-y-2">
+                <span className="font-mono text-xs font-bold text-[#D97706] block">02</span>
+                <h3 className="text-sm font-bold text-[#09090B]">Assign Residents</h3>
+                <p className="text-xs text-[#475569] leading-relaxed">
+                  Add tenant names and WhatsApp numbers. Each resident gets an unguessable private link to view dues and upload proofs.
+                </p>
+              </div>
+
+              <div className="bg-[#F8FAFC] rounded-[10px] p-5 border border-[#E2E8F0] shadow-xs space-y-2">
+                <span className="font-mono text-xs font-bold text-[#D97706] block">03</span>
+                <h3 className="text-sm font-bold text-[#09090B]">Collect & Remind</h3>
+                <p className="text-xs text-[#475569] leading-relaxed">
+                  Residents pay directly to your personal UPI ID. Send 1-tap reminders when dues approach and verify payments in seconds.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* RESIDENT TOKEN LOOKUP SECTION */}
+        <section id="resident-lookup" className="max-w-xl mx-auto px-5 py-20 text-center">
+          <div className="bg-white border border-[#E2E8F0] rounded-[12px] p-6 sm:p-8 shadow-sm space-y-4">
+            <div className="space-y-1">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-[#D97706] bg-[#FEF3C7] px-2 py-0.5 rounded-[4px]">
+                Resident Portal
+              </span>
+              <h2 className="text-lg font-bold text-[#09090B]">
+                Are you a resident staying at a PG?
+              </h2>
+              <p className="text-xs text-[#64748B]">
+                Enter the 12-character token from your WhatsApp rent link to view your rent status or download your HRA receipt.
+              </p>
+            </div>
+
+            <form onSubmit={handleLookup} className="space-y-3 pt-2">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Enter token (e.g. abcd1234efgh)"
+                  value={tokenInput}
+                  onChange={(e) => setTokenInput(e.target.value)}
+                  className="flex-1 h-10 px-3.5 rounded-[8px] border border-[#E2E8F0] text-xs font-mono text-[#09090B] placeholder:text-[#94A3B8] bg-[#F8FAFC] focus:outline-none focus:border-[#D97706]"
+                />
+                <Button
+                  type="submit"
+                  size="md"
+                  variant="solid"
+                  className="bg-[#D97706] hover:bg-[#B45309] text-white text-xs px-4"
+                >
+                  <span>Open Portal</span>
+                  <ArrowRight className="w-3.5 h-3.5 ml-1" />
+                </Button>
+              </div>
+            </form>
+
+            <p className="text-[11px] text-[#94A3B8]">
+              Tip: You can also tap the direct link sent to you by your PG manager on WhatsApp.
+            </p>
+          </div>
+        </section>
       </main>
 
-      {/* Footer */}
-      <footer className="w-full border-t border-slate-800/80 py-8 text-center text-xs text-slate-500 relative z-10">
-        <div className="max-w-6xl mx-auto px-5 flex flex-col sm:flex-row justify-between items-center gap-4">
+      {/* FOOTER */}
+      <footer className="border-t border-[#E2E8F0] bg-white py-8">
+        <div className="max-w-6xl mx-auto px-5 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#64748B]">
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-lg bg-indigo-600 text-white font-black text-xs flex items-center justify-center">
+            <div className="w-5 h-5 rounded-[4px] bg-[#D97706] text-white flex items-center justify-center font-bold text-[10px]">
               P
             </div>
-            <span className="font-bold text-slate-300">PGPass India</span>
-            <span className="text-slate-600">•</span>
-            <span>Zero-Cost PG Rent & Bed Management Platform</span>
+            <span className="font-bold text-[#09090B]">PGPass</span>
+            <span>· Zero-cost PG management for India</span>
           </div>
+
           <div className="flex items-center gap-4">
-            <Link
-              href="/admin"
-              className="text-slate-500 hover:text-rose-400 transition-colors flex items-center gap-1 font-semibold"
-            >
-              <span>Platform Admin</span>
+            <Link href="/login" className="hover:text-[#09090B] transition-colors">
+              Owner Sign In
             </Link>
-            <p>© {new Date().getFullYear()} PGPass. Free Forever.</p>
+            <span>·</span>
+            <Link href="/admin" className="hover:text-[#09090B] text-[#94A3B8] transition-colors">
+              Master Admin
+            </Link>
           </div>
         </div>
       </footer>

@@ -1,42 +1,52 @@
-import * as React from 'react';
-import { cn } from '@/lib/utils';
-import { BedStatus, RentStatus } from '@/types';
+import * as React from "react";
 
 export interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
-  variant?: BedStatus | RentStatus | 'default' | 'neutral';
+  variant?: "default" | "paid" | "pending" | "verify" | "vacant" | "danger" | "neutral" | "amber" | "cyan";
+  dot?: boolean;
 }
 
-export function Badge({ className, variant = 'default', children, ...props }: BadgeProps) {
-  const styles: Record<string, string> = {
-    paid: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
-    pending: 'bg-rose-500/15 text-rose-400 border-rose-500/30',
-    verify: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
-    vacant: 'bg-slate-700/40 text-slate-400 border-slate-600/30',
-    occupied: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
-    default: 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30',
-    neutral: 'bg-slate-800 text-slate-300 border-slate-700',
+export function Badge({
+  className = "",
+  variant = "default",
+  dot = false,
+  children,
+  ...props
+}: BadgeProps) {
+  const variants = {
+    default: "bg-[#F1F5F9] text-[#475569] border-[#E2E8F0]",
+    neutral: "bg-[#F1F5F9] text-[#475569] border-[#E2E8F0]",
+    amber: "bg-[#FEF3C7] text-[#92400E] border-[#FDE68A]",
+    paid: "bg-[#ECFDF5] text-[#065F46] border-[#A7F3D0]",
+    pending: "bg-[#FFFBEB] text-[#B45309] border-[#FDE68A]",
+    verify: "bg-[#EEF2FF] text-[#4338CA] border-[#C7D2FE]",
+    vacant: "bg-[#F8FAFC] text-[#64748B] border-[#E2E8F0]",
+    danger: "bg-[#FEF2F2] text-[#991B1B] border-[#FECACA]",
+    cyan: "bg-[#ECFEFF] text-[#0E7490] border-[#A5F3FC]",
   };
 
-  const dots: Record<string, string> = {
-    paid: 'bg-emerald-400',
-    pending: 'bg-rose-400',
-    verify: 'bg-amber-400 animate-pulse',
-    vacant: 'bg-slate-500',
-    occupied: 'bg-blue-400',
-    default: 'bg-indigo-400',
-    neutral: 'bg-slate-400',
+  const dots = {
+    default: "bg-[#64748B]",
+    neutral: "bg-[#64748B]",
+    amber: "bg-[#D97706]",
+    paid: "bg-[#10B981]",
+    pending: "bg-[#F59E0B]",
+    verify: "bg-[#6366F1]",
+    vacant: "bg-[#94A3B8]",
+    danger: "bg-[#EF4444]",
+    cyan: "bg-[#06B6D4]",
   };
 
   return (
     <span
-      className={cn(
-        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold border backdrop-blur-sm select-none',
-        styles[variant] || styles.default,
-        className
-      )}
+      className={`inline-flex items-center gap-1.5 rounded-[6px] border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider select-none ${variants[variant]} ${className}`}
       {...props}
     >
-      <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', dots[variant] || dots.default)} />
+      {dot && (
+        <span
+          className={`h-1.5 w-1.5 rounded-full shrink-0 ${dots[variant]}`}
+          aria-hidden="true"
+        />
+      )}
       {children}
     </span>
   );

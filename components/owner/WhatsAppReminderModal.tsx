@@ -3,9 +3,11 @@
 import React from 'react';
 import { Bed, RentRecord, Tenant } from '@/types';
 import { Button } from '@/components/ui/button';
+import { Drawer } from '@/components/ui/drawer';
 import { getWhatsAppLink, formatCurrency } from '@/lib/utils';
 import { config } from '@/lib/config';
-import { X, Send, CheckCircle2, MessageSquare, Copy, ExternalLink } from 'lucide-react';
+import { Send, CheckCircle2, MessageSquare, Copy } from 'lucide-react';
+import { Avatar } from '@/components/ui/avatar';
 import toast from 'react-hot-toast';
 
 interface WhatsAppReminderModalProps {
@@ -29,20 +31,31 @@ export function WhatsAppReminderModal({
   ownerName,
   ownerUpi,
 }: WhatsAppReminderModalProps) {
-  if (!isOpen) return null;
-
   const recordMap = new Map<string, RentRecord>();
   rentRecords.forEach((r) => recordMap.set(r.bedId, r));
 
   const tenantMap = new Map<string, Tenant>();
   tenants.forEach((t) => tenantMap.set(t.id, t));
 
-  // Find all occupied beds with pending rent
   const pendingItems = beds.filter((b) => {
     if (b.status === 'vacant') return false;
     const rec = recordMap.get(b.id);
     return rec?.status !== 'paid' && b.status !== 'paid';
   });
+
+  const getReminderMessage = (bed: Bed) => {
+    const tenant = bed.tenantId ? tenantMap.get(bed.tenantId) : null;
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : config.app.url;
+    const portalUrl = tenant?.token ? `${baseUrl}/t/${tenant.token}` : baseUrl;
+
+    return `Namaste ${bed.tenantName || 'Resident'} ji 🙏,\n\nFriendly reminder from *${
+      pgName || 'Our PG'
+    }* that room rent for *Bed ${bed.bedLabel}* is due:\n\n💵 *Amount:* ${formatCurrency(
+      bed.monthlyRent
+    )}\n💳 *UPI ID:* ${ownerUpi || 'owner@upi'}\n\n📎 *Upload screenshot & download HRA receipt here:* ${portalUrl}\n\nThank you,\n${
+      ownerName || 'PG Management'
+    }`;
+  };
 
   const handleSendReminder = (bed: Bed) => {
     if (!bed.tenantPhone) {
@@ -50,90 +63,84 @@ export function WhatsAppReminderModal({
       return;
     }
 
-    const tenant = bed.tenantId ? tenantMap.get(bed.tenantId) : null;
-    const baseUrl = typeof window !== 'undefined' ? window.location.origin : config.app.url;
-    const portalUrl = tenant?.token
-      ? `${baseUrl}/t/${tenant.token}`
-      : `${baseUrl}/t/demo`;
-
-    const message = `Namaste ${bed.tenantName || 'Resident'} ji 🙏,\n\nFriendly reminder from *${pgName || 'Our PG'}* that room rent for *Bed ${bed.bedLabel}* is due:\n\n💵 *Amount:* ${formatCurrency(bed.monthlyRent)}\n💳 *UPI ID:* ${ownerUpi || 'owner@upi'}\n\n📎 *Upload screenshot & download HRA receipt here:* ${portalUrl}\n\nThank you!\n- ${ownerName || 'PG Management'}`;
-
+    const message = getReminderMessage(bed);
     const link = getWhatsAppLink(bed.tenantPhone, message);
     window.open(link, '_blank');
   };
 
+  const handleCopyMessage = (bed: Bed) => {
+    const message = getReminderMessage(bed);
+    navigator.clipboard.writeText(message);
+    toast.success('Reminder message copied to clipboard');
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
-      <div className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl relative max-h-[85vh] flex flex-col">
-        {/* Close Button */}
-        <button
-          onClick={onClose}
-          className="absolute top-5 right-5 text-slate-400 hover:text-white p-1 rounded-full hover:bg-slate-800 transition-colors cursor-pointer"
-        >
-          <X className="w-5 h-5" />
-        </button>
-
-        {/* Header */}
-        <div className="mb-4 pr-8">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-bold mb-2">
-            <MessageSquare className="w-3.5 h-3.5" />
-            <span>Zero-Cost WhatsApp Reminders</span>
+    <Drawer
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Send WhatsApp Rent Reminders"
+      description="Direct 1-click reminders to residents with their personalized portal links."
+      width="md"
+    >
+      <div className="space-y-3">
+        {pendingItems.length === 0 ? (
+          <div className="p-8 text-center rounded-[10px] border border-dashed border-[#E2E8F0] bg-[#F8FAFC]">
+            <CheckCircle2 className="w-8 h-8 text-[#10B981] mx-auto mb-2" />
+            <h4 className="text-sm font-bold text-[#09090B]">All Clear</h4>
+            <p className="text-xs text-[#64748B] mt-1">
+              All residents have settled their rent for the current billing cycle.
+            </p>
           </div>
-          <h2 className="text-xl font-black text-white">Remind All Pending Residents</h2>
-          <p className="text-xs text-slate-400 mt-0.5">
-            Tap send to open WhatsApp on your phone with the pre-filled reminder and portal link.
-          </p>
-        </div>
-
-        {/* List of Pending Residents */}
-        <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 my-2">
-          {pendingItems.length === 0 ? (
-            <div className="text-center py-10 bg-slate-950/60 rounded-2xl border border-slate-800 p-6">
-              <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto mb-2" />
-              <h4 className="text-sm font-bold text-white mb-1">All Caught Up!</h4>
-              <p className="text-xs text-slate-400">Every resident has cleared their rent for this month.</p>
-            </div>
-          ) : (
-            pendingItems.map((bed) => (
-              <div
-                key={bed.id}
-                className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800/80 hover:border-slate-700 transition-colors"
-              >
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-sm text-white">{bed.tenantName || 'Resident'}</span>
-                    <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-slate-800 text-slate-300">
+        ) : (
+          pendingItems.map((bed) => (
+            <div
+              key={bed.id}
+              className="flex items-center justify-between p-3.5 rounded-[10px] bg-white border border-[#E2E8F0] hover:border-[#CBD5E1] transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <Avatar name={bed.tenantName || 'R'} size="md" />
+                <div className="text-left">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-[#09090B]">
+                      {bed.tenantName}
+                    </span>
+                    <span className="text-[10px] font-mono-numbers font-semibold text-[#64748B] bg-[#F1F5F9] px-1.5 py-0.2 rounded-[4px]">
                       {bed.bedLabel}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-slate-400 mt-1">
-                    <span>Due: {formatCurrency(bed.monthlyRent)}</span>
-                    <span>•</span>
-                    <span className="font-mono text-slate-500">{bed.tenantPhone || 'No Phone'}</span>
+                  <div className="mt-0.5 flex items-center gap-2 text-[11px] text-[#64748B]">
+                    <span className="font-mono-numbers text-[#D97706] font-bold">
+                      {formatCurrency(bed.monthlyRent)}
+                    </span>
+                    <span>·</span>
+                    <span className="font-mono-numbers">{bed.tenantPhone}</span>
                   </div>
                 </div>
+              </div>
 
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  title="Copy text"
+                  onClick={() => handleCopyMessage(bed)}
+                  className="p-1.5 rounded-[6px] border border-[#E2E8F0] text-[#64748B] hover:bg-[#F8FAFC] hover:text-[#09090B] transition-colors cursor-pointer"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                </button>
                 <Button
                   size="sm"
+                  variant="solid"
                   onClick={() => handleSendReminder(bed)}
-                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-3.5 py-1.5"
+                  className="bg-[#10B981] hover:bg-[#059669] text-white text-xs gap-1"
                 >
-                  <Send className="w-3.5 h-3.5 mr-1" />
+                  <Send className="w-3 h-3" />
                   <span>Send</span>
                 </Button>
               </div>
-            ))
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="pt-4 border-t border-slate-800 flex justify-between items-center text-xs text-slate-500">
-          <span>{pendingItems.length} residents pending</span>
-          <Button variant="ghost" size="sm" onClick={onClose} className="text-slate-400 hover:text-white">
-            Done
-          </Button>
-        </div>
+            </div>
+          ))
+        )}
       </div>
-    </div>
+    </Drawer>
   );
 }

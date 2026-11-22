@@ -4,9 +4,10 @@ import React, { useState } from 'react';
 import { Bed } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PhoneInput } from '@/components/ui/phone-input';
+import { Drawer } from '@/components/ui/drawer';
 import { createTenant } from '@/lib/firestore';
 import { validatePhone, sanitizeText } from '@/lib/security';
-import { X, UserPlus, Phone, Calendar, IndianRupee } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface AddTenantModalProps {
@@ -26,14 +27,17 @@ export function AddTenantModal({
 }: AddTenantModalProps) {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [moveInDate, setMoveInDate] = useState(new Date().toISOString().split('T')[0]);
+  const [moveInDate, setMoveInDate] = useState(
+    new Date().toISOString().split('T')[0]
+  );
+  const [rent, setRent] = useState(String(bed.monthlyRent || 8500));
   const [deposit, setDeposit] = useState(String(bed.monthlyRent || 8500));
   const [loading, setLoading] = useState(false);
-
-  if (!isOpen) return null;
+  const [phoneError, setPhoneError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setPhoneError('');
 
     const sanitizedName = sanitizeText(name, 60);
     if (!sanitizedName) {
@@ -43,7 +47,7 @@ export function AddTenantModal({
 
     const phoneValidation = validatePhone(phone);
     if (!phoneValidation.valid) {
-      toast.error(phoneValidation.error || 'Please enter a valid 10-digit WhatsApp number');
+      setPhoneError(phoneValidation.error || 'Please enter a valid 10-digit mobile number');
       return;
     }
     const cleanPhone = phoneValidation.cleaned;
@@ -59,10 +63,10 @@ export function AddTenantModal({
         phone: cleanPhone,
         moveInDate,
         depositPaid: Number(deposit) || 0,
-        monthlyRent: bed.monthlyRent || 8500,
+        monthlyRent: Number(rent) || bed.monthlyRent || 8500,
       });
 
-      toast.success(`${name} assigned to Bed ${bed.bedLabel}!`);
+      toast.success(`${sanitizedName} assigned to Bed ${bed.bedLabel}`);
       onSuccess(tenantId);
       onClose();
     } catch (err: any) {
@@ -74,89 +78,84 @@ export function AddTenantModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-150">
-      <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl relative">
-        {/* Close Button */}
-        <button
-          onClick={onClose}
-          className="absolute top-5 right-5 text-slate-400 hover:text-white p-1 rounded-full hover:bg-slate-800 transition-colors cursor-pointer"
-        >
-          <X className="w-5 h-5" />
-        </button>
+    <Drawer
+      isOpen={isOpen}
+      onClose={onClose}
+      title={`Assign Bed ${bed.bedLabel}`}
+      description={`Room ${bed.roomNumber} · Floor ${bed.floor}`}
+      width="md"
+      footer={
+        <div className="flex items-center justify-end gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            disabled={loading}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            form="add-tenant-form"
+            loading={loading}
+            variant="solid"
+          >
+            Assign Resident & Generate Link
+          </Button>
+        </div>
+      }
+    >
+      <form id="add-tenant-form" onSubmit={handleSubmit} className="space-y-4">
+        <Input
+          label="Resident Full Name"
+          placeholder="e.g. Rahul Sharma"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          required
+          disabled={loading}
+        />
 
-        {/* Header */}
-        <div className="mb-5">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-400 text-xs font-bold mb-2">
-            <span>Room {bed.roomNumber}</span>
-            <span>•</span>
-            <span>Bed {bed.bedLabel}</span>
-          </div>
-          <h2 className="text-xl font-black text-white">Add Resident to Bed</h2>
-          <p className="text-xs text-slate-400 mt-0.5">
-            Create resident record & generate their personal rent portal link.
-          </p>
+        <PhoneInput
+          label="WhatsApp Number"
+          value={phone}
+          onChange={setPhone}
+          error={phoneError}
+          disabled={loading}
+        />
+
+        <div className="grid grid-cols-2 gap-3">
+          <Input
+            label="Monthly Rent (₹)"
+            type="number"
+            value={rent}
+            onChange={(e) => setRent(e.target.value)}
+            required
+            disabled={loading}
+          />
+
+          <Input
+            label="Security Deposit (₹)"
+            type="number"
+            value={deposit}
+            onChange={(e) => setDeposit(e.target.value)}
+            required
+            disabled={loading}
+          />
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <Input
-            label="Resident Full Name"
-            placeholder="e.g. Rahul Sharma"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-            autoFocus
-          />
+        <Input
+          label="Move-In Date"
+          type="date"
+          value={moveInDate}
+          onChange={(e) => setMoveInDate(e.target.value)}
+          required
+          disabled={loading}
+        />
 
-          <Input
-            label="WhatsApp Mobile Number"
-            type="tel"
-            inputMode="numeric"
-            maxLength={10}
-            placeholder="98765 43210"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            prefix={<span className="text-slate-400 font-bold">+91</span>}
-            suffix={<Phone className="w-4 h-4 text-slate-500" />}
-            required
-          />
-
-          <div className="grid grid-cols-2 gap-3">
-            <Input
-              label="Move-In Date"
-              type="date"
-              value={moveInDate}
-              onChange={(e) => setMoveInDate(e.target.value)}
-              required
-            />
-
-            <Input
-              label="Security Deposit"
-              type="number"
-              placeholder="8500"
-              value={deposit}
-              onChange={(e) => setDeposit(e.target.value)}
-              prefix={<IndianRupee className="w-3.5 h-3.5 text-slate-500" />}
-              required
-            />
-          </div>
-
-          <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl text-xs text-slate-400 flex items-center justify-between">
-            <span>Monthly Rent</span>
-            <span className="font-bold text-white">₹{bed.monthlyRent.toLocaleString('en-IN')}/month</span>
-          </div>
-
-          <div className="pt-2 flex gap-3">
-            <Button type="button" variant="ghost" onClick={onClose} className="flex-1">
-              Cancel
-            </Button>
-            <Button type="submit" loading={loading} className="flex-1 font-bold">
-              <UserPlus className="w-4 h-4 mr-1.5" />
-              <span>Confirm & Assign</span>
-            </Button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <div className="p-3.5 rounded-[8px] bg-[#F8FAFC] border border-[#E2E8F0] text-xs text-[#64748B] leading-relaxed">
+          Assigning this bed will instantly generate an unguessable private portal URL for this resident. They can upload payment proofs and download official HRA tax receipts without downloading an app.
+        </div>
+      </form>
+    </Drawer>
   );
 }

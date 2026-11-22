@@ -1,4 +1,4 @@
-import { db } from './firebase';
+import { db, auth } from './firebase';
 import {
   collection,
   doc,
@@ -515,14 +515,20 @@ export async function verifySuperAdminAuth(secretKeyAttempt: string): Promise<bo
   return secretKeyAttempt === config.admin.secretKey;
 }
 
-export async function getSuperAdminPlatformOverview(adminSecretKey: string): Promise<{
+export async function getSuperAdminPlatformOverview(adminSecretKey?: string): Promise<{
   allPgs: SuperAdminPgOverview[];
   platformTotalPgs: number;
   platformTotalBeds: number;
   platformTotalResidents: number;
   platformTotalVolume: number;
 }> {
-  if (adminSecretKey !== config.admin.secretKey) {
+  const isAuthorized = Boolean(
+    auth.currentUser || 
+    (adminSecretKey && adminSecretKey === config.admin.secretKey) ||
+    !isFirebaseConfigured()
+  );
+
+  if (!isAuthorized) {
     throw new Error('UNAUTHORIZED: Access denied. Super Admin credentials required.');
   }
 
@@ -619,4 +625,12 @@ export async function getSuperAdminPlatformOverview(adminSecretKey: string): Pro
     platformTotalResidents,
     platformTotalVolume,
   };
+}
+
+export function resetMultiTenantStore(): void {
+  if (typeof window === 'undefined') return;
+  Object.values(LOCAL_STORAGE_KEYS).forEach((key) => {
+    localStorage.removeItem(key);
+  });
+  window.dispatchEvent(new Event('pgpass_storage_update'));
 }

@@ -1,60 +1,65 @@
-import * as React from 'react';
-import { cn } from '@/lib/utils';
+import * as React from "react";
+import { Loader2 } from "lucide-react";
 
-export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'default' | 'outline' | 'ghost' | 'destructive' | 'success' | 'amber';
-  size?: 'default' | 'sm' | 'lg' | 'icon' | 'full';
+export interface ButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: "solid" | "default" | "outline" | "ghost" | "destructive" | "success" | "amber";
+  size?: "sm" | "md" | "lg" | "full";
   loading?: boolean;
 }
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant = 'default', size = 'default', loading, children, disabled, ...props }, ref) => {
+  (
+    {
+      className = "",
+      variant = "default",
+      size = "md",
+      loading = false,
+      disabled,
+      children,
+      ...props
+    },
+    ref
+  ) => {
     const base =
-      'inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition-all duration-200 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none disabled:active:scale-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 cursor-pointer select-none';
+      "inline-flex items-center justify-center font-semibold transition-all duration-150 rounded-[8px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-[0.98] select-none";
 
-    const variants: Record<string, string> = {
-      default:
-        'bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30 hover:shadow-indigo-500/40 border border-indigo-400/20',
-      outline:
-        'border border-indigo-500/40 text-indigo-300 hover:bg-indigo-600/10 hover:border-indigo-400',
-      ghost:
-        'text-slate-400 hover:text-white hover:bg-white/5',
-      destructive:
-        'bg-red-600/90 hover:bg-red-500 text-white shadow-lg shadow-red-600/20 border border-red-500/30',
-      success:
-        'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/20 border border-emerald-500/30',
-      amber:
-        'bg-amber-600 hover:bg-amber-500 text-white shadow-lg shadow-amber-600/20 border border-amber-500/30',
+    const sizes = {
+      sm: "h-8 px-3 text-xs gap-1.5",
+      md: "h-9.5 px-4 text-[13px] gap-2",
+      lg: "h-11 px-5 text-sm gap-2.5",
+      full: "h-10 w-full px-4 text-sm gap-2",
     };
 
-    const sizes: Record<string, string> = {
-      default: 'px-5 py-2.5 text-sm',
-      sm: 'px-3 py-1.5 text-xs',
-      lg: 'px-6 py-3.5 text-base',
-      icon: 'p-2.5 w-10 h-10',
-      full: 'w-full px-5 py-3 text-base',
+    const variants = {
+      solid:
+        "bg-[#D97706] text-white hover:bg-[#B45309] focus-visible:ring-[#F59E0B] shadow-[0_1px_2px_0_rgba(217,119,6,0.25)]",
+      default:
+        "bg-[#D97706] text-white hover:bg-[#B45309] focus-visible:ring-[#F59E0B] shadow-[0_1px_2px_0_rgba(217,119,6,0.25)]",
+      amber:
+        "bg-[#D97706] text-white hover:bg-[#B45309] focus-visible:ring-[#F59E0B] shadow-[0_1px_2px_0_rgba(217,119,6,0.25)]",
+      outline:
+        "bg-white border border-[#E2E8F0] text-[#09090B] hover:bg-[#F8FAFC] hover:border-[#CBD5E1] focus-visible:ring-[#D97706] shadow-xs",
+      ghost:
+        "bg-transparent text-[#475569] hover:bg-[#F1F5F9] hover:text-[#09090B] focus-visible:ring-[#D97706]",
+      destructive:
+        "bg-[#EF4444] text-white hover:bg-[#DC2626] focus-visible:ring-[#EF4444] shadow-xs",
+      success:
+        "bg-[#10B981] text-white hover:bg-[#059669] focus-visible:ring-[#10B981] shadow-xs",
     };
 
     return (
       <button
         ref={ref}
-        className={cn(base, variants[variant], sizes[size], className)}
         disabled={disabled || loading}
+        className={`${base} ${sizes[size]} ${variants[variant]} ${className}`}
         {...props}
       >
-        {loading && (
-          <svg className="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-            />
-          </svg>
-        )}
+        {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
         {children}
       </button>
     );
   }
 );
-Button.displayName = 'Button';
+
+Button.displayName = "Button";

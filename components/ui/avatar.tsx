@@ -1,45 +1,59 @@
-import { cn } from '@/lib/utils';
+import * as React from "react";
 
-const colors = [
-  'bg-indigo-600',
-  'bg-violet-600',
-  'bg-emerald-600',
-  'bg-rose-600',
-  'bg-amber-600',
-  'bg-cyan-600',
-  'bg-pink-600',
-  'bg-teal-600',
+const PALETTE = [
+  { bg: "#F0FDFA", text: "#0F766E", border: "#99F6E4" }, // teal
+  { bg: "#EFF6FF", text: "#1D4ED8", border: "#BFDBFE" }, // blue
+  { bg: "#F5F3FF", text: "#6D28D9", border: "#DDD6FE" }, // purple
+  { bg: "#ECFDF5", text: "#047857", border: "#A7F3D0" }, // emerald
+  { bg: "#FFFBEB", text: "#B45309", border: "#FDE68A" }, // amber
+  { bg: "#FDF2F8", text: "#BE185D", border: "#FBCFE8" }, // pink
+  { bg: "#F8FAFC", text: "#334155", border: "#CBD5E1" }, // slate
 ];
 
-export function Avatar({ name, className }: { name: string; className?: string }) {
-  const safeName = name || 'User';
-  const index = Math.abs(safeName.charCodeAt(0) % colors.length);
-  const initials = safeName
-    .split(' ')
-    .filter(Boolean)
-    .map((w) => w[0])
-    .join('')
-    .toUpperCase()
-    .substring(0, 2) || 'U';
+function hashString(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash << 5) - hash + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+}
+
+function getInitials(name: string): string {
+  if (!name) return "??";
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+export interface AvatarProps extends React.HTMLAttributes<HTMLDivElement> {
+  name: string;
+  size?: "sm" | "md" | "lg";
+}
+
+export function Avatar({ name, size = "md", className = "", ...props }: AvatarProps) {
+  const index = hashString(name) % PALETTE.length;
+  const color = PALETTE[index];
+  const initials = getInitials(name);
+
+  const sizes = {
+    sm: "h-7 w-7 text-[11px]",
+    md: "h-9 w-9 text-xs",
+    lg: "h-11 w-11 text-sm",
+  };
 
   return (
     <div
-      className={cn(
-        'w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-xs flex-shrink-0 shadow-md select-none',
-        colors[index],
-        className
-      )}
+      className={`inline-flex items-center justify-center rounded-full font-semibold border select-none shrink-0 ${sizes[size]} ${className}`}
+      style={{
+        backgroundColor: color.bg,
+        color: color.text,
+        borderColor: color.border,
+      }}
+      aria-label={name}
+      {...props}
     >
       {initials}
     </div>
-  );
-}
-
-export function Skeleton({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return (
-    <div
-      className={cn('animate-pulse rounded-xl bg-slate-800/80', className)}
-      {...props}
-    />
   );
 }

@@ -4,8 +4,9 @@ import React, { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { uploadToCloudinary } from '@/lib/cloudinary';
 import { updateRentRecord, updateBedStatus } from '@/lib/firestore';
-import { RentRecord, Bed } from '@/types';
-import { UploadCloud, CheckCircle2, Image as ImageIcon, Camera } from 'lucide-react';
+import { RentRecord } from '@/types';
+import { UploadCloud, CheckCircle2, Camera, RefreshCw } from 'lucide-react';
+import { ProgressBar } from '@/components/ui/progress-bar';
 import toast from 'react-hot-toast';
 
 interface ProofUploaderProps {
@@ -22,7 +23,10 @@ export function ProofUploader({
   onSuccess,
 }: ProofUploaderProps) {
   const [uploading, setUploading] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(rentRecord?.proofImageUrl || null);
+  const [progress, setProgress] = useState(0);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(
+    rentRecord?.proofImageUrl || null
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -35,15 +39,16 @@ export function ProofUploader({
     }
 
     setUploading(true);
+    setProgress(30);
+
     try {
-      // Create local preview instantly
       const localUrl = URL.createObjectURL(file);
       setPreviewUrl(localUrl);
+      setProgress(60);
 
-      // Upload to Cloudinary / storage
       const uploadedUrl = await uploadToCloudinary(file, `proofs/${tenantId}`);
+      setProgress(90);
 
-      // Update Firestore record if record exists
       if (rentRecord?.id) {
         await updateRentRecord(rentRecord.id, {
           status: 'verify',
@@ -51,10 +56,10 @@ export function ProofUploader({
         });
       }
 
-      // Update bed status to 'verify' so owner is alerted
       await updateBedStatus(bedId, 'verify');
 
-      toast.success('Payment screenshot uploaded! Landlord notified.');
+      setProgress(100);
+      toast.success('Screenshot submitted for landlord review');
       onSuccess(uploadedUrl);
     } catch (err: any) {
       console.error(err);
@@ -65,14 +70,14 @@ export function ProofUploader({
   };
 
   return (
-    <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-xl backdrop-blur-xl">
+    <div className="bg-white border border-[#E2E8F0] rounded-[12px] p-5 shadow-xs text-left">
       <div className="mb-4">
-        <h3 className="text-base font-bold text-white flex items-center gap-2">
-          <UploadCloud className="w-5 h-5 text-indigo-400" />
-          <span>Upload Payment Screenshot</span>
+        <h3 className="text-sm font-bold text-[#09090B] flex items-center gap-2">
+          <UploadCloud className="w-4 h-4 text-[#D97706]" />
+          <span>Upload Payment Proof</span>
         </h3>
-        <p className="text-xs text-slate-400 mt-1">
-          Paid via GPay, PhonePe, or Paytm? Upload your transaction proof here to get verified.
+        <p className="text-xs text-[#64748B] mt-0.5">
+          Attach a screenshot of your GPay, PhonePe, or bank transfer for verification.
         </p>
       </div>
 
@@ -86,39 +91,50 @@ export function ProofUploader({
 
       {previewUrl ? (
         <div className="space-y-3">
-          <div className="relative rounded-2xl overflow-hidden border border-slate-700 bg-black/40 max-h-56 flex items-center justify-center">
-            <img src={previewUrl} alt="Payment Proof" className="max-h-56 object-contain" />
-            <div className="absolute bottom-2 right-2 px-2.5 py-1 rounded-full bg-slate-950/80 border border-slate-700 text-[11px] text-slate-200 font-medium">
-              Submitted
+          <div className="relative rounded-[8px] overflow-hidden border border-[#E2E8F0] bg-[#F8FAFC] max-h-52 flex items-center justify-center p-2">
+            <img
+              src={previewUrl}
+              alt="Payment Proof"
+              className="max-h-48 rounded-[6px] object-contain"
+            />
+            <div className="absolute top-3 right-3 px-2 py-0.5 rounded-[4px] bg-white/95 border border-[#E2E8F0] text-[10px] font-bold text-[#10B981] flex items-center gap-1 shadow-xs">
+              <CheckCircle2 className="w-3 h-3 text-[#10B981]" />
+              <span>Uploaded</span>
             </div>
           </div>
 
           <Button
-            size="full"
+            size="md"
             variant="outline"
             onClick={() => fileInputRef.current?.click()}
             loading={uploading}
-            className="text-xs py-2.5"
+            className="w-full text-xs"
           >
+            <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
             <span>Replace Screenshot</span>
           </Button>
         </div>
       ) : (
         <div
           onClick={() => fileInputRef.current?.click()}
-          className="border-2 border-dashed border-slate-700 hover:border-indigo-500/60 bg-slate-950/50 hover:bg-slate-950/80 rounded-2xl p-6 text-center transition-all cursor-pointer group"
+          className="border border-dashed border-[#CBD5E1] hover:border-[#D97706] bg-[#F8FAFC] hover:bg-white rounded-[10px] p-5 text-center transition-all cursor-pointer group"
         >
-          <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center mx-auto mb-3 group-hover:scale-105 transition-transform">
-            <Camera className="w-6 h-6" />
+          <div className="w-10 h-10 rounded-full bg-[#FEF3C7] text-[#D97706] flex items-center justify-center mx-auto mb-2 group-hover:scale-105 transition-transform">
+            <Camera className="w-5 h-5" />
           </div>
-          <span className="text-xs font-bold text-slate-200 block mb-0.5">
-            Tap to Select or Snap Photo
+          <span className="text-xs font-bold text-[#09090B] block">
+            Take photo or select screenshot
           </span>
-          <span className="text-[11px] text-slate-500">Supports JPG, PNG from gallery or camera</span>
+          <span className="text-[11px] text-[#94A3B8] mt-0.5 block">
+            JPG, PNG from camera or photo library
+          </span>
 
           {uploading && (
-            <div className="mt-3 text-xs text-indigo-400 font-semibold animate-pulse">
-              Compressing & uploading...
+            <div className="mt-3 space-y-1.5">
+              <ProgressBar value={progress} color="amber" height="sm" />
+              <span className="text-[10px] font-semibold text-[#D97706]">
+                Processing & uploading proof...
+              </span>
             </div>
           )}
         </div>
