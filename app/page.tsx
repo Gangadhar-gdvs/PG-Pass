@@ -403,6 +403,14 @@ export default function LandingPage() {
           </div>
 
           <div className="flex items-center gap-4">
+            <Link href="/privacy" className="hover:text-[#09090B] transition-colors">
+              Privacy Policy
+            </Link>
+            <span>·</span>
+            <Link href="/terms" className="hover:text-[#09090B] transition-colors">
+              Terms of Service
+            </Link>
+            <span>·</span>
             <Link href="/login" className="hover:text-[#09090B] transition-colors">
               Owner Sign In
             </Link>

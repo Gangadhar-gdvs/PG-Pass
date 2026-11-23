@@ -14,6 +14,7 @@ import { StatsBar } from '@/components/owner/StatsBar';
 import { BedGrid } from '@/components/owner/BedGrid';
 import { AddTenantModal } from '@/components/owner/AddTenantModal';
 import { WhatsAppReminderModal } from '@/components/owner/WhatsAppReminderModal';
+import { BankCsvReconciler } from '@/components/owner/BankCsvReconciler';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Drawer } from '@/components/ui/drawer';
@@ -32,6 +33,7 @@ import {
   ExternalLink,
   UserPlus,
   ShieldAlert,
+  FileSpreadsheet,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -62,6 +64,7 @@ export default function OwnerDashboardPage() {
   // Modals & Drawer State
   const [selectedBedForAdd, setSelectedBedForAdd] = useState<Bed | null>(null);
   const [showReminderModal, setShowReminderModal] = useState(false);
+  const [showBankReconciler, setShowBankReconciler] = useState(false);
   const [proofModalRecord, setProofModalRecord] = useState<{ bed: Bed; record: RentRecord } | null>(null);
   const [activeBedDrawer, setActiveBedDrawer] = useState<Bed | null>(null);
   const [confirmVacateBed, setConfirmVacateBed] = useState<Bed | null>(null);
@@ -437,6 +440,15 @@ export default function OwnerDashboardPage() {
         <div className="flex items-center gap-2">
           <Button
             size="sm"
+            variant="outline"
+            onClick={() => setShowBankReconciler(true)}
+            className="text-xs border-[#CBD5E1] text-[#334155] hover:bg-[#F8FAFC]"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5 mr-1.5 text-emerald-600" />
+            <span>Bank CSV</span>
+          </Button>
+          <Button
+            size="sm"
             variant="solid"
             onClick={() => {
               const firstVacant = beds.find((b) => b.status === 'vacant');
@@ -805,6 +817,13 @@ export default function OwnerDashboardPage() {
           </div>
         </Drawer>
       )}
+
+      {/* BANK CSV STATEMENT RECONCILER */}
+      <BankCsvReconciler
+        isOpen={showBankReconciler}
+        onClose={() => setShowBankReconciler(false)}
+        rentRecords={rentRecords}
+      />
     </div>
   );
 }
