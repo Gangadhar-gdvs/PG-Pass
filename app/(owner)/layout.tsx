@@ -10,6 +10,8 @@ import {
   Settings,
   LogOut,
   Building,
+  CreditCard,
+  UserCheck,
 } from 'lucide-react';
 import { Avatar } from '@/components/ui/avatar';
 
@@ -38,6 +40,8 @@ export default function OwnerLayout({ children }: { children: React.ReactNode })
   const navLinks = [
     { href: '/dashboard', label: 'Bed Inventory', icon: LayoutDashboard },
     { href: '/tenants', label: 'Residents', icon: Users },
+    { href: '/staff', label: 'Wardens & Staff', icon: UserCheck },
+    { href: '/billing', label: 'Subscription', icon: CreditCard },
     { href: '/settings', label: 'Settings', icon: Settings },
   ];
 

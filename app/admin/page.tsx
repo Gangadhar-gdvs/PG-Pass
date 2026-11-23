@@ -62,6 +62,62 @@ export default function SuperAdminPortalPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPgId, setSelectedPgId] = useState<string | null>(null);
 
+  // Tab State
+  const [activeTab, setActiveTab] = useState<'telemetry' | 'upgrades'>('telemetry');
+  const [upgradeRequests, setUpgradeRequests] = useState<any[]>([]);
+  const [loadingUpgrades, setLoadingUpgrades] = useState(false);
+
+  const loadUpgrades = async () => {
+    setLoadingUpgrades(true);
+    try {
+      const res = await fetch('/api/admin/subscriptions');
+      if (res.ok) {
+        const data = await res.json();
+        setUpgradeRequests(data.requests || []);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingUpgrades(false);
+    }
+  };
+
+  const handleApproveUpgrade = async (requestId: string) => {
+    try {
+      const res = await fetch('/api/admin/subscriptions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId, action: 'approve' }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Approval failed');
+      toast.success('Subscription plan upgraded successfully');
+      await loadUpgrades();
+      await loadPlatformData();
+    } catch (e: any) {
+      toast.error(e.message || 'Could not approve upgrade');
+    }
+  };
+
+  const handleToggleAccountStatus = async (ownerId: string, currentStatus: string) => {
+    const newStatus = currentStatus === 'suspended' ? 'active' : 'suspended';
+    if (!confirm(`Are you sure you want to change account status to ${newStatus}?`)) return;
+
+    try {
+      const res = await fetch('/api/admin/accounts', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ownerId, accountStatus: newStatus }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Status update failed');
+      toast.success(`Account status set to ${newStatus}`);
+      await loadPlatformData();
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to update account status');
+    }
+  };
+
   // Listen to Firebase Auth state
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -369,153 +425,276 @@ export default function SuperAdminPortalPage() {
         </div>
       </div>
 
-      {/* Main Master-Detail Workspace */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left Master List: PGs */}
-        <aside className="w-80 shrink-0 border-r border-[#E2E8F0] bg-white flex flex-col">
-          {/* Search bar */}
-          <div className="p-3 border-b border-[#E2E8F0]">
-            <div className="relative">
-              <Search className="w-3.5 h-3.5 text-[#94A3B8] absolute left-2.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search PG or owner..."
-                className="w-full h-8.5 pl-8 pr-2.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-[6px] text-xs text-[#09090B] placeholder-[#94A3B8] focus:outline-none focus:border-[#D97706]"
-              />
+      {/* Admin Navigation Tabs */}
+      <div className="border-b border-[#E2E8F0] bg-white px-6 flex items-center gap-6 text-xs font-semibold">
+        <button
+          type="button"
+          onClick={() => setActiveTab('telemetry')}
+          className={`py-3 border-b-2 transition-colors cursor-pointer ${
+            activeTab === 'telemetry'
+              ? 'border-[#D97706] text-[#D97706]'
+              : 'border-transparent text-[#64748B] hover:text-[#09090B]'
+          }`}
+        >
+          PG Directory & Telemetry
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab('upgrades');
+            loadUpgrades();
+          }}
+          className={`py-3 border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${
+            activeTab === 'upgrades'
+              ? 'border-[#D97706] text-[#D97706]'
+              : 'border-transparent text-[#64748B] hover:text-[#09090B]'
+          }`}
+        >
+          <span>SaaS Upgrade Requests</span>
+          {upgradeRequests.length > 0 && (
+            <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-[#FEF3C7] text-[#D97706] font-bold">
+              {upgradeRequests.length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* Main Content Area */}
+      {activeTab === 'upgrades' ? (
+        <div className="flex-1 p-6 overflow-y-auto max-w-5xl mx-auto w-full space-y-4 text-left">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-bold text-[#09090B]">
+                Pending SaaS Subscription Upgrades
+              </h2>
+              <p className="text-xs text-[#64748B]">
+                Verify direct UPI UTR settlements and activate owner Growth / Pro quotas.
+              </p>
             </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={loadUpgrades}
+              loading={loadingUpgrades}
+            >
+              Refresh
+            </Button>
           </div>
 
-          {/* List items */}
-          <div className="flex-1 overflow-y-auto divide-y divide-[#E2E8F0]">
-            {filteredPgs.length === 0 ? (
-              <div className="p-6 text-center text-xs text-[#94A3B8]">
-                No PGs registered yet.
-              </div>
-            ) : (
-              filteredPgs.map((pg) => {
-                const isSelected = selectedPg?.owner.id === pg.owner.id;
-                return (
-                  <button
-                    key={pg.owner.id}
-                    type="button"
-                    onClick={() => setSelectedPgId(pg.owner.id)}
-                    className={`w-full p-3.5 text-left transition-colors flex items-start gap-3 cursor-pointer ${
-                      isSelected
-                        ? 'bg-[#FEF3C7] border-l-3 border-[#D97706]'
-                        : 'hover:bg-[#F8FAFC]'
-                    }`}
-                  >
-                    <Avatar name={pg.owner.pgName} size="md" />
-                    <div className="flex-1 min-w-0">
-                      <span className="text-xs font-bold text-[#09090B] block truncate">
-                        {pg.owner.pgName}
-                      </span>
-                      <span className="text-[11px] text-[#64748B] block truncate">
-                        {pg.owner.name} · {pg.owner.phone}
-                      </span>
-                      <div className="mt-1 flex items-center gap-2 text-[10px] font-mono text-[#64748B]">
-                        <span>{pg.beds.length} beds</span>
-                        <span>•</span>
-                        <span className="text-[#10B981] font-semibold">{pg.tenants.length} occupied</span>
-                      </div>
-                    </div>
-                  </button>
-                );
-              })
-            )}
-          </div>
-        </aside>
-
-        {/* Right Detail Panel: Selected PG */}
-        <main className="flex-1 overflow-y-auto p-6 space-y-6">
-          {selectedPg ? (
-            <div className="space-y-6 text-left">
-              {/* Selected PG Header */}
-              <div className="bg-white border border-[#E2E8F0] rounded-[12px] p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xs">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-lg font-bold text-[#09090B] tracking-tight">
-                      {selectedPg.owner.pgName}
-                    </h2>
-                    <span className="text-[10px] font-mono uppercase bg-[#FEF3C7] text-[#92400E] px-2 py-0.5 rounded-[4px] border border-[#FDE68A]">
-                      ID: {selectedPg.owner.id.slice(0, 8)}
-                    </span>
-                  </div>
-                  <p className="text-xs text-[#64748B] mt-0.5">
-                    Owner: {selectedPg.owner.name} · Phone: {selectedPg.owner.phone} · UPI: {selectedPg.owner.upiId || 'None'}
-                  </p>
-                  {selectedPg.owner.pgAddress && (
-                    <p className="text-[11px] text-[#94A3B8] mt-0.5">
-                      {selectedPg.owner.pgAddress}
-                    </p>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-4 text-xs font-mono">
-                  <div className="text-right">
-                    <span className="text-[10px] uppercase text-[#64748B] block">Default Rent</span>
-                    <span className="text-sm font-bold text-[#09090B]">
-                      {formatCurrency(selectedPg.owner.monthlyRent || 0)}
-                    </span>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-[10px] uppercase text-[#64748B] block">Units / Occ.</span>
-                    <span className="text-sm font-bold text-[#10B981]">
-                      {selectedPg.tenants.length} / {selectedPg.beds.length}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Mini Bed Occupancy Matrix */}
-              <div className="bg-white border border-[#E2E8F0] rounded-[12px] p-4.5 space-y-2 shadow-xs">
-                <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#64748B]">
-                  Unit Occupancy Matrix ({selectedPg.beds.length} Total Beds)
-                </span>
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  {selectedPg.beds.map((bed) => {
-                    const isOcc = bed.status !== 'vacant';
-                    return (
-                      <div
-                        key={bed.id}
-                        title={`Bed ${bed.bedLabel}: ${isOcc ? bed.tenantName || 'Occupied' : 'Vacant'}`}
-                        className={`h-5 w-5 rounded-[4px] flex items-center justify-center text-[9px] font-mono font-bold select-none cursor-default ${
-                          isOcc
-                            ? 'bg-[#10B981] text-white'
-                            : 'bg-[#F1F5F9] border border-[#E2E8F0] text-[#94A3B8]'
-                        }`}
-                      >
-                        {bed.bedLabel.slice(-1)}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Resident Data Table */}
-              <div className="space-y-2">
-                <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#64748B]">
-                  Active Leaseholders ({selectedPg.tenants.length})
-                </span>
-                <div className="bg-white border border-[#E2E8F0] rounded-[12px] overflow-hidden shadow-xs">
-                  <DataTable
-                    columns={residentColumns}
-                    data={selectedPg.tenants}
-                    keyExtractor={(t) => t.id}
-                    emptyText="No residents currently registered in this PG."
-                  />
-                </div>
-              </div>
+          {upgradeRequests.length === 0 ? (
+            <div className="bg-white border border-[#E2E8F0] rounded-[12px] p-8 text-center text-xs text-[#64748B]">
+              No pending upgrade requests. All accounts are on authorized tiers.
             </div>
           ) : (
-            <div className="h-full flex items-center justify-center text-xs text-[#94A3B8]">
-              Select a PG from the directory to inspect telemetry.
+            <div className="bg-white border border-[#E2E8F0] rounded-[12px] divide-y divide-[#E2E8F0] shadow-xs">
+              {upgradeRequests.map((req) => (
+                <div
+                  key={req.id}
+                  className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-sm text-[#09090B]">
+                        Owner ID: {req.ownerId?.slice(0, 8)}...
+                      </span>
+                      <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-[4px] bg-[#FEF3C7] text-[#D97706]">
+                        {req.requestedPlan} ({req.billingCycle})
+                      </span>
+                      <span className="font-mono text-xs font-semibold text-[#10B981]">
+                        {formatCurrency((req.amountPaise || 0) / 100)}
+                      </span>
+                    </div>
+                    <div className="text-[#64748B] flex items-center gap-2">
+                      <span>Submitted UTR:</span>
+                      <strong className="font-mono text-[#09090B]">
+                        {req.utrReference}
+                      </strong>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {req.status === 'approved' ? (
+                      <span className="text-xs font-bold text-[#10B981] bg-[#ECFDF5] px-2.5 py-1 rounded-[6px]">
+                        Approved
+                      </span>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="solid"
+                        onClick={() => handleApproveUpgrade(req.id)}
+                        className="bg-[#10B981] hover:bg-[#059669] text-white text-xs font-bold"
+                      >
+                        Approve & Activate Quotas
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
-        </main>
-      </div>
+        </div>
+      ) : (
+        <div className="flex-1 flex overflow-hidden">
+          {/* Left Master List: PGs */}
+          <aside className="w-80 shrink-0 border-r border-[#E2E8F0] bg-white flex flex-col">
+            {/* Search bar */}
+            <div className="p-3 border-b border-[#E2E8F0]">
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-[#94A3B8] absolute left-2.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search PG or owner..."
+                  className="w-full h-8.5 pl-8 pr-2.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-[6px] text-xs text-[#09090B] placeholder-[#94A3B8] focus:outline-none focus:border-[#D97706]"
+                />
+              </div>
+            </div>
+
+            {/* List items */}
+            <div className="flex-1 overflow-y-auto divide-y divide-[#E2E8F0]">
+              {filteredPgs.length === 0 ? (
+                <div className="p-6 text-center text-xs text-[#94A3B8]">
+                  No PGs registered yet.
+                </div>
+              ) : (
+                filteredPgs.map((pg) => {
+                  const isSelected = selectedPg?.owner.id === pg.owner.id;
+                  return (
+                    <button
+                      key={pg.owner.id}
+                      type="button"
+                      onClick={() => setSelectedPgId(pg.owner.id)}
+                      className={`w-full p-3.5 text-left transition-colors flex items-start gap-3 cursor-pointer ${
+                        isSelected
+                          ? 'bg-[#FEF3C7] border-l-3 border-[#D97706]'
+                          : 'hover:bg-[#F8FAFC]'
+                      }`}
+                    >
+                      <Avatar name={pg.owner.pgName} size="md" />
+                      <div className="flex-1 min-w-0">
+                        <span className="text-xs font-bold text-[#09090B] block truncate">
+                          {pg.owner.pgName}
+                        </span>
+                        <span className="text-[11px] text-[#64748B] block truncate">
+                          {pg.owner.name} · {pg.owner.phone}
+                        </span>
+                        <div className="mt-1 flex items-center gap-2 text-[10px] font-mono text-[#64748B]">
+                          <span>{pg.beds.length} beds</span>
+                          <span>•</span>
+                          <span className="text-[#10B981] font-semibold">{pg.tenants.length} occupied</span>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </aside>
+
+          {/* Right Detail Panel: Selected PG */}
+          <main className="flex-1 overflow-y-auto p-6 space-y-6">
+            {selectedPg ? (
+              <div className="space-y-6 text-left">
+                {/* Selected PG Header */}
+                <div className="bg-white border border-[#E2E8F0] rounded-[12px] p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xs">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-lg font-bold text-[#09090B] tracking-tight">
+                        {selectedPg.owner.pgName}
+                      </h2>
+                      <span className="text-[10px] font-mono uppercase bg-[#FEF3C7] text-[#92400E] px-2 py-0.5 rounded-[4px] border border-[#FDE68A]">
+                        ID: {selectedPg.owner.id.slice(0, 8)}
+                      </span>
+                    </div>
+                    <p className="text-xs text-[#64748B] mt-0.5">
+                      Owner: {selectedPg.owner.name} · Phone: {selectedPg.owner.phone} · UPI: {selectedPg.owner.upiId || 'None'}
+                    </p>
+                    {selectedPg.owner.pgAddress && (
+                      <p className="text-[11px] text-[#94A3B8] mt-0.5">
+                        {selectedPg.owner.pgAddress}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-4 text-xs font-mono">
+                      <div className="text-right">
+                        <span className="text-[10px] uppercase text-[#64748B] block">Default Rent</span>
+                        <span className="text-sm font-bold text-[#09090B]">
+                          {formatCurrency(selectedPg.owner.monthlyRent || 0)}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] uppercase text-[#64748B] block">Units / Occ.</span>
+                        <span className="text-sm font-bold text-[#10B981]">
+                          {selectedPg.tenants.length} / {selectedPg.beds.length}
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleToggleAccountStatus(selectedPg.owner.id, selectedPg.owner.accountStatus || 'active')}
+                      className={`px-3 py-1.5 rounded-[6px] text-xs font-semibold border transition-colors cursor-pointer ${
+                        selectedPg.owner.accountStatus === 'suspended'
+                          ? 'bg-[#ECFDF5] border-[#A7F3D0] text-[#065F46] hover:bg-[#D1FAE5]'
+                          : 'bg-[#FEF2F2] border-[#FECACA] text-[#DC2626] hover:bg-[#FEE2E2]'
+                      }`}
+                    >
+                      {selectedPg.owner.accountStatus === 'suspended' ? 'Reactivate PG' : 'Suspend Account'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Mini Bed Occupancy Matrix */}
+                <div className="bg-white border border-[#E2E8F0] rounded-[12px] p-4.5 space-y-2 shadow-xs">
+                  <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#64748B]">
+                    Unit Occupancy Matrix ({selectedPg.beds.length} Total Beds)
+                  </span>
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {selectedPg.beds.map((bed) => {
+                      const isOcc = bed.status !== 'vacant';
+                      return (
+                        <div
+                          key={bed.id}
+                          title={`Bed ${bed.bedLabel}: ${isOcc ? bed.tenantName || 'Occupied' : 'Vacant'}`}
+                          className={`h-5 w-5 rounded-[4px] flex items-center justify-center text-[9px] font-mono font-bold select-none cursor-default ${
+                            isOcc
+                              ? 'bg-[#10B981] text-white'
+                              : 'bg-[#F1F5F9] border border-[#E2E8F0] text-[#94A3B8]'
+                          }`}
+                        >
+                          {bed.bedLabel.slice(-1)}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Resident Data Table */}
+                <div className="space-y-2">
+                  <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#64748B]">
+                    Active Leaseholders ({selectedPg.tenants.length})
+                  </span>
+                  <div className="bg-white border border-[#E2E8F0] rounded-[12px] overflow-hidden shadow-xs">
+                    <DataTable
+                      columns={residentColumns}
+                      data={selectedPg.tenants}
+                      keyExtractor={(t) => t.id}
+                      emptyText="No residents currently registered in this PG."
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="h-full flex items-center justify-center text-xs text-[#94A3B8]">
+                Select a PG from the directory to inspect telemetry.
+              </div>
+            )}
+          </main>
+        </div>
+      )}
     </div>
   );
 }
