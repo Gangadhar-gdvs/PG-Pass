@@ -2,8 +2,7 @@
 
 import React, { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { uploadToCloudinary } from '@/lib/cloudinary';
-import { updateRentRecord, updateBedStatus } from '@/lib/firestore';
+import { uploadPhotoToB2 } from '@/lib/client/uploader';
 import { RentRecord } from '@/types';
 import { UploadCloud, CheckCircle2, Camera, RefreshCw } from 'lucide-react';
 import { ProgressBar } from '@/components/ui/progress-bar';
@@ -11,22 +10,23 @@ import toast from 'react-hot-toast';
 
 interface ProofUploaderProps {
   rentRecord?: RentRecord | null;
-  bedId: string;
-  tenantId: string;
-  onSuccess: (url: string) => void;
+  portalAuth?: {
+    token: string;
+    pin: string;
+  };
+  tenantId?: string;
+  onSuccess: (photoId: string) => void;
 }
 
 export function ProofUploader({
   rentRecord,
-  bedId,
+  portalAuth,
   tenantId,
   onSuccess,
 }: ProofUploaderProps) {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(
-    rentRecord?.proofImageUrl || null
-  );
+  const [uploaded, setUploaded] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -34,35 +34,28 @@ export function ProofUploader({
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      toast.error('Please upload an image file (PNG / JPG)');
+      toast.error('Please upload an image file (PNG / JPG / WebP)');
       return;
     }
 
     setUploading(true);
-    setProgress(30);
+    setProgress(10);
 
     try {
-      const localUrl = URL.createObjectURL(file);
-      setPreviewUrl(localUrl);
-      setProgress(60);
+      const result = await uploadPhotoToB2({
+        file,
+        photoType: 'payment_proof',
+        tenantId,
+        rentRecordId: rentRecord?.id,
+        portalAuth,
+        onProgress: (p) => setProgress(p),
+      });
 
-      const uploadedUrl = await uploadToCloudinary(file, `proofs/${tenantId}`);
-      setProgress(90);
-
-      if (rentRecord?.id) {
-        await updateRentRecord(rentRecord.id, {
-          status: 'verify',
-          proofImageUrl: uploadedUrl,
-        });
-      }
-
-      await updateBedStatus(bedId, 'verify');
-
-      setProgress(100);
-      toast.success('Screenshot submitted for landlord review');
-      onSuccess(uploadedUrl);
+      setUploaded(true);
+      toast.success('Screenshot securely uploaded to encrypted vault');
+      onSuccess(result.photoId);
     } catch (err: any) {
-      console.error(err);
+      console.error('Proof upload error:', err);
       toast.error(err.message || 'Upload failed. Please try again.');
     } finally {
       setUploading(false);
@@ -74,10 +67,10 @@ export function ProofUploader({
       <div className="mb-4">
         <h3 className="text-sm font-bold text-[#09090B] flex items-center gap-2">
           <UploadCloud className="w-4 h-4 text-[#D97706]" />
-          <span>Upload Payment Proof</span>
+          <span>Upload Payment Proof (Screenshot)</span>
         </h3>
         <p className="text-xs text-[#64748B] mt-0.5">
-          Attach a screenshot of your GPay, PhonePe, or bank transfer for verification.
+          Attach a screenshot of your GPay, PhonePe, or bank transfer for landlord confirmation.
         </p>
       </div>
 
@@ -89,17 +82,17 @@ export function ProofUploader({
         className="hidden"
       />
 
-      {previewUrl ? (
+      {uploaded ? (
         <div className="space-y-3">
-          <div className="relative rounded-[8px] overflow-hidden border border-[#E2E8F0] bg-[#F8FAFC] max-h-52 flex items-center justify-center p-2">
-            <img
-              src={previewUrl}
-              alt="Payment Proof"
-              className="max-h-48 rounded-[6px] object-contain"
-            />
-            <div className="absolute top-3 right-3 px-2 py-0.5 rounded-[4px] bg-white/95 border border-[#E2E8F0] text-[10px] font-bold text-[#10B981] flex items-center gap-1 shadow-xs">
-              <CheckCircle2 className="w-3 h-3 text-[#10B981]" />
-              <span>Uploaded</span>
+          <div className="rounded-[8px] border border-[#A7F3D0] bg-[#ECFDF5] p-3.5 flex items-center gap-2.5">
+            <CheckCircle2 className="w-5 h-5 text-[#10B981] shrink-0" />
+            <div>
+              <span className="text-xs font-bold text-[#065F46] block">
+                Screenshot Secured
+              </span>
+              <span className="text-[11px] text-[#047857]">
+                Your payment screenshot has been uploaded. Submit your 12-digit UTR below to complete verification.
+              </span>
             </div>
           </div>
 
@@ -111,7 +104,7 @@ export function ProofUploader({
             className="w-full text-xs"
           >
             <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
-            <span>Replace Screenshot</span>
+            <span>Upload Different Screenshot</span>
           </Button>
         </div>
       ) : (
@@ -126,14 +119,14 @@ export function ProofUploader({
             Take photo or select screenshot
           </span>
           <span className="text-[11px] text-[#94A3B8] mt-0.5 block">
-            JPG, PNG from camera or photo library
+            JPG, PNG or WebP · Auto-compressed to WebP
           </span>
 
           {uploading && (
             <div className="mt-3 space-y-1.5">
               <ProgressBar value={progress} color="amber" height="sm" />
               <span className="text-[10px] font-semibold text-[#D97706]">
-                Processing & uploading proof...
+                Encrypting & uploading to private storage... {progress}%
               </span>
             </div>
           )}

@@ -19,7 +19,7 @@ export interface LogContext {
   [key: string]: unknown;
 }
 
-function redactValue(key: string, value: unknown): unknown {
+export function redactValue(key: string, value: unknown): unknown {
   if (typeof value !== 'string') return value;
 
   const lowerKey = key.toLowerCase();
@@ -30,7 +30,9 @@ function redactValue(key: string, value: unknown): unknown {
     lowerKey.includes('password') ||
     lowerKey.includes('pin') ||
     lowerKey.includes('authorization') ||
-    lowerKey.includes('presigned')
+    lowerKey.includes('presigned') ||
+    lowerKey.includes('apikey') ||
+    lowerKey.includes('creditcard')
   ) {
     return '[REDACTED]';
   }
@@ -38,15 +40,15 @@ function redactValue(key: string, value: unknown): unknown {
   if (lowerKey.includes('phone')) {
     const cleaned = value.replace(/\D/g, '');
     if (cleaned.length >= 4) {
-      return '*'.repeat(cleaned.length - 2) + cleaned.slice(-2);
+      return '*'.repeat(cleaned.length - 4) + cleaned.slice(-4);
     }
-    return '[REDACTED]';
+    return '***';
   }
 
   return value;
 }
 
-function sanitizeObject(obj: Record<string, unknown>): Record<string, unknown> {
+export function sanitizeObject(obj: Record<string, unknown>): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(obj)) {
     if (v && typeof v === 'object' && !Array.isArray(v)) {

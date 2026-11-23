@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PhoneInput } from '@/components/ui/phone-input';
 import { Drawer } from '@/components/ui/drawer';
-import { createTenant } from '@/lib/firestore';
 import { validatePhone, sanitizeText } from '@/lib/security';
 import toast from 'react-hot-toast';
 
@@ -15,12 +14,11 @@ interface AddTenantModalProps {
   ownerId: string;
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: (tenantId: string) => void;
+  onSuccess: (tenantId: string, rawPortalToken?: string) => void;
 }
 
 export function AddTenantModal({
   bed,
-  ownerId,
   isOpen,
   onClose,
   onSuccess,
@@ -47,30 +45,42 @@ export function AddTenantModal({
 
     const phoneValidation = validatePhone(phone);
     if (!phoneValidation.valid) {
-      setPhoneError(phoneValidation.error || 'Please enter a valid 10-digit mobile number');
+      setPhoneError(
+        phoneValidation.error || 'Please enter a valid 10-digit mobile number'
+      );
       return;
     }
     const cleanPhone = phoneValidation.cleaned;
 
     setLoading(true);
     try {
-      const tenantId = await createTenant({
-        ownerId,
-        bedId: bed.id,
-        bedLabel: bed.bedLabel,
-        roomNumber: bed.roomNumber,
-        name: sanitizedName,
-        phone: cleanPhone,
-        moveInDate,
-        depositPaid: Number(deposit) || 0,
-        monthlyRent: Number(rent) || bed.monthlyRent || 8500,
+      const depositVal = Number(deposit) || 0;
+      const rentVal = Number(rent) || bed.monthlyRent || 8500;
+
+      const res = await fetch('/api/tenants', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bedId: bed.id,
+          name: sanitizedName,
+          phone: cleanPhone,
+          moveInDate,
+          securityDepositPaise: Math.round(depositVal * 100),
+          depositPaidPaise: Math.round(depositVal * 100),
+          initialRentAmountPaise: Math.round(rentVal * 100),
+        }),
       });
 
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to assign resident');
+      }
+
       toast.success(`${sanitizedName} assigned to Bed ${bed.bedLabel}`);
-      onSuccess(tenantId);
+      onSuccess(data.tenant.id, data.rawPortalToken);
       onClose();
     } catch (err: any) {
-      console.error(err);
+      console.error('Tenant assignment error:', err);
       toast.error(err.message || 'Failed to add resident');
     } finally {
       setLoading(false);
@@ -153,7 +163,8 @@ export function AddTenantModal({
         />
 
         <div className="p-3.5 rounded-[8px] bg-[#F8FAFC] border border-[#E2E8F0] text-xs text-[#64748B] leading-relaxed">
-          Assigning this bed will instantly generate an unguessable private portal URL for this resident. They can upload payment proofs and download official HRA tax receipts without downloading an app.
+          Assigning this bed will atomically issue an unguessable cryptographic resident pass URL.
+          The tenant can verify via the last 4 digits of their phone, pay 0%-fee rent directly via UPI, and download verified HRA receipts.
         </div>
       </form>
     </Drawer>

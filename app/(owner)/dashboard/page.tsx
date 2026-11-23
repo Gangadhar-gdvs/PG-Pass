@@ -5,14 +5,9 @@ import { useAuth } from '@/hooks/useAuth';
 import { useBeds } from '@/hooks/useBeds';
 import { useTenants } from '@/hooks/useTenants';
 import {
-  getOwnerProfile,
-  createOwnerProfile,
-  createBeds,
-  updateBedStatus,
-  updateRentRecord,
-  vacateTenant,
   subscribeToOwnerRentRecords,
 } from '@/lib/firestore';
+import { getPhotoViewUrl } from '@/lib/client/uploader';
 import { getCurrentMonthYear, formatCurrency, getWhatsAppLink } from '@/lib/utils';
 import { Bed, Owner, RentRecord, Tenant } from '@/types';
 import { StatsBar } from '@/components/owner/StatsBar';
@@ -75,8 +70,9 @@ export default function OwnerDashboardPage() {
   useEffect(() => {
     async function loadOwner() {
       try {
-        const profile = await getOwnerProfile(ownerId);
-        if (profile) {
+        const res = await fetch('/api/owners');
+        if (res.ok) {
+          const profile = await res.json();
           setOwner(profile);
         }
       } catch (e) {
@@ -99,7 +95,7 @@ export default function OwnerDashboardPage() {
     return unsub;
   }, [ownerId]);
 
-  // Setup Wizard Submission
+  // Setup Wizard Submission via Server APIs
   const handleCompleteSetup = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -132,26 +128,51 @@ export default function OwnerDashboardPage() {
       const bedsCount = Math.min(Math.max(Number(bedsPerRoom) || 1, 1), 10);
       const rent = Math.max(Number(monthlyRent) || 1000, 500);
 
-      const profileData: Omit<Owner, 'id' | 'createdAt'> = {
-        name: sanitizedOwnerName,
-        phone: user?.phoneNumber || '+91 98765 43210',
-        pgName: sanitizedPgName,
-        pgAddress: sanitizedPgAddress,
-        upiId: upiValidation.formatted,
-        panNumber: panValidation.formatted,
-        totalFloors: floors,
-        roomsPerFloor: rooms,
-        bedsPerRoom: bedsCount,
-        monthlyRent: rent,
-      };
-
-      await createOwnerProfile(ownerId, profileData);
-      await createBeds(ownerId, floors, rooms, bedsCount, rent);
-
-      setOwner({
-        ...profileData,
-        id: ownerId,
+      // 1. Create Owner Profile via PUT /api/owners
+      const ownerRes = await fetch('/api/owners', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: sanitizedOwnerName,
+          phone: (user?.phoneNumber || '9876543210').replace(/\D/g, '').slice(-10),
+          pgName: sanitizedPgName,
+          address: sanitizedPgAddress || 'PG Address',
+          upiId: upiValidation.formatted,
+          panNumber: panValidation.formatted,
+        }),
       });
+
+      if (!ownerRes.ok) {
+        const err = await ownerRes.json().catch(() => ({}));
+        throw new Error(err.message || 'Failed to save owner profile');
+      }
+
+      const updatedOwner = await ownerRes.json();
+      setOwner(updatedOwner);
+
+      // 2. Batch generate beds via POST /api/beds
+      const bedPromises = [];
+      for (let f = 1; f <= floors; f++) {
+        for (let r = 1; r <= rooms; r++) {
+          const roomNumber = `${f}${String(r).padStart(2, '0')}`;
+          for (let b = 1; b <= bedsCount; b++) {
+            const bedLabel = `${roomNumber}-${String.fromCharCode(64 + b)}`;
+            bedPromises.push(
+              fetch('/api/beds', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  floor: f,
+                  roomNumber,
+                  bedLabel,
+                  rentAmountPaise: Math.round(rent * 100),
+                }),
+              })
+            );
+          }
+        }
+      }
+      await Promise.all(bedPromises);
 
       toast.success(`Setup complete! Generated ${floors * rooms * bedsCount} beds.`);
     } catch (err: any) {
@@ -162,57 +183,99 @@ export default function OwnerDashboardPage() {
     }
   };
 
-  // Mark Paid
+  // Mark Paid via POST /api/rent/[id]/confirm
   const handleMarkPaid = async (bed: Bed, record?: RentRecord) => {
     try {
-      await updateBedStatus(bed.id, 'paid', bed.tenantId, bed.tenantName, bed.tenantPhone);
-      if (record?.id) {
-        await updateRentRecord(record.id, {
-          status: 'paid',
-          paidDate: new Date().toISOString().split('T')[0],
+      if (record?.id && !record.id.startsWith('temp_')) {
+        const res = await fetch(`/api/rent/${record.id}/confirm`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ paymentReference: 'Manual confirmation' }),
         });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Confirmation failed');
+        toast.success(`Bed ${bed.bedLabel} marked Paid! Receipt REC-#{String(data.record.receiptNumber).padStart(5, '0')} issued.`);
+      } else {
+        toast.success(`Bed ${bed.bedLabel} marked as Paid`);
       }
-      toast.success(`Bed ${bed.bedLabel} marked as Paid`);
       if (activeBedDrawer?.id === bed.id) {
         setActiveBedDrawer({ ...activeBedDrawer, status: 'paid' });
       }
-    } catch (err) {
-      toast.error('Failed to update status');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update status');
     }
   };
 
-  // Approve payment from screenshot proof
+  // Reverse Paid via POST /api/rent/[id]/reverse
+  const handleReversePaid = async (bed: Bed, record: RentRecord) => {
+    const reason = prompt('Please enter reason for reversing this payment:');
+    if (!reason || !reason.trim()) {
+      toast.error('Reversal reason is required');
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/rent/${record.id}/reverse`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reversalReason: reason.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Reversal failed');
+
+      toast.success(`Payment reversed. Bed ${bed.bedLabel} is now pending.`);
+      if (activeBedDrawer?.id === bed.id) {
+        setActiveBedDrawer({ ...activeBedDrawer, status: 'occupied' });
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Could not reverse payment');
+    }
+  };
+
+  // Approve payment from screenshot proof via POST /api/rent/[id]/confirm
   const handleApproveProof = async () => {
     if (!proofModalRecord) return;
     const { bed, record } = proofModalRecord;
 
     try {
-      await updateBedStatus(bed.id, 'paid', bed.tenantId, bed.tenantName, bed.tenantPhone);
-      await updateRentRecord(record.id, {
-        status: 'paid',
-        paidDate: new Date().toISOString().split('T')[0],
+      const res = await fetch(`/api/rent/${record.id}/confirm`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paymentReference: record.paymentReference }),
       });
-      toast.success(`Payment approved for ${bed.tenantName}!`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Could not confirm payment');
+
+      toast.success(`Payment approved for ${bed.tenantName}! Receipt REC-#{String(data.record.receiptNumber).padStart(5, '0')} issued.`);
       setProofModalRecord(null);
       if (activeBedDrawer?.id === bed.id) {
         setActiveBedDrawer({ ...activeBedDrawer, status: 'paid' });
       }
-    } catch (e) {
-      toast.error('Could not approve payment');
+    } catch (e: any) {
+      toast.error(e.message || 'Could not approve payment');
     }
   };
 
-  // Handle Vacate Tenant
+  // Handle Vacate Tenant via POST /api/tenants/[id]/moveout
   const handleConfirmVacate = async () => {
     if (!confirmVacateBed || !confirmVacateBed.tenantId) return;
 
     try {
-      await vacateTenant(confirmVacateBed.tenantId, confirmVacateBed.id);
+      const res = await fetch(`/api/tenants/${confirmVacateBed.tenantId}/moveout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          moveOutDate: new Date().toISOString().split('T')[0],
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Could not vacate bed');
+
       toast.success(`Bed ${confirmVacateBed.bedLabel} is now vacant`);
       setConfirmVacateBed(null);
       setActiveBedDrawer(null);
-    } catch (e) {
-      toast.error('Could not vacate bed');
+    } catch (e: any) {
+      toast.error(e.message || 'Could not vacate bed');
     }
   };
 
@@ -456,6 +519,17 @@ export default function OwnerDashboardPage() {
                     <span>Mark as Paid</span>
                   </Button>
                 )}
+
+                {(activeBedDrawer?.status === 'paid' || activeRecord?.status === 'paid') && activeRecord?.id && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-[#DC2626] border-[#FECACA] hover:bg-[#FEF2F2]"
+                    onClick={() => handleReversePaid(activeBedDrawer!, activeRecord)}
+                  >
+                    <span>Reverse Payment</span>
+                  </Button>
+                )}
               </div>
             </div>
           ) : (
@@ -664,6 +738,15 @@ export default function OwnerDashboardPage() {
                 {formatCurrency(proofModalRecord.record.amount || 0)}
               </span>
             </div>
+
+            {proofModalRecord.record.paymentReference && (
+              <div className="p-3 bg-[#EEF2FF] rounded-[8px] border border-[#C7D2FE] flex items-center justify-between text-xs">
+                <span className="text-[#4338CA] font-medium">Claimed UPI UTR:</span>
+                <span className="font-mono font-bold text-sm text-[#1E1B4B]">
+                  {proofModalRecord.record.paymentReference}
+                </span>
+              </div>
+            )}
 
             {proofModalRecord.record.proofImageUrl ? (
               <div className="border border-[#E2E8F0] rounded-[10px] overflow-hidden bg-black/5 p-2 flex items-center justify-center">

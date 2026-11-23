@@ -235,6 +235,10 @@ export class PhotosService {
       if (photo.ownerId !== callerOwnerId) {
         throw new AppError(403, 'Unauthorized photo access');
       }
+    } else if (callerRole === 'tenant') {
+      if (photo.tenantId !== callerUid) {
+        throw new AppError(403, 'Unauthorized photo access');
+      }
     } else {
       throw new AppError(403, 'Forbidden');
     }

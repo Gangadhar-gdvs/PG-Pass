@@ -56,12 +56,14 @@ export function WhatsAppReminderModal({
     const tenant = bed.tenantId ? tenantMap.get(bed.tenantId) : null;
     const amount = getRentAmount(bed);
     const amountFormatted = `₹${amount.toLocaleString('en-IN')}`;
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://pgpass.app';
+    const passLink = tenant?.token ? `\n🔗 *Resident Pass & UPI Link:* ${baseUrl}/t/${tenant.token}` : '';
 
     return `Namaste ${bed.tenantName || 'Resident'} ji 🙏,\n\nFriendly reminder from *${
       pgName || 'PG Accommodation'
     }* that room rent for *Bed ${bed.bedLabel}* is due:\n\n💵 *Amount:* ${amountFormatted}\n💳 *UPI ID:* ${
       ownerUpi || 'owner@upi'
-    }\n\nThank you,\n${ownerName || 'PG Management'}`;
+    }${passLink}\n\nThank you,\n${ownerName || 'PG Management'}`;
   };
 
   const sendReminderForBed = async (bed: Bed) => {

@@ -98,7 +98,16 @@ export default function SuperAdminPortalPage() {
     setSubmitting(true);
 
     try {
-      await signInWithEmailAndPassword(auth, email.trim(), password);
+      const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
+      const idToken = await userCredential.user.getIdToken();
+      const res = await fetch('/api/auth/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken }),
+      });
+      if (!res.ok) {
+        throw new Error('Failed to establish secure session cookie');
+      }
       toast.success('Admin authenticated successfully');
     } catch (err: any) {
       console.error(err);
@@ -125,6 +134,7 @@ export default function SuperAdminPortalPage() {
 
   const handleAdminLogout = async () => {
     try {
+      await fetch('/api/auth/session', { method: 'DELETE' });
       await signOut(auth);
       setCurrentUser(null);
       setStats(null);

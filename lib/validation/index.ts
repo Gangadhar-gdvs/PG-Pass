@@ -32,7 +32,7 @@ export const createTenantSchema = z.object({
   bedId: z.string().min(1, 'Please select a bed'),
   name: z.string().min(2, 'Name must be at least 2 characters'),
   phone: z.string().regex(/^[6-9]\d{9}$/, 'Must be a valid 10-digit Indian mobile number'),
-  idProofType: z.string().min(1, 'Please select an ID proof type'),
+  idProofType: z.string().default('aadhaar'),
   securityDepositPaise: z.number().int().min(0, 'Deposit must be 0 or positive paise'),
   depositPaidPaise: z.number().int().min(0, 'Deposit paid must be 0 or positive paise').default(0),
   moveInDate: z.string().min(1, 'Move-in date required'),

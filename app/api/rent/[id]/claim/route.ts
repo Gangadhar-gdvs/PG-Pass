@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/server/firebase-admin';
 import { withErrorHandler, AppError } from '@/lib/server/api/withErrorHandler';
 import { withRateLimit } from '@/lib/server/api/withRateLimit';
-import { hashToken, hashUtr, constantTimeEqual } from '@/lib/server/security/tokens';
+import { hashUtr } from '@/lib/server/security/tokens';
+import { verifyPortalSession } from '@/lib/server/security/portalAuth';
 import { Timestamp } from 'firebase-admin/firestore';
 
 export const POST = withErrorHandler(
@@ -44,37 +45,11 @@ export const POST = withErrorHandler(
 
       const normalizedUtr = paymentReference.trim().toUpperCase();
 
-      // 1. Verify portal token & PIN
-      const tokenHash = hashToken(token);
-      const portalTokenSnap = await adminDb
-        .collection('portal_tokens')
-        .doc(tokenHash)
-        .get();
+      // 1. Authoritative verification of portal session & PIN
+      const session = await verifyPortalSession(token, pin);
 
-      if (!portalTokenSnap.exists) {
-        throw new AppError(404, 'Portal session invalid or expired');
-      }
-
-      const tokenData = portalTokenSnap.data()!;
-      const tenantSnap = await adminDb
-        .collection('tenants')
-        .doc(tokenData.tenantId)
-        .get();
-
-      if (!tenantSnap.exists) {
-        throw new AppError(404, 'Tenant record not found');
-      }
-
-      const tenantData = tenantSnap.data()!;
-      const phoneCleaned = (tenantData.phone || '').replace(/\D/g, '');
-      const expectedPin =
-        tenantData.phoneLast4 || phoneCleaned.slice(-4) || '0000';
-
-      if (!constantTimeEqual(pin, expectedPin)) {
-        throw new AppError(401, 'Invalid verification PIN');
-      }
-
-      const ownerId = tokenData.ownerId;
+      const ownerId = session.ownerId;
+      const tenantId = session.tenantId;
       const utrHashKey = hashUtr(ownerId, normalizedUtr);
       const utrClaimRef = adminDb.collection('utr_claims').doc(utrHashKey);
       const rentRecordRef = adminDb
@@ -101,7 +76,7 @@ export const POST = withErrorHandler(
         const rentData = rentRecordDoc.data()!;
 
         // Confirm tenant owns this rent record
-        if (rentData.tenantId !== tokenData.tenantId) {
+        if (rentData.tenantId !== tenantId) {
           throw new AppError(403, 'Unauthorized rent record access');
         }
 
@@ -113,7 +88,7 @@ export const POST = withErrorHandler(
         transaction.set(utrClaimRef, {
           ownerId,
           rentRecordId,
-          tenantId: tokenData.tenantId,
+          tenantId,
           claimedAt: Timestamp.now(),
         });
 

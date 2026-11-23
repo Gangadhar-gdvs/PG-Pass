@@ -3,93 +3,129 @@
 import React, { useState, useEffect } from 'react';
 import { Tenant, Owner, RentRecord } from '@/types';
 import { formatCurrency } from '@/lib/utils';
-import { generateHRAReceipt } from '@/lib/pdf';
+import { generateNumberedReceipt } from '@/lib/client/receiptPdf';
 import { generateQrDataUrl } from '@/lib/client/qrcode';
+import { buildUpiPayload } from '@/lib/client/upi';
 import {
   CheckCircle2,
   Clock,
-  AlertCircle,
   Copy,
   QrCode,
   Download,
   ShieldCheck,
-  Eye,
-  EyeOff,
   ExternalLink,
+  Send,
+  AlertCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { StatusDot } from '@/components/ui/status-dot';
+import { ProofUploader } from './ProofUploader';
 import toast from 'react-hot-toast';
 
 interface RentStatusCardProps {
-  tenant: Tenant;
-  owner: Owner;
-  rentRecord?: RentRecord | null;
-  onProofUploaded: (url: string) => void;
+  tenant: {
+    id: string;
+    name: string;
+    roomNumber?: string;
+    bedLabel?: string;
+    depositPaidPaise?: number;
+    securityDepositPaise?: number;
+  };
+  pg: {
+    name: string;
+    address?: string;
+    upiId?: string;
+    upiMerchantName?: string;
+    phone?: string;
+  };
+  rentRecord?: any;
+  portalAuth: {
+    token: string;
+    pin: string;
+  };
+  onStatusChange?: (newRecord: any) => void;
 }
 
 export function RentStatusCard({
   tenant,
-  owner,
+  pg,
   rentRecord,
+  portalAuth,
+  onStatusChange,
 }: RentStatusCardProps) {
   const [copiedUpi, setCopiedUpi] = useState(false);
   const [showQr, setShowQr] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
-  const [showPan, setShowPan] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
+
+  // UTR Claim State
+  const [showClaimForm, setShowClaimForm] = useState(false);
+  const [utrInput, setUtrInput] = useState('');
+  const [proofPhotoId, setProofPhotoId] = useState<string | undefined>(undefined);
+  const [submittingClaim, setSubmittingClaim] = useState(false);
 
   const status = rentRecord?.status || 'pending';
   const isPaid = status === 'paid';
   const isVerify = status === 'verify';
 
-  const amount = rentRecord?.amount || tenant.monthlyRent || owner.monthlyRent || 8500;
-  const monthYear =
+  // Amount in rupees
+  const amountRupees = rentRecord?.amountDuePaise
+    ? Math.round(rentRecord.amountDuePaise / 100)
+    : rentRecord?.amountPaidPaise
+    ? Math.round(rentRecord.amountPaidPaise / 100)
+    : 8500;
+
+  const period =
+    rentRecord?.period ||
     rentRecord?.monthYear ||
     new Date().toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
 
   const handleCopyUpi = () => {
-    if (!owner.upiId) return;
-    navigator.clipboard.writeText(owner.upiId);
+    if (!pg.upiId) return;
+    navigator.clipboard.writeText(pg.upiId);
     setCopiedUpi(true);
     toast.success('UPI ID copied to clipboard');
     setTimeout(() => setCopiedUpi(false), 2000);
   };
 
-  const handleDownloadHra = async () => {
+  const handleDownloadReceipt = async () => {
+    if (!rentRecord) return;
     setGeneratingPdf(true);
     try {
-      await generateHRAReceipt({
+      await generateNumberedReceipt({
+        owner: {
+          id: 'owner',
+          name: pg.upiMerchantName || pg.name,
+          phone: pg.phone || '',
+          pgName: pg.name,
+          pgAddress: pg.address || '',
+          upiId: pg.upiId || '',
+        },
         tenantName: tenant.name,
-        ownerName: owner.name,
-        ownerPan: owner.panNumber || 'XXXXX0000X',
-        pgName: owner.pgName,
-        pgAddress: owner.pgAddress,
-        bedId: tenant.bedLabel || 'Assigned Bed',
-        amount: amount,
-        monthYear: monthYear,
-        paidDate: rentRecord?.paidDate || new Date().toISOString().split('T')[0],
+        record: rentRecord,
       });
-      toast.success('HRA Receipt downloaded');
+      toast.success('Official numbered receipt downloaded');
       if (typeof window !== 'undefined') {
         const confetti = (await import('canvas-confetti')).default;
         confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
       }
     } catch (e: any) {
-      console.error(e);
-      toast.error('Could not generate PDF receipt');
+      console.error('Receipt generation error:', e);
+      toast.error('Could not generate receipt PDF');
     } finally {
       setGeneratingPdf(false);
     }
   };
 
-  const upiPayUrl = `upi://pay?pa=${encodeURIComponent(
-    owner.upiId || ''
-  )}&pn=${encodeURIComponent(
-    owner.name || 'PG Owner'
-  )}&am=${amount}&cu=INR&tn=${encodeURIComponent(
-    `Rent ${monthYear} Bed ${tenant.bedLabel || ''}`
-  )}`;
+  // Build UPI deep-link URL
+  const upiPayUrl = pg.upiId
+    ? buildUpiPayload({
+        upiId: pg.upiId,
+        merchantName: pg.upiMerchantName || pg.name,
+        amountPaise: rentRecord?.amountDuePaise || 850000,
+        transactionNote: `Rent ${period} Bed ${tenant.bedLabel || ''}`,
+      })
+    : '';
 
   useEffect(() => {
     if (showQr && upiPayUrl && !qrDataUrl) {
@@ -97,9 +133,51 @@ export function RentStatusCard({
     }
   }, [showQr, upiPayUrl, qrDataUrl]);
 
-  const maskPan = (pan: string) => {
-    if (!pan || pan.length < 5) return 'Not on file';
-    return `${pan.slice(0, 4)}•••••${pan.slice(-1)}`;
+  // Handle UTR claim submission
+  const handleSubmitClaim = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanUtr = utrInput.trim().toUpperCase();
+    if (!cleanUtr || cleanUtr.length < 6) {
+      toast.error('Please enter a valid UPI Reference / UTR Number (min 6 characters)');
+      return;
+    }
+
+    if (!rentRecord?.id) {
+      toast.error('No active rent record to claim against');
+      return;
+    }
+
+    setSubmittingClaim(true);
+    try {
+      const res = await fetch(`/api/rent/${rentRecord.id}/claim`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: portalAuth.token,
+          pin: portalAuth.pin,
+          paymentReference: cleanUtr,
+          proofPhotoId,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to submit payment claim');
+      }
+
+      toast.success('Payment claim submitted! Awaiting PG manager confirmation.');
+      setShowClaimForm(false);
+      onStatusChange?.({
+        ...rentRecord,
+        status: 'verify',
+        paymentReference: cleanUtr,
+        proofPhotoId,
+      });
+    } catch (err: any) {
+      toast.error(err.message || 'Submission failed');
+    } finally {
+      setSubmittingClaim(false);
+    }
   };
 
   return (
@@ -108,11 +186,11 @@ export function RentStatusCard({
       <div className="bg-white border border-[#E2E8F0] rounded-[12px] p-5 shadow-xs text-left">
         <div className="flex items-center justify-between pb-3 border-b border-[#E2E8F0]">
           <span className="text-xs font-semibold text-[#64748B]">
-            Billing Cycle · {monthYear}
+            Billing Cycle · {period}
           </span>
           <StatusDot
             status={isPaid ? 'paid' : isVerify ? 'verify' : 'pending'}
-            label={isPaid ? 'Paid' : isVerify ? 'Under Review' : 'Payment Due'}
+            label={isPaid ? 'Paid' : isVerify ? 'Under Verification' : 'Payment Due'}
           />
         </div>
 
@@ -123,27 +201,31 @@ export function RentStatusCard({
           </span>
           <div className="mt-1 flex items-baseline justify-between">
             <span className="text-3xl font-extrabold font-mono-numbers text-[#09090B] tracking-tight">
-              {formatCurrency(amount)}
+              {formatCurrency(amountRupees)}
             </span>
-            {isPaid && rentRecord?.paidDate && (
-              <span className="text-xs text-[#10B981] font-semibold">
-                Settled {new Date(rentRecord.paidDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+            {isPaid && rentRecord?.receiptNumber && (
+              <span className="text-xs font-mono font-bold text-[#10B981] bg-[#ECFDF5] px-2 py-0.5 rounded-[4px]">
+                REC-#{String(rentRecord.receiptNumber).padStart(5, '0')}
               </span>
             )}
           </div>
         </div>
 
         {isVerify && (
-          <div className="p-3 rounded-[8px] bg-[#EEF2FF] border border-[#C7D2FE] text-xs text-[#4338CA] flex items-start gap-2">
-            <Clock className="w-4 h-4 shrink-0 mt-0.5 text-[#6366F1]" />
-            <span>
-              Your payment proof has been submitted and is awaiting owner confirmation. Your official HRA receipt will unlock here once approved.
-            </span>
+          <div className="p-3.5 rounded-[8px] bg-[#EEF2FF] border border-[#C7D2FE] text-xs text-[#4338CA] space-y-1">
+            <div className="flex items-center gap-1.5 font-bold">
+              <Clock className="w-4 h-4 text-[#6366F1]" />
+              <span>Payment Verification Pending</span>
+            </div>
+            <p className="text-[11px] text-[#475569]">
+              Submitted UTR: <strong className="font-mono text-[#1E1B4B]">{rentRecord?.paymentReference || 'On File'}</strong>.
+              Your official numbered receipt will become available here once confirmed by your PG manager.
+            </p>
           </div>
         )}
       </div>
 
-      {/* If Paid -> HRA Tax Receipt Box */}
+      {/* If Paid -> Numbered Receipt Box */}
       {isPaid ? (
         <div className="bg-white border border-[#E2E8F0] rounded-[12px] p-5 shadow-xs space-y-4 text-left">
           <div className="flex items-center gap-2.5">
@@ -151,40 +233,30 @@ export function RentStatusCard({
               <ShieldCheck className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-[#09090B]">HRA Tax Exemption Receipt</h3>
-              <p className="text-[11px] text-[#64748B]">IT Act 10(13A) compliant rent certificate</p>
+              <h3 className="text-sm font-bold text-[#09090B]">
+                Official Digital Rent Receipt
+              </h3>
+              <p className="text-[11px] text-[#64748B]">
+                Sequential, tamper-evident HRA & tax-deductible receipt
+              </p>
             </div>
           </div>
 
           <div className="p-3.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-[8px] space-y-2 text-xs">
             <div className="flex items-center justify-between">
-              <span className="text-[#64748B]">Landlord / Owner:</span>
-              <span className="font-bold text-[#09090B]">{owner.name || 'PG Owner'}</span>
+              <span className="text-[#64748B]">Receipt Number:</span>
+              <span className="font-mono font-bold text-[#09090B]">
+                REC-{String(rentRecord.receiptNumber || 0).padStart(5, '0')}
+              </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-[#64748B]">Landlord PAN:</span>
-              <div className="flex items-center gap-1.5">
-                <span className="font-mono-numbers font-semibold text-[#09090B]">
-                  {showPan ? (owner.panNumber || 'Not on file') : maskPan(owner.panNumber || '')}
-                </span>
-                {owner.panNumber && (
-                  <button
-                    type="button"
-                    onClick={() => setShowPan(!showPan)}
-                    className="text-[#94A3B8] hover:text-[#09090B] p-0.5 cursor-pointer"
-                    aria-label="Toggle PAN"
-                  >
-                    {showPan ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                  </button>
-                )}
-              </div>
+              <span className="text-[#64748B]">Settled For:</span>
+              <span className="font-semibold text-[#09090B]">{period}</span>
             </div>
-            {owner.pgAddress && (
-              <div className="flex items-start justify-between pt-1 border-t border-[#E2E8F0]">
-                <span className="text-[#64748B]">Property:</span>
-                <span className="font-medium text-[#09090B] text-right max-w-[200px] truncate">
-                  {owner.pgAddress}
-                </span>
+            {rentRecord.paymentReference && (
+              <div className="flex items-center justify-between">
+                <span className="text-[#64748B]">Bank UTR:</span>
+                <span className="font-mono text-[#09090B]">{rentRecord.paymentReference}</span>
               </div>
             )}
           </div>
@@ -192,25 +264,27 @@ export function RentStatusCard({
           <Button
             size="lg"
             variant="solid"
-            onClick={handleDownloadHra}
+            onClick={handleDownloadReceipt}
             loading={generatingPdf}
             className="w-full bg-[#10B981] hover:bg-[#059669] text-white"
           >
             <Download className="w-4 h-4 mr-2" />
-            <span>Download Official HRA Receipt (PDF)</span>
+            <span>Download Official PDF Receipt</span>
           </Button>
         </div>
       ) : (
-        /* If Pending/Verify -> UPI Payment Option */
+        /* If Pending/Overdue -> UPI Settlement & Claim Flow */
         <div className="bg-white border border-[#E2E8F0] rounded-[12px] p-5 shadow-xs space-y-4 text-left">
           <div>
-            <h3 className="text-sm font-bold text-[#09090B]">Direct Bank Settlement via UPI</h3>
+            <h3 className="text-sm font-bold text-[#09090B]">
+              Direct Bank Settlement via UPI (0% Fee)
+            </h3>
             <p className="text-[11px] text-[#64748B] mt-0.5">
-              Zero transaction fee transfer directly to owner bank account.
+              Instant transfer directly to your landlord without any gateway commission.
             </p>
           </div>
 
-          {owner.upiId ? (
+          {pg.upiId ? (
             <div className="space-y-3">
               <div className="flex items-center justify-between p-3 rounded-[8px] bg-[#F8FAFC] border border-[#E2E8F0]">
                 <div className="flex flex-col">
@@ -218,7 +292,7 @@ export function RentStatusCard({
                     Landlord UPI ID
                   </span>
                   <span className="font-mono-numbers text-xs font-bold text-[#09090B] select-all">
-                    {owner.upiId}
+                    {pg.upiId}
                   </span>
                 </div>
                 <button
@@ -267,9 +341,77 @@ export function RentStatusCard({
                     </div>
                   )}
                   <span className="text-xs font-bold text-[#09090B] mt-2">
-                    Scan to pay {formatCurrency(amount)}
+                    Scan to pay {formatCurrency(amountRupees)}
                   </span>
-                  <span className="text-[11px] text-[#64748B]">{owner.upiId}</span>
+                  <span className="text-[11px] text-[#64748B]">{pg.upiId}</span>
+                </div>
+              )}
+
+              {/* UTR Claim & Payment Notification Button */}
+              {!isVerify && (
+                <div className="pt-2 border-t border-[#E2E8F0]">
+                  {!showClaimForm ? (
+                    <Button
+                      size="md"
+                      variant="solid"
+                      onClick={() => setShowClaimForm(true)}
+                      className="w-full bg-[#0F172A] hover:bg-[#1E293B] text-white text-xs"
+                    >
+                      <CheckCircle2 className="w-4 h-4 mr-1.5 text-[#10B981]" />
+                      <span>I Have Transferred Rent (Submit UTR)</span>
+                    </Button>
+                  ) : (
+                    <form
+                      onSubmit={handleSubmitClaim}
+                      className="p-3.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-[8px] space-y-3"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-[#09090B]">
+                          Submit UPI Reference (UTR)
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setShowClaimForm(false)}
+                          className="text-[11px] text-[#64748B] hover:text-[#09090B]"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+
+                      <div>
+                        <label className="text-[11px] font-semibold text-[#64748B] block mb-1">
+                          12-digit UTR / UPI Transaction ID:
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          maxLength={32}
+                          placeholder="e.g. 432198765432"
+                          value={utrInput}
+                          onChange={(e) => setUtrInput(e.target.value)}
+                          className="w-full h-9 px-3 rounded-[6px] border border-[#CBD5E1] bg-white text-xs font-mono text-[#09090B] placeholder:text-[#94A3B8] focus:outline-none focus:border-[#D97706]"
+                        />
+                      </div>
+
+                      {/* Screenshot Uploader */}
+                      <ProofUploader
+                        rentRecord={rentRecord}
+                        portalAuth={portalAuth}
+                        onSuccess={(id) => setProofPhotoId(id)}
+                      />
+
+                      <Button
+                        size="md"
+                        variant="solid"
+                        type="submit"
+                        loading={submittingClaim}
+                        className="w-full bg-[#10B981] hover:bg-[#059669] text-white text-xs"
+                      >
+                        <Send className="w-3.5 h-3.5 mr-1.5" />
+                        <span>Confirm & Submit Reference</span>
+                      </Button>
+                    </form>
+                  )}
                 </div>
               )}
             </div>
