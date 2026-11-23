@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Tenant, Owner, RentRecord } from '@/types';
 import { formatCurrency } from '@/lib/utils';
 import { generateHRAReceipt } from '@/lib/pdf';
+import { generateQrDataUrl } from '@/lib/client/qrcode';
 import {
   CheckCircle2,
   Clock,
@@ -34,6 +35,7 @@ export function RentStatusCard({
 }: RentStatusCardProps) {
   const [copiedUpi, setCopiedUpi] = useState(false);
   const [showQr, setShowQr] = useState(false);
+  const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const [showPan, setShowPan] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
 
@@ -88,6 +90,12 @@ export function RentStatusCard({
   )}&am=${amount}&cu=INR&tn=${encodeURIComponent(
     `Rent ${monthYear} Bed ${tenant.bedLabel || ''}`
   )}`;
+
+  useEffect(() => {
+    if (showQr && upiPayUrl && !qrDataUrl) {
+      generateQrDataUrl(upiPayUrl).then(setQrDataUrl);
+    }
+  }, [showQr, upiPayUrl, qrDataUrl]);
 
   const maskPan = (pan: string) => {
     if (!pan || pan.length < 5) return 'Not on file';
@@ -247,13 +255,17 @@ export function RentStatusCard({
 
               {showQr && (
                 <div className="p-4 bg-[#F8FAFC] border border-[#E2E8F0] rounded-[8px] flex flex-col items-center justify-center text-center">
-                  <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(
-                      upiPayUrl
-                    )}`}
-                    alt="UPI QR Code"
-                    className="w-36 h-36 border border-[#E2E8F0] rounded-[6px] bg-white p-2"
-                  />
+                  {qrDataUrl ? (
+                    <img
+                      src={qrDataUrl}
+                      alt="UPI QR Code"
+                      className="w-36 h-36 border border-[#E2E8F0] rounded-[6px] bg-white p-2"
+                    />
+                  ) : (
+                    <div className="w-36 h-36 border border-[#E2E8F0] rounded-[6px] bg-white p-2 flex items-center justify-center text-xs text-[#64748B]">
+                      Generating QR...
+                    </div>
+                  )}
                   <span className="text-xs font-bold text-[#09090B] mt-2">
                     Scan to pay {formatCurrency(amount)}
                   </span>

@@ -37,7 +37,9 @@ export function BedGrid({
   const [searchQuery, setSearchQuery] = useState('');
 
   const recordMap = new Map<string, RentRecord>();
-  rentRecords.forEach((r) => recordMap.set(r.bedId, r));
+  rentRecords.forEach((r) => {
+    if (r.bedId) recordMap.set(r.bedId, r);
+  });
 
   const uniqueFloors = Array.from(new Set(beds.map((b) => b.floor))).sort((a, b) => a - b);
 

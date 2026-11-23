@@ -20,7 +20,9 @@ export function StatsBar({ beds, rentRecords, onRemindAll }: StatsBarProps) {
   const occupancyRate = totalBeds > 0 ? Math.round((occupiedBeds / totalBeds) * 100) : 0;
 
   const recordMap = new Map<string, RentRecord>();
-  rentRecords.forEach((r) => recordMap.set(r.bedId, r));
+  rentRecords.forEach((r) => {
+    if (r.bedId) recordMap.set(r.bedId, r);
+  });
 
   let totalCollected = 0;
   let totalPending = 0;

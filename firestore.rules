@@ -1,56 +1,82 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Helper functions
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-    
-    function isOwner(ownerId) {
-      return isAuthenticated() && request.auth.uid == ownerId;
-    }
-    
-    function isSuperAdmin() {
-      return isAuthenticated() && (request.auth.token.admin == true || request.auth.token.phone_number == '+919876543210');
-    }
 
-    // 1. PG OWNERS - Each owner can only read/write their own profile
+    // Mirrors lib/constants/status.ts and limits.ts — keep in sync (§3.4).
+    function isSignedIn() { return request.auth != null; }
+    function notSuspended() { return isSignedIn() && request.auth.token.suspended != true; }
+    function isAdmin() { return notSuspended() && request.auth.token.admin == true; }
+    function isOwnerUid(ownerId) { return notSuspended() && request.auth.uid == ownerId; }
+    function isStaffFor(ownerId) {
+      return notSuspended()
+        && request.auth.token.role == 'staff'
+        && request.auth.token.ownerId == ownerId;
+    }
+    function canReadOwnerScope(ownerId) { return isOwnerUid(ownerId) || isStaffFor(ownerId) || isAdmin(); }
+    function boundedList() { return request.query.limit <= 100; } // MAX_LIST_LIMIT
+
     match /owners/{ownerId} {
-      allow read: if isOwner(ownerId) || isSuperAdmin();
-      allow create, update: if isOwner(ownerId) || isSuperAdmin();
-      allow delete: if isSuperAdmin();
+      allow get:   if isOwnerUid(ownerId) || isStaffFor(ownerId) || isAdmin();
+      allow list:  if isAdmin() && boundedList();
+      allow write: if false;
     }
 
-    // 2. BEDS - Strict tenant isolation by ownerId
+    match /staff/{staffUid} {
+      // Staff lists are served strictly via GET /api/staff (Admin SDK) to avoid client query-filter failures.
+      allow get:   if notSuspended() && (request.auth.uid == staffUid || isOwnerUid(resource.data.ownerId) || isAdmin());
+      allow list:  if false;
+      allow write: if false;
+    }
+
     match /beds/{bedId} {
-      allow read: if isOwner(resource.data.ownerId) || isSuperAdmin();
-      allow create: if isOwner(request.resource.data.ownerId) || isSuperAdmin();
-      allow update: if isOwner(resource.data.ownerId) || isSuperAdmin();
-      allow delete: if isOwner(resource.data.ownerId) || isSuperAdmin();
+      allow get:   if canReadOwnerScope(resource.data.ownerId);
+      allow list:  if canReadOwnerScope(resource.data.ownerId) && boundedList();
+      allow write: if false;
     }
 
-    // 3. TENANTS - Only owner can list their tenants; public read only for token lookup
     match /tenants/{tenantId} {
-      allow read: if isOwner(resource.data.ownerId) || isSuperAdmin() || resource.data.token != null;
-      allow create: if isOwner(request.resource.data.ownerId) || isSuperAdmin();
-      allow update: if isOwner(resource.data.ownerId) || isSuperAdmin();
-      allow delete: if isOwner(resource.data.ownerId) || isSuperAdmin();
+      allow get:   if canReadOwnerScope(resource.data.ownerId);
+      allow list:  if canReadOwnerScope(resource.data.ownerId) && boundedList();
+      allow write: if false;
     }
 
-    // 4. RENT RECORDS - Scoped strictly to the owning PG and the assigned tenant
+    match /deposits/{txId} {
+      allow get:   if canReadOwnerScope(resource.data.ownerId);
+      allow list:  if canReadOwnerScope(resource.data.ownerId) && boundedList();
+      allow write: if false;
+    }
+
     match /rent_records/{recordId} {
-      allow read: if isOwner(resource.data.ownerId) || isSuperAdmin() || resource.data.tenantId != null;
-      allow create: if isOwner(request.resource.data.ownerId) || isSuperAdmin();
-      allow update: if isOwner(resource.data.ownerId) || isSuperAdmin() || request.resource.data.status == 'verify';
-      allow delete: if isOwner(resource.data.ownerId) || isSuperAdmin();
+      allow get:   if canReadOwnerScope(resource.data.ownerId);
+      allow list:  if canReadOwnerScope(resource.data.ownerId) && boundedList();
+      allow write: if false; // transitions happen strictly in rent.service.ts (§10.1)
     }
 
-    // 5. MOVE-IN PHOTOS - Scoped strictly to tenant & owner
     match /movein_photos/{photoId} {
-      allow read: if isOwner(resource.data.ownerId) || isSuperAdmin() || resource.data.tenantId != null;
-      allow create, update: if isOwner(request.resource.data.ownerId) || isSuperAdmin() || request.resource.data.tenantId != null;
-      allow delete: if isOwner(resource.data.ownerId) || isSuperAdmin();
+      allow get:   if canReadOwnerScope(resource.data.ownerId); // metadata only; image bytes come from B2 via /api (§11)
+      allow list:  if canReadOwnerScope(resource.data.ownerId) && boundedList();
+      allow write: if false;
     }
+
+    match /subscription_requests/{reqId} {
+      allow get:   if isOwnerUid(resource.data.ownerId) || isAdmin();
+      allow list:  if (isOwnerUid(resource.data.ownerId) || isAdmin()) && boundedList();
+      allow write: if false;
+    }
+
+    match /audit_logs/{logId}           { allow get, list: if isAdmin() && boundedList(); allow write: if false; }
+    match /admin_notifications/{id}     { allow get, list: if isAdmin() && boundedList(); allow write: if false; }
+    match /support_flags/{flagId}       { allow get, list: if isAdmin() && boundedList(); allow write: if false; }
+    match /metrics/{date}               { allow get: if isAdmin(); allow list, write: if false; }
+
+    // Strictly server-only internal collections
+    match /portal_tokens/{token}        { allow read, write: if false; }
+    match /portal_lockouts/{token}      { allow read, write: if false; }
+    match /utr_claims/{claimId}         { allow read, write: if false; }
+    match /rate_limits/{key}            { allow read, write: if false; }
+    match /idempotency_keys/{key}       { allow read, write: if false; }
+
+    match /{document=**}                { allow read, write: if false; }
   }
 }

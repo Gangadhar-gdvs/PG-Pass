@@ -470,7 +470,7 @@ export async function saveMoveinPhotos(
   const list = getLocal<MoveInPhoto[]>(LOCAL_STORAGE_KEYS.PHOTOS, []);
   const existing = list.findIndex((p) => p.tenantId === tenantId);
   if (existing !== -1) {
-    list[existing].photoUrls = [...list[existing].photoUrls, ...photoUrls];
+    list[existing].photoUrls = [...(list[existing].photoUrls || []), ...photoUrls];
   } else {
     list.push(photoSet);
   }
@@ -574,7 +574,9 @@ export async function getSuperAdminPlatformOverview(adminSecretKey?: string): Pr
     const pgRecords = allRecords.filter((r) => r.ownerId === owner.id);
 
     const recordMap = new Map<string, RentRecord>();
-    pgRecords.forEach((r) => recordMap.set(r.bedId, r));
+    pgRecords.forEach((r) => {
+      if (r.bedId) recordMap.set(r.bedId, r);
+    });
 
     let totalCollected = 0;
     let totalPending = 0;
@@ -588,15 +590,15 @@ export async function getSuperAdminPlatformOverview(adminSecretKey?: string): Pr
 
       if (isPaid) {
         paidBeds++;
-        totalCollected += bed.monthlyRent;
+        totalCollected += bed.monthlyRent || 0;
       } else {
         pendingBeds++;
-        totalPending += bed.monthlyRent;
+        totalPending += bed.monthlyRent || 0;
       }
     });
 
     const occupiedBeds = pgBeds.filter((b) => b.status !== 'vacant').length;
-    const totalRevenuePotential = pgBeds.reduce((sum, b) => sum + b.monthlyRent, 0);
+    const totalRevenuePotential = pgBeds.reduce((sum, b) => sum + (b.monthlyRent || 0), 0);
 
     return {
       owner,

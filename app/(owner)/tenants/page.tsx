@@ -42,7 +42,11 @@ export default function TenantsPage() {
     return matchName || matchPhone || matchBed;
   });
 
-  const handleCopyLink = (token: string) => {
+  const handleCopyLink = (token?: string) => {
+    if (!token) {
+      toast.error('No portal token generated for this resident');
+      return;
+    }
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : config.app.url;
     const url = `${baseUrl}/t/${token}`;
     navigator.clipboard.writeText(url);

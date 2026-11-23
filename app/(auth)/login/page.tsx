@@ -1,128 +1,104 @@
 'use client';
 
-import React, { useState, useRef, useEffect, Suspense } from 'react';
+import React, { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, ShieldCheck, CheckCircle2, Building, RefreshCw, Sparkles } from 'lucide-react';
-import { RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from 'firebase/auth';
+import { ArrowLeft, ShieldCheck, CheckCircle2, Building, Mail, Lock, AlertCircle } from 'lucide-react';
+import {
+  signInWithPopup,
+  GoogleAuthProvider,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+} from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
-import { PhoneInput } from '@/components/ui/phone-input';
-import { OtpInput } from '@/components/ui/otp-input';
-import { config } from '@/lib/config';
-import { validatePhone } from '@/lib/security';
+import { Input } from '@/components/ui/input';
 import toast from 'react-hot-toast';
 
 function LoginFormContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const role = searchParams.get('role') || 'owner';
   const isExpired = searchParams.get('expired') === 'true';
+  const from = searchParams.get('from') || '/dashboard';
 
-  const [step, setStep] = useState<'phone' | 'otp'>('phone');
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [otpCode, setOtpCode] = useState('');
+  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [countdown, setCountdown] = useState(0);
-  const [phoneError, setPhoneError] = useState('');
-  const [otpError, setOtpError] = useState('');
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const confirmResultRef = useRef<ConfirmationResult | null>(null);
-  const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
+  // Exchange Firebase ID token for httpOnly session cookie
+  const establishSession = async (user: any) => {
+    const idToken = await user.getIdToken();
+    const res = await fetch('/api/auth/session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken }),
+    });
 
-  useEffect(() => {
-    if (countdown > 0) {
-      const timer = setTimeout(() => setCountdown((c) => c - 1), 1000);
-      return () => clearTimeout(timer);
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || 'Failed to establish server session');
     }
-  }, [countdown]);
 
-  const initRecaptcha = () => {
-    if (!recaptchaVerifierRef.current && typeof window !== 'undefined') {
-      try {
-        recaptchaVerifierRef.current = new RecaptchaVerifier(auth, 'recaptcha-container', {
-          size: 'invisible',
-          callback: () => {},
-        });
-      } catch (e) {
-        console.warn('Recaptcha init notice:', e);
-      }
-    }
-    return recaptchaVerifierRef.current;
+    toast.success('Signed in successfully');
+    router.push(from);
   };
 
-  const handleSendOtp = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    setPhoneError('');
-
-    const phoneValidation = validatePhone(phoneNumber);
-    if (!phoneValidation.valid) {
-      setPhoneError(phoneValidation.error || 'Please enter a valid 10-digit mobile number');
-      return;
-    }
-    const cleanNumber = phoneValidation.cleaned;
-
-    setLoading(true);
-
-    if (!config.firebase.isConfigured()) {
-      setPhoneError('Authentication service is currently unavailable. Please check system configuration.');
-      setLoading(false);
-      return;
-    }
-
+  const handleGoogleSignIn = async () => {
+    setError('');
+    setGoogleLoading(true);
     try {
-      const verifier = initRecaptcha();
-      if (!verifier) throw new Error('Recaptcha verification unavailable');
-
-      const fullPhone = `+91${cleanNumber}`;
-      const result = await signInWithPhoneNumber(auth, fullPhone, verifier);
-      confirmResultRef.current = result;
-
-      setStep('otp');
-      setOtpCode('');
-      setOtpError('');
-      setCountdown(30);
-      toast.success('6-digit code sent via SMS');
+      const provider = new GoogleAuthProvider();
+      const userCredential = await signInWithPopup(auth, provider);
+      await establishSession(userCredential.user);
     } catch (err: any) {
-      console.error(err);
-      setPhoneError(err.message || 'Failed to send SMS code. Please try again.');
-      recaptchaVerifierRef.current = null;
+      console.error('Google sign-in error:', err);
+      setError(err.message || 'Failed to sign in with Google');
     } finally {
-      setLoading(false);
+      setGoogleLoading(false);
     }
   };
 
-  const handleVerifyOtp = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    setOtpError('');
+  const handleEmailAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
 
-    if (otpCode.length !== 6) {
-      setOtpError('Please enter all 6 digits of the verification code');
+    if (!email || !email.includes('@')) {
+      setError('Please enter a valid email address');
       return;
     }
-
-    if (!confirmResultRef.current) {
-      setOtpError('Session expired. Please request a new code.');
-      setStep('phone');
+    if (!password || password.length < 6) {
+      setError('Password must be at least 6 characters');
       return;
     }
 
     setLoading(true);
-
     try {
-      await confirmResultRef.current.confirm(otpCode);
-      toast.success('Signed in successfully');
-      router.push(role === 'owner' ? '/dashboard' : '/');
+      let userCredential;
+      if (authMode === 'signin') {
+        userCredential = await signInWithEmailAndPassword(auth, email, password);
+      } else {
+        userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      }
+      await establishSession(userCredential.user);
     } catch (err: any) {
-      setOtpError('Invalid verification code. Please check and try again.');
+      console.error('Email auth error:', err);
+      let msg = err.message || 'Authentication failed';
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+        msg = 'Invalid email or password';
+      } else if (err.code === 'auth/email-already-in-use') {
+        msg = 'An account with this email already exists. Please sign in.';
+      }
+      setError(msg);
+    } finally {
       setLoading(false);
     }
   };
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center p-4 sm:p-6 lg:p-8">
-      <div id="recaptcha-container" />
-
       {/* Main Container Card */}
       <div className="w-full max-w-4xl bg-white border border-[#E2E8F0] rounded-[14px] shadow-[0_20px_50px_rgba(0,0,0,0.06)] overflow-hidden grid grid-cols-1 md:grid-cols-2">
         {/* Left Brand Panel (Desktop) */}
@@ -137,32 +113,32 @@ function LoginFormContent() {
 
             <div className="mt-12 space-y-3">
               <h1 className="text-2xl font-bold leading-snug tracking-tight text-white">
-                Bento-grade PG bed management & rent settlement.
+                Bento-grade PG bed management & 0% UPI rent settlement.
               </h1>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Streamline bed inventory, collect rents with 1-tap WhatsApp reminders, and issue compliant HRA tax receipts without app downloads.
+                Streamline bed inventory, collect rents with direct 0%-fee UPI settlement, and issue tamper-evident receipts without app downloads.
               </p>
             </div>
 
             <div className="mt-10 space-y-3.5">
               <div className="flex items-center gap-2.5 text-xs font-semibold text-slate-200">
                 <CheckCircle2 className="h-4 w-4 text-[#F59E0B] shrink-0" />
-                <span>Zero cost, no app installation required</span>
+                <span>Zero gateway fee direct UPI settlement</span>
               </div>
               <div className="flex items-center gap-2.5 text-xs font-semibold text-slate-200">
                 <CheckCircle2 className="h-4 w-4 text-[#F59E0B] shrink-0" />
-                <span>Personalized resident links for rent & photos</span>
+                <span>PIN-protected Resident Pass links</span>
               </div>
               <div className="flex items-center gap-2.5 text-xs font-semibold text-slate-200">
                 <CheckCircle2 className="h-4 w-4 text-[#F59E0B] shrink-0" />
-                <span>Live occupancy HUD tracking across floors</span>
+                <span>Anti-fraud UTR deduplication</span>
               </div>
             </div>
           </div>
 
           <div className="pt-8 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-400 font-mono">
             <span>PGPass Production</span>
-            <span>Secured via Firebase</span>
+            <span>Secured via Firebase & B2</span>
           </div>
         </div>
 
@@ -180,127 +156,138 @@ function LoginFormContent() {
               </Link>
 
               <span className="text-[11px] font-semibold uppercase tracking-wider text-[#D97706] bg-[#FEF3C7] px-2.5 py-0.5 rounded-[6px]">
-                {role === 'owner' ? 'PG Owner Portal' : 'Resident Portal'}
+                Owner & Staff Login
               </span>
             </div>
 
             {isExpired && (
               <div className="mb-6 p-3 rounded-[8px] bg-[#FFFBEB] border border-[#FDE68A] text-xs text-[#92400E]">
-                Your session has expired. Please verify your phone number to continue.
+                Your session has expired. Please sign in to continue.
               </div>
             )}
 
-            {step === 'phone' ? (
-              <div className="space-y-6">
-                <div>
-                  <h2 className="text-xl font-bold text-[#09090B] tracking-tight">
-                    Sign in with mobile
-                  </h2>
-                  <p className="mt-1 text-xs text-[#64748B]">
-                    We will send a 6-digit one-time password to your phone.
-                  </p>
-                </div>
-
-                <form onSubmit={handleSendOtp} className="space-y-4">
-                  <PhoneInput
-                    label="Mobile Number"
-                    value={phoneNumber}
-                    onChange={setPhoneNumber}
-                    error={phoneError}
-                    placeholder="98765 43210"
-                    disabled={loading}
-                  />
-
-                  <Button
-                    type="submit"
-                    size="lg"
-                    loading={loading}
-                    variant="solid"
-                    className="w-full text-[13px]"
-                  >
-                    Send Verification Code
-                  </Button>
-                </form>
-
-                <p className="text-[11px] text-center text-[#94A3B8] leading-relaxed">
-                  By continuing, you agree to receive SMS verification codes. Standard carrier rates apply.
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-xl font-bold text-[#09090B] tracking-tight">
+                  {authMode === 'signin' ? 'Welcome back' : 'Create an owner account'}
+                </h2>
+                <p className="mt-1 text-xs text-[#64748B]">
+                  Sign in with Google or your email to access your PG dashboard.
                 </p>
               </div>
-            ) : (
-              <div className="space-y-6">
-                <div>
-                  <h2 className="text-xl font-bold text-[#09090B] tracking-tight">
-                    Enter verification code
-                  </h2>
-                  <p className="mt-1 text-xs text-[#64748B]">
-                    Enter the 6-digit code sent to{" "}
-                    <span className="font-bold text-[#09090B] font-mono-numbers">
-                      +91 {phoneNumber}
-                    </span>
-                  </p>
+
+              {/* Primary: 1-Tap Google Sign-In */}
+              <button
+                type="button"
+                onClick={handleGoogleSignIn}
+                disabled={googleLoading || loading}
+                className="w-full flex items-center justify-center gap-2.5 h-11 px-4 border border-[#E2E8F0] hover:border-[#CBD5E1] bg-white hover:bg-[#F8FAFC] rounded-[8px] text-xs font-bold text-[#09090B] transition-colors shadow-2xs cursor-pointer disabled:opacity-60"
+              >
+                <svg className="h-4 w-4" viewBox="0 0 24 24">
+                  <path
+                    fill="#4285F4"
+                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                  />
+                </svg>
+                <span>{googleLoading ? 'Connecting...' : 'Continue with Google'}</span>
+              </button>
+
+              <div className="relative flex items-center justify-center">
+                <div className="border-t border-[#E2E8F0] w-full" />
+                <span className="bg-white px-3 text-[11px] font-semibold text-[#94A3B8] uppercase tracking-wider absolute">
+                  Or with email
+                </span>
+              </div>
+
+              {error && (
+                <div className="p-3 rounded-[8px] bg-[#FEF2F2] border border-[#FEE2E2] flex items-center gap-2 text-xs font-semibold text-[#DC2626]">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <span>{error}</span>
                 </div>
+              )}
 
-                <form onSubmit={handleVerifyOtp} className="space-y-4">
-                  <div className="space-y-2">
-                    <label className="text-[11px] font-semibold uppercase tracking-wider text-[#475569]">
-                      6-Digit SMS Code
-                    </label>
-                    <OtpInput
-                      value={otpCode}
-                      onChange={setOtpCode}
-                      disabled={loading}
-                      error={!!otpError}
-                    />
-                    {otpError && (
-                      <p className="text-xs font-semibold text-[#EF4444] animate-shake">
-                        {otpError}
-                      </p>
-                    )}
-                  </div>
+              {/* Fallback: Email & Password */}
+              <form onSubmit={handleEmailAuth} className="space-y-3.5">
+                <Input
+                  type="email"
+                  label="Email Address"
+                  placeholder="owner@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={loading || googleLoading}
+                  required
+                />
 
-                  <Button
-                    type="submit"
-                    size="lg"
-                    loading={loading}
-                    variant="solid"
-                    className="w-full text-[13px]"
-                  >
-                    Verify & Continue
-                  </Button>
-                </form>
+                <Input
+                  type="password"
+                  label="Password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={loading || googleLoading}
+                  required
+                />
 
-                <div className="pt-2 flex items-center justify-between text-xs">
-                  <button
-                    type="button"
-                    onClick={() => setStep('phone')}
-                    className="text-[#64748B] hover:text-[#09090B] font-medium transition-colors cursor-pointer"
-                  >
-                    Change phone number
-                  </button>
+                <Button
+                  type="submit"
+                  size="lg"
+                  loading={loading}
+                  variant="solid"
+                  className="w-full text-[13px] mt-2"
+                >
+                  {authMode === 'signin' ? 'Sign In' : 'Create Account'}
+                </Button>
+              </form>
 
-                  {countdown > 0 ? (
-                    <span className="text-[#94A3B8] font-mono-numbers">
-                      Resend in {countdown}s
-                    </span>
-                  ) : (
+              <div className="pt-2 text-center text-xs text-[#64748B]">
+                {authMode === 'signin' ? (
+                  <span>
+                    Don't have an account?{' '}
                     <button
                       type="button"
-                      onClick={() => handleSendOtp()}
-                      disabled={loading}
-                      className="inline-flex items-center gap-1 font-bold text-[#D97706] hover:text-[#B45309] transition-colors cursor-pointer disabled:cursor-not-allowed"
+                      onClick={() => {
+                        setAuthMode('signup');
+                        setError('');
+                      }}
+                      className="font-bold text-[#D97706] hover:underline cursor-pointer"
                     >
-                      <RefreshCw className="h-3 w-3" />
-                      Resend SMS
+                      Sign up
                     </button>
-                  )}
-                </div>
+                  </span>
+                ) : (
+                  <span>
+                    Already have an account?{' '}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAuthMode('signin');
+                        setError('');
+                      }}
+                      className="font-bold text-[#D97706] hover:underline cursor-pointer"
+                    >
+                      Sign in
+                    </button>
+                  </span>
+                )}
               </div>
-            )}
+            </div>
           </div>
 
           <div className="mt-8 pt-4 border-t border-[#E2E8F0] flex items-center justify-center gap-1.5 text-[11px] text-[#94A3B8]">
             <ShieldCheck className="h-3.5 w-3.5 text-[#10B981]" />
-            <span>End-to-end encrypted session</span>
+            <span>Secure httpOnly session cookies</span>
           </div>
         </div>
       </div>

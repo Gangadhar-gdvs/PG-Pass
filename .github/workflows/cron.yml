@@ -1,0 +1,30 @@
+name: Scheduled Maintenance & Backups
+
+on:
+  schedule:
+    # 00:30 IST = 19:00 UTC (Nightly metrics & rent generation)
+    - cron: '0 19 * * *'
+    # 02:00 IST = 20:30 UTC (Encrypted DB backup)
+    - cron: '30 20 * * *'
+    # 03:00 IST = 21:30 UTC (Retention cleanup & orphans)
+    - cron: '30 21 * * *'
+  workflow_dispatch:
+
+jobs:
+  trigger-cron:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Metrics Job
+        run: |
+          curl -f -s -X POST "${{ secrets.APP_URL || 'https://pgpass.in' }}/api/cron/metrics" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" || echo "Metrics job completed or skipped"
+
+      - name: Trigger Backup Job
+        run: |
+          curl -f -s -X POST "${{ secrets.APP_URL || 'https://pgpass.in' }}/api/cron/backup" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" || echo "Backup job completed or skipped"
+
+      - name: Trigger Cleanup Job
+        run: |
+          curl -f -s -X POST "${{ secrets.APP_URL || 'https://pgpass.in' }}/api/cron/cleanup" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" || echo "Cleanup job completed or skipped"

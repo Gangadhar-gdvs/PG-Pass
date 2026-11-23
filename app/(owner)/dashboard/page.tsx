@@ -661,7 +661,7 @@ export default function OwnerDashboardPage() {
             <div className="p-3.5 bg-[#F8FAFC] rounded-[8px] border border-[#E2E8F0] flex items-center justify-between text-xs">
               <span className="text-[#64748B]">Claimed Amount:</span>
               <span className="font-mono-numbers font-bold text-sm text-[#09090B]">
-                {formatCurrency(proofModalRecord.record.amount)}
+                {formatCurrency(proofModalRecord.record.amount || 0)}
               </span>
             </div>
 

@@ -136,7 +136,8 @@ export default function SuperAdminPortalPage() {
     }
   };
 
-  const handleCopyLink = (token: string) => {
+  const handleCopyLink = (token?: string) => {
+    if (!token) return;
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : config.app.url;
     navigator.clipboard.writeText(`${baseUrl}/t/${token}`);
     toast.success('Resident link copied');
