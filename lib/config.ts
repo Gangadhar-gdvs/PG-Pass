@@ -26,16 +26,6 @@ export const config = {
     },
   },
 
-  cloudinary: {
-    cloudName: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || '',
-    uploadPreset: process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || '',
-    isConfigured: (): boolean => {
-      const c = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
-      const p = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
-      return Boolean(c && p && c !== 'your_cloud_name' && p !== 'your_unsigned_upload_preset');
-    },
-  },
-
   security: {
     // Max file upload limits (prevent denial of service and memory crashes)
     maxUploadSizeBytes: 5 * 1024 * 1024, // 5 MB
