@@ -3,6 +3,7 @@ import { withErrorHandler, AppError } from '@/lib/server/api/withErrorHandler';
 import { withAuth, AuthContext } from '@/lib/server/api/withAuth';
 import { withRateLimit } from '@/lib/server/api/withRateLimit';
 import { rentService } from '@/lib/server/services/rent.service';
+import { STAFF_PERMISSIONS } from '@/lib/constants/permissions';
 
 export const POST = withErrorHandler(
   withAuth(
@@ -35,6 +36,6 @@ export const POST = withErrorHandler(
       },
       { tier: 'standard' }
     ),
-    { roles: ['owner', 'staff'] }
+    { roles: ['owner', 'staff'], permission: STAFF_PERMISSIONS.COLLECT_RENT }
   )
 );

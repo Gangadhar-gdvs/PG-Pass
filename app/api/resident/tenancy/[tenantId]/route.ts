@@ -17,7 +17,7 @@ export const GET = withErrorHandler(
       const { tenantId } = await ctx.params;
       const tenant = await residentsService.assertOwnTenant(ctx.auth.uid, tenantId);
 
-      const [rentSnap, depositSnap, ticketSnap] = await Promise.all([
+      const [rentSnap, depositSnap, ticketSnap, staffSnap] = await Promise.all([
         adminDb
           .collection('rent_records')
           .where('tenantId', '==', tenantId)
@@ -38,18 +38,40 @@ export const GET = withErrorHandler(
           .orderBy('createdAt', 'desc')
           .limit(50)
           .get(),
+        // Active staff of this PG — so the resident can rate individual wardens.
+        adminDb
+          .collection('staff')
+          .where('ownerId', '==', tenant.ownerId)
+          .limit(25)
+          .get(),
       ]);
+
+      const staff = staffSnap.docs
+        .map((d) => d.data())
+        .filter((s: any) => s.accountStatus !== 'revoked')
+        .map((s: any) => {
+          const agg = s.ratingAgg || { count: 0, sum: 0 };
+          return {
+            uid: s.uid || s.id,
+            name: s.name || 'Staff',
+            ratingAvg: agg.count > 0 ? Math.round((agg.sum / agg.count) * 10) / 10 : 0,
+            ratingCount: agg.count || 0,
+          };
+        });
 
       return NextResponse.json({
         tenant: {
           id: tenant.id,
           name: tenant.name,
+          ownerId: tenant.ownerId,
+          propertyId: tenant.propertyId || tenant.ownerId,
           bedLabel: tenant.bedLabel,
           roomNumber: tenant.roomNumber,
           moveInDate: tenant.moveInDate,
           securityDepositPaise: tenant.securityDepositPaise,
           depositPaidPaise: tenant.depositPaidPaise,
         },
+        staff,
         rentHistory: rentSnap.docs.map((d) => ({ ...d.data(), id: d.id })),
         deposits: depositSnap.docs.map((d) => ({ ...d.data(), id: d.id })),
         tickets: ticketSnap.docs.map((d) => ({ ...d.data(), id: d.id })),

@@ -4,6 +4,7 @@ import { withAuth, AuthContext } from '@/lib/server/api/withAuth';
 import { withRateLimit } from '@/lib/server/api/withRateLimit';
 import { verifyPortalSession } from '@/lib/server/security/portalAuth';
 import { maintenanceService } from '@/lib/server/services/maintenance.service';
+import { STAFF_PERMISSIONS, PG_FEATURES } from '@/lib/constants/permissions';
 
 // Tenant raises a maintenance ticket from the portal (token + PIN auth).
 export const POST = withErrorHandler(
@@ -55,6 +56,6 @@ export const GET = withErrorHandler(
       const tickets = await maintenanceService.listForOwner(ownerId, status || undefined);
       return NextResponse.json({ tickets });
     },
-    { roles: ['owner', 'staff'] }
+    { roles: ['owner', 'staff'], permission: STAFF_PERMISSIONS.MANAGE_MAINTENANCE, feature: PG_FEATURES.MAINTENANCE }
   )
 );

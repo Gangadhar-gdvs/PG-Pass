@@ -4,6 +4,7 @@ import { withAuth, AuthContext } from '@/lib/server/api/withAuth';
 import { withRateLimit } from '@/lib/server/api/withRateLimit';
 import { bedsService, createBedsBatch } from '@/lib/server/services/beds.service';
 import { createBedsBatchSchema } from '@/lib/validation';
+import { STAFF_PERMISSIONS } from '@/lib/constants/permissions';
 
 export const POST = withErrorHandler(
   withAuth(
@@ -32,6 +33,6 @@ export const POST = withErrorHandler(
       },
       { tier: 'standard' }
     ),
-    { roles: ['owner', 'staff'] }
+    { roles: ['owner', 'staff'], permission: STAFF_PERMISSIONS.MANAGE_BEDS }
   )
 );

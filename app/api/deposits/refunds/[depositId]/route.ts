@@ -3,6 +3,7 @@ import { withErrorHandler, AppError } from '@/lib/server/api/withErrorHandler';
 import { withAuth, AuthContext } from '@/lib/server/api/withAuth';
 import { withRateLimit } from '@/lib/server/api/withRateLimit';
 import { depositsService } from '@/lib/server/services/deposits.service';
+import { STAFF_PERMISSIONS } from '@/lib/constants/permissions';
 
 // Owner marks a pending deposit refund as actually paid out to the tenant.
 export const PATCH = withErrorHandler(
@@ -32,6 +33,6 @@ export const PATCH = withErrorHandler(
       },
       { tier: 'standard', key: 'uid' }
     ),
-    { roles: ['owner', 'staff'] }
+    { roles: ['owner', 'staff'], permission: STAFF_PERMISSIONS.MANAGE_TENANTS }
   )
 );

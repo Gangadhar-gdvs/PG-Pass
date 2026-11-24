@@ -4,6 +4,8 @@ import { adminAuth, adminDb } from '../firebase-admin';
 import { AppError, RouteHandler } from './withErrorHandler';
 import { SESSION_COOKIE_NAME, SESSION_ID_COOKIE_NAME } from '@/lib/constants/limits';
 import { isSessionCurrent } from '../auth/sessionRegistry';
+import { staffHasPermission, pgFeatureEnabled } from '../auth/entitlements';
+import { StaffPermission, PgFeature } from '@/lib/constants/permissions';
 
 export interface AuthContext {
   uid: string;
@@ -14,6 +16,11 @@ export interface AuthContext {
 
 export interface WithAuthOptions {
   roles?: Array<'owner' | 'staff' | 'admin' | 'tenant' | 'resident'>;
+  // When set, a STAFF caller must hold this permission (owner/admin bypass).
+  permission?: StaffPermission;
+  // When set, the PG (owner scope) must have this feature enabled by the admin.
+  // Applies to owner + staff callers; admins bypass.
+  feature?: PgFeature;
 }
 
 // In-memory 60s cache for account status to eliminate redundant Firestore queries on every API request
@@ -118,6 +125,26 @@ export function withAuth(
       const current = await isSessionCurrent(role, uid, sid);
       if (!current) {
         throw new AppError(401, 'This session was signed out on another device', 'SESSION_SUPERSEDED');
+      }
+    }
+
+    // 7. Per-staff permission check (owner/admin bypass). Enforced server-side
+    // so a staff member can only perform actions their owner granted them.
+    if (options.permission && !isAdmin && role === 'staff') {
+      const ok = await staffHasPermission(uid, options.permission);
+      if (!ok) {
+        throw new AppError(403, 'You do not have permission to perform this action', 'PERMISSION_DENIED');
+      }
+    }
+
+    // 8. Admin-controlled per-PG feature gate (owner + staff; admin bypasses).
+    if (options.feature && !isAdmin) {
+      const scopeOwnerId = role === 'owner' ? uid : ownerId;
+      if (scopeOwnerId) {
+        const enabled = await pgFeatureEnabled(scopeOwnerId, options.feature);
+        if (!enabled) {
+          throw new AppError(403, 'This feature is not enabled for your PG', 'FEATURE_DISABLED');
+        }
       }
     }
 

@@ -23,6 +23,10 @@ import {
   MessageSquare,
 } from 'lucide-react';
 import { AdminSupportPanel } from '@/components/support/AdminSupportPanel';
+import { AdminPgFeatures } from '@/components/admin/AdminPgFeatures';
+import { AdminPgManage } from '@/components/admin/AdminPgManage';
+import { IdleLogout } from '@/components/auth/IdleLogout';
+import { clearLocalData } from '@/lib/client/localData';
 import {
   signInWithEmailAndPassword,
   signOut,
@@ -222,6 +226,7 @@ export default function SuperAdminPortalPage() {
     try {
       await fetch('/api/auth/session', { method: 'DELETE' });
       await signOut(auth);
+      clearLocalData();
       setCurrentUser(null);
       setStats(null);
       setEmail('');
@@ -398,6 +403,7 @@ export default function SuperAdminPortalPage() {
 
   return (
     <div className="theme-admin min-h-screen app-gradient-tint text-slate-900 flex flex-col font-sans">
+      <IdleLogout role="admin" redirectTo="/admin" />
       {/* Gradient header */}
       <header className="app-gradient px-5 sm:px-6 py-4 flex items-center justify-between shadow-[0_8px_24px_-12px_rgba(79,70,229,0.5)]">
         <div className="flex items-center gap-3">
@@ -846,6 +852,12 @@ export default function SuperAdminPortalPage() {
                     })}
                   </div>
                 </div>
+
+                {/* Per-PG feature access control (admin, server-enforced) */}
+                <AdminPgFeatures ownerId={selectedPg.owner.id} />
+
+                {/* Admin act-as-owner management + full history */}
+                <AdminPgManage pg={selectedPg} onChanged={loadPlatformData} />
 
                 {/* Resident Data Table */}
                 <div className="space-y-2">

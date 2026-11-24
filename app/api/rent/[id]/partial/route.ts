@@ -3,6 +3,7 @@ import { withErrorHandler, AppError } from '@/lib/server/api/withErrorHandler';
 import { withAuth, AuthContext } from '@/lib/server/api/withAuth';
 import { withRateLimit } from '@/lib/server/api/withRateLimit';
 import { rentService } from '@/lib/server/services/rent.service';
+import { STAFF_PERMISSIONS } from '@/lib/constants/permissions';
 
 // Owner/staff records a partial or advance payment toward a rent record.
 // When the accumulated amount covers the due amount, the record is marked paid
@@ -45,6 +46,6 @@ export const POST = withErrorHandler(
       },
       { tier: 'standard', key: 'uid' }
     ),
-    { roles: ['owner', 'staff'] }
+    { roles: ['owner', 'staff'], permission: STAFF_PERMISSIONS.COLLECT_RENT }
   )
 );

@@ -3,11 +3,13 @@
 import React, { useState, useEffect } from 'react';
 import { useOwnerSession } from '@/hooks/useOwner';
 import { AddPropertyCard } from '@/components/owner/AddPropertyCard';
+import { OwnerOnlyGuard } from '@/components/owner/OwnerOnlyGuard';
+import { PgPhotoGallery } from '@/components/owner/PgPhotoGallery';
 import { SupportLink } from '@/components/ui/support-link';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { validatePan, validateUpi, sanitizeText } from '@/lib/security';
+import { validateUpi, sanitizeText } from '@/lib/security';
 import {
   Settings,
   Building,
@@ -17,8 +19,8 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-export default function SettingsPage() {
-  const { ownerId } = useOwnerSession();
+function SettingsPageInner() {
+  const { ownerId, selectedPropertyId } = useOwnerSession();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -27,7 +29,6 @@ export default function SettingsPage() {
   const [ownerName, setOwnerName] = useState('');
   const [pgAddress, setPgAddress] = useState('');
   const [upiId, setUpiId] = useState('');
-  const [panNumber, setPanNumber] = useState('');
   const [phone, setPhone] = useState('');
   const [rentDueDay, setRentDueDay] = useState('5');
   const [lateFeePerDay, setLateFeePerDay] = useState('0');
@@ -43,7 +44,6 @@ export default function SettingsPage() {
           setOwnerName(profile.name || '');
           setPgAddress(profile.address || profile.pgAddress || '');
           setUpiId(profile.upiId || '');
-          setPanNumber(profile.panNumber || '');
           setPhone(profile.phone || '');
           setRentDueDay(String(profile.rentDueDay ?? 5));
           setLateFeePerDay(String(Math.round((profile.lateFeePerDayPaise ?? 0) / 100)));
@@ -76,12 +76,6 @@ export default function SettingsPage() {
       return;
     }
 
-    const panValidation = validatePan(panNumber);
-    if (!panValidation.valid) {
-      toast.error(panValidation.error || 'Invalid PAN Number format');
-      return;
-    }
-
     setSaving(true);
     try {
       const res = await fetch('/api/owners', {
@@ -92,7 +86,6 @@ export default function SettingsPage() {
           name: sanitizedOwnerName,
           address: sanitizedPgAddress || 'PG Address',
           upiId: upiValidation.formatted,
-          panNumber: panValidation.formatted,
           phone: phone.replace(/\D/g, '').slice(-10) || '9876543210',
           rentDueDay: Math.min(28, Math.max(1, Number(rentDueDay) || 5)),
           lateFeePerDayPaise: Math.max(0, Math.round((Number(lateFeePerDay) || 0) * 100)),
@@ -191,16 +184,6 @@ export default function SettingsPage() {
               required
               disabled={saving}
             />
-
-            <Input
-              label="Income Tax PAN (For Tenant HRA Receipts)"
-              placeholder="e.g. ABCDE1234F"
-              value={panNumber}
-              onChange={(e) => setPanNumber(e.target.value.toUpperCase())}
-              required
-              disabled={saving}
-              maxLength={10}
-            />
           </div>
 
           <div className="space-y-4 pt-4 border-t border-[#E2E8F0]">
@@ -282,9 +265,19 @@ export default function SettingsPage() {
         </form>
       </div>
 
+      <PgPhotoGallery propertyId={selectedPropertyId} />
+
       <div className="flex justify-center pt-1">
         <SupportLink subject="Owner support request" />
       </div>
     </div>
+  );
+}
+
+export default function SettingsPage() {
+  return (
+    <OwnerOnlyGuard>
+      <SettingsPageInner />
+    </OwnerOnlyGuard>
   );
 }

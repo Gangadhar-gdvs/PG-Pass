@@ -4,6 +4,7 @@ import { withAuth, AuthContext } from '@/lib/server/api/withAuth';
 import { withRateLimit } from '@/lib/server/api/withRateLimit';
 import { depositsService } from '@/lib/server/services/deposits.service';
 import { depositEntrySchema } from '@/lib/validation';
+import { STAFF_PERMISSIONS } from '@/lib/constants/permissions';
 
 export const GET = withErrorHandler(
   withAuth(
@@ -52,6 +53,6 @@ export const POST = withErrorHandler(
       },
       { tier: 'standard' }
     ),
-    { roles: ['owner', 'staff'] }
+    { roles: ['owner', 'staff'], permission: STAFF_PERMISSIONS.MANAGE_TENANTS }
   )
 );

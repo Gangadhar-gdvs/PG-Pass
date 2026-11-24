@@ -55,7 +55,13 @@ export function subscribeToOwnerBeds(
 
   return onSnapshot(
     q,
-    (snap) => callback(snap.docs.map((d) => ({ ...d.data(), id: d.id } as Bed))),
+    (snap) =>
+      callback(
+        snap.docs
+          .map((d) => ({ ...d.data(), id: d.id } as Bed))
+          // Hide soft-deleted beds from the live inventory view.
+          .filter((b) => !(b as any).deletedAt)
+      ),
     (error) => {
       console.warn('Firestore beds subscription error:', error.code);
       callback([]);

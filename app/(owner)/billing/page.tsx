@@ -24,11 +24,12 @@ import { Button } from '@/components/ui/button';
 import { Drawer } from '@/components/ui/drawer';
 import { ProgressBar } from '@/components/ui/progress-bar';
 import { Skeleton } from '@/components/ui/skeleton';
+import { OwnerOnlyGuard } from '@/components/owner/OwnerOnlyGuard';
 import toast from 'react-hot-toast';
 
 const ADMIN_BILLING_UPI = 'pgpass.billing@icici';
 
-export default function BillingPage() {
+function BillingPageInner() {
   const { ownerId } = useOwnerSession();
   const { beds } = useBeds(ownerId);
 
@@ -507,5 +508,13 @@ export default function BillingPage() {
         </Drawer>
       )}
     </div>
+  );
+}
+
+export default function BillingPage() {
+  return (
+    <OwnerOnlyGuard>
+      <BillingPageInner />
+    </OwnerOnlyGuard>
   );
 }

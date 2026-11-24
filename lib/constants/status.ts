@@ -10,6 +10,7 @@ export const ACCOUNT_STATUS = {
   ACTIVE: 'active',
   SUSPENDED: 'suspended',
   PENDING_REVIEW: 'pending_review',
+  REVOKED: 'revoked', // staff access permanently withdrawn (soft — record kept)
 } as const;
 
 export type AccountStatus = (typeof ACCOUNT_STATUS)[keyof typeof ACCOUNT_STATUS];

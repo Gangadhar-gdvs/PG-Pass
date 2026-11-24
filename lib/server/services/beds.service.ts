@@ -13,9 +13,14 @@ export class BedsService {
 
   async listBeds(ownerId: string, limitCount = 50, startAfterId?: string): Promise<Bed[]> {
     const safeLimit = Math.min(limitCount, MAX_LIST_LIMIT);
+    // Filter soft-deleted in the QUERY (not in memory) so the page returns a
+    // full `safeLimit` of ACTIVE beds and pagination can't skip active rows.
+    // Requires composite index beds(ownerId, deletedAt, roomNumber) + beds are
+    // created with `deletedAt: null`.
     let q = adminDb
       .collection('beds')
       .where('ownerId', '==', ownerId)
+      .where('deletedAt', '==', null)
       .orderBy('roomNumber', 'asc')
       .limit(safeLimit);
 
@@ -39,6 +44,9 @@ export class BedsService {
     if (data.ownerId !== ownerId) {
       throw new AppError(403, 'Unauthorized bed access');
     }
+    if ((data as any).deletedAt) {
+      throw new AppError(404, 'Bed not found');
+    }
     return { ...data, id: doc.id };
   }
 
@@ -55,17 +63,20 @@ export class BedsService {
       roomAmenities?: string[];
     }
   ): Promise<Bed> {
-    // 1. Quota check — owner read + bed count in parallel.
-    const [ownerDoc, countSnap] = await Promise.all([
+    // 1. Quota check — owner read + ACTIVE bed count in parallel. We fetch only
+    // the `deletedAt` field and count non-deleted in memory so soft-deleted beds
+    // don't consume the plan quota (count() can't exclude missing/null cleanly).
+    const [ownerDoc, bedsSnap] = await Promise.all([
       adminDb.collection('owners').doc(ownerId).get(),
-      adminDb.collection('beds').where('ownerId', '==', ownerId).count().get(),
+      adminDb.collection('beds').where('ownerId', '==', ownerId).select('deletedAt').get(),
     ]);
     if (!ownerDoc.exists) {
       throw new AppError(404, 'Owner profile not found. Please complete setup.');
     }
     const maxBeds = ownerDoc.data()?.maxBeds ?? 20;
+    const activeBedCount = bedsSnap.docs.filter((d) => !d.data()?.deletedAt).length;
 
-    if (countSnap.data().count >= maxBeds) {
+    if (activeBedCount >= maxBeds) {
       throw new AppError(
         403,
         `Plan bed limit reached (${maxBeds} beds). Please upgrade your plan in Billing.`
@@ -80,9 +91,11 @@ export class BedsService {
     const bedRef = adminDb.collection('beds').doc(bedId);
 
     const existing = await bedRef.get();
-    if (existing.exists) {
+    if (existing.exists && !existing.data()?.deletedAt) {
       throw new AppError(409, `Bed ${data.roomNumber}-${data.bedLabel} already exists`);
     }
+    // If a soft-deleted bed occupies this id, it is revived below (set overwrites
+    // it with a fresh vacant bed and clears deletedAt).
 
     const newBed: Bed = {
       id: bedId,
@@ -100,6 +113,7 @@ export class BedsService {
       tenantId: null as any,
       tenantName: null as any,
       tenantPhone: null as any,
+      deletedAt: null, // explicit so `where('deletedAt','==',null)` matches
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
     };
@@ -130,16 +144,17 @@ export class BedsService {
         throw new AppError(403, 'Invalid property for this account');
       }
     }
-    const [ownerDoc, countSnap] = await Promise.all([
+    const [ownerDoc, bedsSnap] = await Promise.all([
       adminDb.collection('owners').doc(ownerId).get(),
-      adminDb.collection('beds').where('ownerId', '==', ownerId).count().get(),
+      adminDb.collection('beds').where('ownerId', '==', ownerId).select('deletedAt').get(),
     ]);
     if (!ownerDoc.exists) {
       throw new AppError(404, 'Owner profile not found. Please complete setup.');
     }
     const planLimit = ownerDoc.data()?.maxBeds ?? 20;
 
-    const currentCount = countSnap.data().count;
+    // Count only ACTIVE beds — soft-deleted ones don't consume quota.
+    const currentCount = bedsSnap.docs.filter((d) => !d.data()?.deletedAt).length;
     // First-setup grace: a brand-new PG may generate its full bed layout in one
     // batch even if it exceeds the default free limit — but never beyond a hard
     // ceiling, so the grace can't be abused to create an unbounded inventory.
@@ -181,6 +196,7 @@ export class BedsService {
         tenantId: null as any,
         tenantName: null as any,
         tenantPhone: null as any,
+        deletedAt: null, // explicit: matches the deletedAt==null query + clears any stale value on merge-revive
         createdAt: now,
         updatedAt: now,
       };
@@ -218,7 +234,13 @@ export class BedsService {
     if (bed.status === BED_STATUS.OCCUPIED || bed.tenantId) {
       throw new AppError(400, 'Cannot delete an occupied bed. Vacate the resident first.');
     }
-    await adminDb.collection('beds').doc(bedId).delete();
+    // SOFT delete — keep the bed record (occupancy history references it) but
+    // mark it removed so it disappears from active inventory. Reads filter on
+    // `deletedAt == null`.
+    await adminDb.collection('beds').doc(bedId).update({
+      deletedAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+    });
   }
 }
 

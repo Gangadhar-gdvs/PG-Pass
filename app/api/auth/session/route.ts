@@ -78,7 +78,13 @@ export const POST = withErrorHandler(
       const activeSid = await getActiveSessionId(role, uid);
 
       if (mode === 'refresh') {
-        // Background re-sync must not reclaim a session taken over elsewhere.
+        // Background re-sync must not reclaim a session taken over elsewhere, and
+        // must never MINT a new session. A refresh with no existing session-id
+        // cookie is not a legitimate active device (e.g. a second tab racing the
+        // login tab) — reject it so it can't clobber the real login's sid.
+        if (!existingSid) {
+          throw new AppError(409, 'No active session to refresh', 'SESSION_SUPERSEDED');
+        }
         const current = await isSessionCurrent(role, uid, existingSid);
         if (!current) {
           throw new AppError(409, 'This session was signed out on another device', 'SESSION_SUPERSEDED');
@@ -98,9 +104,9 @@ export const POST = withErrorHandler(
       }
 
       // 5. Decide this device's session id.
-      // - refresh: keep the existing (already-validated) id.
+      // - refresh: keep the existing (already-validated) id (guaranteed present).
       // - login:   mint a fresh id (so the previous device is superseded).
-      const sessionId = mode === 'refresh' && existingSid ? existingSid : randomUUID();
+      const sessionId = mode === 'refresh' ? (existingSid as string) : randomUUID();
 
       // 6. Create the Firebase session cookie
       const expiresInMs = SESSION_MAX_AGE_DAYS * 24 * 60 * 60 * 1000;

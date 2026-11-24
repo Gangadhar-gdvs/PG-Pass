@@ -3,6 +3,7 @@ import { withErrorHandler, AppError } from '@/lib/server/api/withErrorHandler';
 import { withAuth, AuthContext } from '@/lib/server/api/withAuth';
 import { withRateLimit } from '@/lib/server/api/withRateLimit';
 import { maintenanceService } from '@/lib/server/services/maintenance.service';
+import { STAFF_PERMISSIONS, PG_FEATURES } from '@/lib/constants/permissions';
 
 const VALID_STATUS = ['open', 'in_progress', 'resolved'];
 
@@ -40,6 +41,6 @@ export const PATCH = withErrorHandler(
       },
       { tier: 'standard', key: 'uid' }
     ),
-    { roles: ['owner', 'staff'] }
+    { roles: ['owner', 'staff'], permission: STAFF_PERMISSIONS.MANAGE_MAINTENANCE, feature: PG_FEATURES.MAINTENANCE }
   )
 );

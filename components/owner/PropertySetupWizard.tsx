@@ -36,7 +36,7 @@ import {
 } from '@/lib/constants/amenities';
 import { Owner } from '@/types';
 import { formatCurrency } from '@/lib/utils';
-import { validatePan, validateUpi, sanitizeText } from '@/lib/security';
+import { validateUpi, sanitizeText } from '@/lib/security';
 import toast from 'react-hot-toast';
 
 interface PropertySetupWizardProps {
@@ -74,7 +74,6 @@ export function PropertySetupWizard({
   const [ownerName, setOwnerName] = useState(existingOwner?.name || '');
   const [pgAddress, setPgAddress] = useState(existingOwner?.pgAddress || existingOwner?.address || '');
   const [upiId, setUpiId] = useState(existingOwner?.upiId || '');
-  const [panNumber, setPanNumber] = useState(existingOwner?.panNumber || '');
   const [pgCategory, setPgCategory] = useState<PgCategory>(existingOwner?.pgCategory || 'coliving');
   const [foodPlan, setFoodPlan] = useState<FoodPlan>(existingOwner?.foodPlan || '3_meals');
   const [foodCuisine, setFoodCuisine] = useState<FoodCuisine>(existingOwner?.foodCuisine || 'both');
@@ -239,14 +238,6 @@ export function PropertySetupWizard({
       return false;
     }
 
-    if (panNumber.trim()) {
-      const panRes = validatePan(panNumber);
-      if (!panRes.valid) {
-        toast.error(panRes.error || 'Invalid PAN format');
-        return false;
-      }
-    }
-
     return true;
   };
 
@@ -273,7 +264,6 @@ export function PropertySetupWizard({
           pgName: cleanPg,
           address: cleanAddress,
           upiId: upiId.trim().toLowerCase(),
-          panNumber: panNumber.trim().toUpperCase() || undefined,
           pgCategory,
           foodPlan,
           foodCuisine: foodPlan !== 'no_food' ? foodCuisine : undefined,
@@ -425,23 +415,14 @@ export function PropertySetupWizard({
               onChange={(e) => setPgAddress(e.target.value)}
             />
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Input
-                label="Direct Rent UPI ID (VPA)"
-                placeholder="e.g. payments@bank"
-                value={upiId}
-                onChange={(e) => setUpiId(e.target.value)}
-                helperText="Residents pay directly to this UPI. Zero payment gateway fees."
-                required
-              />
-              <Input
-                label="PAN Number (Optional)"
-                placeholder="e.g. ABCDE1234F"
-                value={panNumber}
-                onChange={(e) => setPanNumber(e.target.value.toUpperCase())}
-                helperText="Required if residents claim income tax HRA deductions."
-              />
-            </div>
+            <Input
+              label="Direct Rent UPI ID (VPA)"
+              placeholder="e.g. payments@bank"
+              value={upiId}
+              onChange={(e) => setUpiId(e.target.value)}
+              helperText="Residents pay directly to this UPI. Zero payment gateway fees."
+              required
+            />
 
             {/* PG Category */}
             <div className="space-y-1.5">

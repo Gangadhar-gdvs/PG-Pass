@@ -14,6 +14,16 @@ export interface PublicListing {
   pgCategory?: string;
   foodPlan?: string;
   monthlyRent?: number; // indicative base rent
+  coverPhotoUrl?: string; // first gallery photo, for the search card
+  ratingAvg?: number; // 0 when no reviews
+  ratingCount?: number;
+}
+
+/** Average helper from a {count,sum} aggregate. */
+function avgOf(agg: any): { ratingAvg: number; ratingCount: number } {
+  const count = agg?.count || 0;
+  const sum = agg?.sum || 0;
+  return { ratingAvg: count > 0 ? Math.round((sum / count) * 10) / 10 : 0, ratingCount: count };
 }
 
 /** Only public-safe fields — never owner PII, UPI, PAN, etc. */
@@ -27,6 +37,8 @@ function toListing(id: string, data: any): PublicListing {
     pgCategory: data.pgCategory,
     foodPlan: data.foodPlan,
     monthlyRent: data.monthlyRent,
+    coverPhotoUrl: data.coverPhotoUrl || undefined, // denormalized on first photo upload
+    ...avgOf(data.reviewAgg),
   };
 }
 
@@ -42,7 +54,10 @@ export class DiscoveryService {
     query = query.limit(lim);
 
     const snap = await query.get();
-    let listings = snap.docs.map((d: any) => toListing(d.id, d.data()));
+    // Honor the admin per-PG `discovery` feature flag (fail-open unless set false).
+    let listings = snap.docs
+      .filter((d: any) => d.data()?.features?.discovery !== false)
+      .map((d: any) => toListing(d.id, d.data()));
 
     const q = params.q?.trim().toLowerCase();
     if (q) {
@@ -53,6 +68,22 @@ export class DiscoveryService {
           (l.city || '').toLowerCase().includes(q)
       );
     }
+
+    // Cover photos come from the denormalized `coverPhotoUrl` on the property
+    // doc (set on first photo upload) — no per-listing query. Only legacy
+    // listings that predate denormalization fall back to a one-off lookup, and
+    // that fallback is capped so a public search can't fan out unboundedly.
+    const missing = listings.filter((l: PublicListing) => !l.coverPhotoUrl).slice(0, 10);
+    await Promise.all(
+      missing.map(async (l: PublicListing) => {
+        const photoSnap = await adminDb
+          .collection('property_photos')
+          .where('propertyId', '==', l.propertyId)
+          .limit(1)
+          .get();
+        if (!photoSnap.empty) l.coverPhotoUrl = photoSnap.docs[0].data().publicUrl;
+      })
+    );
     return listings;
   }
 
@@ -62,6 +93,69 @@ export class DiscoveryService {
       throw new AppError(404, 'PG not found or not listed');
     }
     return toListing(doc.id, doc.data());
+  }
+
+  /**
+   * Full public PG page: listing + gallery photos + visible reviews + a public
+   * contact (phone + address). Still never exposes UPI, email, or internal data.
+   */
+  async getListingDetail(propertyId: string) {
+    const propDoc = await adminDb.collection('properties').doc(propertyId).get();
+    if (!propDoc.exists || !propDoc.data()?.isListed || propDoc.data()?.features?.discovery === false) {
+      throw new AppError(404, 'PG not found or not listed');
+    }
+    const listing = toListing(propDoc.id, propDoc.data());
+    const data = propDoc.data()!;
+
+    const [photoSnap, reviewSnap, ownerDoc] = await Promise.all([
+      adminDb.collection('property_photos').where('propertyId', '==', propertyId).limit(30).get(),
+      adminDb
+        .collection('pg_reviews')
+        .where('propertyId', '==', propertyId)
+        .where('hidden', '==', false)
+        .limit(50)
+        .get(),
+      adminDb.collection('owners').doc(listing.ownerId).get(),
+    ]);
+
+    const photos = photoSnap.docs
+      .map((d) => d.data())
+      .sort((a: any, b: any) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0))
+      .map((p: any) => ({
+        id: p.id,
+        category: p.category,
+        caption: p.caption || null,
+        sharingType: p.sharingType || null,
+        publicUrl: p.publicUrl,
+      }));
+
+    // Hide reviews entirely if the admin disabled the reviews feature for this
+    // PG (the property doc mirrors `features`; no extra read needed).
+    const reviewsEnabled = data.features?.reviews !== false;
+    const reviews = !reviewsEnabled
+      ? []
+      : reviewSnap.docs
+          .map((d) => d.data())
+          .sort((a: any, b: any) => (b.updatedAt?.toMillis?.() || 0) - (a.updatedAt?.toMillis?.() || 0))
+          .map((r: any) => ({
+            id: r.id,
+            reviewerName: r.reviewerName,
+            reviewerRole: r.reviewerRole,
+            rating: r.rating,
+            text: r.text || '',
+            createdAt: r.updatedAt?.toDate?.()?.toISOString?.() || null,
+          }));
+
+    // Public contact — phone + address only (owner opted into listing).
+    const owner = ownerDoc.data() || {};
+    const contact = {
+      phone: owner.phone || null,
+      address: data.pgAddress || owner.pgAddress || owner.address || null,
+      amenities: data.pgAmenities || owner.pgAmenities || [],
+      foodCuisine: data.foodCuisine || owner.foodCuisine || null,
+    };
+
+    return { listing, photos, reviews, contact };
   }
 
   /** A resident requests to join a listed PG. Deduped per resident+property. */

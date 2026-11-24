@@ -4,8 +4,9 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Search, MapPin, Building2 } from 'lucide-react';
+import { Search, MapPin, Building2, Star } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { PgDetailDrawer } from '@/components/resident/PgDetailDrawer';
 
 interface Listing {
   propertyId: string;
@@ -13,6 +14,9 @@ interface Listing {
   city?: string;
   area?: string;
   pgCategory?: string;
+  coverPhotoUrl?: string;
+  ratingAvg?: number;
+  ratingCount?: number;
 }
 
 export default function DiscoverPage() {
@@ -21,6 +25,7 @@ export default function DiscoverPage() {
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
   const [joiningId, setJoiningId] = useState<string | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
 
   const search = useCallback(async () => {
     setLoading(true);
@@ -110,31 +115,52 @@ export default function DiscoverPage() {
       ) : (
         <div className="space-y-2.5 stagger">
           {listings.map((l) => (
-            <div key={l.propertyId} className="app-card p-4 flex items-center gap-3.5">
-              <div className="w-12 h-12 rounded-[16px] accent-soft-bg flex items-center justify-center shrink-0">
-                <Building2 className="w-6 h-6" />
-              </div>
+            <button
+              key={l.propertyId}
+              type="button"
+              onClick={() => setDetailId(l.propertyId)}
+              className="app-card p-4 flex items-center gap-3.5 w-full text-left press cursor-pointer"
+            >
+              {l.coverPhotoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={l.coverPhotoUrl}
+                  alt={l.pgName}
+                  className="w-14 h-14 rounded-[16px] object-cover shrink-0"
+                />
+              ) : (
+                <div className="w-14 h-14 rounded-[16px] accent-soft-bg flex items-center justify-center shrink-0">
+                  <Building2 className="w-6 h-6" />
+                </div>
+              )}
               <div className="min-w-0 flex-1">
                 <div className="font-extrabold text-[15px] text-slate-900 truncate">{l.pgName}</div>
                 <div className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
                   <MapPin className="w-3 h-3" />
                   {[l.area, l.city].filter(Boolean).join(', ') || 'Location n/a'}
                 </div>
-                <div className="text-[11px] text-slate-400 mt-0.5 capitalize">{l.pgCategory || 'coliving'}</div>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="text-[11px] text-slate-400 capitalize">{l.pgCategory || 'coliving'}</span>
+                  {(l.ratingCount ?? 0) > 0 && (
+                    <span className="text-[11px] font-bold text-amber-600 flex items-center gap-0.5">
+                      <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
+                      {l.ratingAvg} ({l.ratingCount})
+                    </span>
+                  )}
+                </div>
               </div>
-              <Button
-                size="sm"
-                variant="solid"
-                disabled={joiningId === l.propertyId}
-                loading={joiningId === l.propertyId}
-                onClick={() => join(l.propertyId)}
-              >
-                Join
-              </Button>
-            </div>
+              <span className="text-xs font-bold accent-text shrink-0">View →</span>
+            </button>
           ))}
         </div>
       )}
+
+      <PgDetailDrawer
+        propertyId={detailId}
+        onClose={() => setDetailId(null)}
+        onJoin={join}
+        joiningId={joiningId}
+      />
     </div>
   );
 }

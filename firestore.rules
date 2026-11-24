@@ -95,6 +95,31 @@ service cloud.firestore {
       allow write: if false; // managed via /api/properties (Admin SDK)
     }
 
+    // PG gallery photos. Metadata is public (the underlying B2 objects are
+    // public-read anyway, and prospective residents browse galleries while
+    // signed out). Writes are server-only via /api/properties/photos.
+    match /property_photos/{photoId} {
+      allow get:   if true;
+      allow list:  if boundedList();
+      allow write: if false;
+    }
+
+    // Public PG reviews (verified residents/guests/staff only — enforced in the
+    // service). Publicly readable; written server-side via /api/reviews.
+    match /pg_reviews/{reviewId} {
+      allow get:   if true;
+      allow list:  if boundedList();
+      allow write: if false;
+    }
+
+    // Individual staff ratings (resident → staff). Read by the owning PG + admin;
+    // written server-side via /api/reviews/staff.
+    match /staff_ratings/{ratingId} {
+      allow get:   if canReadOwnerScope(resource.data.ownerId);
+      allow list:  if canReadOwnerScope(resource.data.ownerId) && boundedList();
+      allow write: if false;
+    }
+
     // Owner↔admin support chat. Owner reads ONLY their own thread + messages
     // (enables live onSnapshot); admin reads all. Writes are server-only.
     match /support_threads/{ownerId} {

@@ -4,8 +4,15 @@ import { storageProvider } from '../storage/provider';
 import { env } from '@/lib/env';
 import { AppError } from '../api/withErrorHandler';
 import { PHOTO_MAX_BYTES, UPLOAD_URL_TTL_SECONDS, PHOTO_URL_TTL_SECONDS } from '@/lib/constants/limits';
-import { STORAGE_PREFIX, ALLOWED_MIME_TYPES, AllowedMimeType } from '@/lib/constants/storage';
+import {
+  STORAGE_PREFIX,
+  ALLOWED_MIME_TYPES,
+  AllowedMimeType,
+  PROPERTY_PHOTO_CATEGORIES,
+  PropertyPhotoCategory,
+} from '@/lib/constants/storage';
 import { PhotoType } from '@/lib/constants/status';
+import { PROPERTY_PHOTO_MAX } from '@/lib/constants/limits';
 import { Timestamp } from 'firebase-admin/firestore';
 import crypto from 'crypto';
 
@@ -312,6 +319,188 @@ export class PhotosService {
       console.warn(`Failed to immediately delete B2 object: ${photoData.objectKey}`, e);
     }
 
+    return { success: true };
+  }
+
+  // ---------------- PG GALLERY PHOTOS (PUBLIC) ----------------
+  // Separate from tenant evidence photos: these are public-read, categorized,
+  // and surfaced to prospective residents in discovery.
+
+  /** Verify a property belongs to the owner (primary property id == ownerId). */
+  private async assertPropertyOwned(ownerId: string, propertyId: string) {
+    if (propertyId === ownerId) return; // primary property is always owned
+    const propDoc = await adminDb.collection('properties').doc(propertyId).get();
+    if (!propDoc.exists || propDoc.data()?.ownerId !== ownerId) {
+      throw new AppError(403, 'Unauthorized property access');
+    }
+  }
+
+  /** Presigned PUT for a PG gallery photo (pending/ buffer, like tenant photos). */
+  async createPropertyUploadIntent(params: {
+    ownerId: string;
+    propertyId: string;
+    contentType: string;
+    sizeBytes: number;
+  }) {
+    const { ownerId, propertyId, contentType, sizeBytes } = params;
+
+    if (!ALLOWED_MIME_TYPES.includes(contentType as AllowedMimeType)) {
+      throw new AppError(400, `Invalid image format: ${contentType}. Allowed: image/webp, image/jpeg`);
+    }
+    if (sizeBytes > PHOTO_MAX_BYTES) {
+      throw new AppError(400, `File size exceeds ${PHOTO_MAX_BYTES / (1024 * 1024)} MB`);
+    }
+
+    const [, countSnap] = await Promise.all([
+      this.assertPropertyOwned(ownerId, propertyId),
+      adminDb.collection('property_photos').where('propertyId', '==', propertyId).count().get(),
+    ]);
+    if (countSnap.data().count >= PROPERTY_PHOTO_MAX) {
+      throw new AppError(403, `Gallery photo limit reached (${PROPERTY_PHOTO_MAX} per property).`);
+    }
+
+    const uuid = crypto.randomUUID();
+    const ext = contentType === 'image/webp' ? 'webp' : 'jpg';
+    const objectKey = `${STORAGE_PREFIX.PENDING}${ownerId}/property/${propertyId}/${uuid}.${ext}`;
+
+    const uploadUrl = await storageProvider.mintPresignedPut(
+      env.B2_BUCKET,
+      objectKey,
+      contentType,
+      UPLOAD_URL_TTL_SECONDS
+    );
+    return { uploadUrl, objectKey, expiresSeconds: UPLOAD_URL_TTL_SECONDS };
+  }
+
+  /** Verify + publish a PG gallery photo as a public-read object, store metadata. */
+  async confirmPropertyUpload(params: {
+    ownerId: string;
+    propertyId: string;
+    objectKey: string;
+    category: string;
+    caption?: string;
+    sharingType?: string;
+    uploadedBy: string;
+  }) {
+    const { ownerId, propertyId, objectKey, caption, sharingType, uploadedBy } = params;
+
+    const category = (PROPERTY_PHOTO_CATEGORIES as readonly string[]).includes(params.category)
+      ? (params.category as PropertyPhotoCategory)
+      : 'other';
+
+    // Object key must belong to this owner's pending property buffer.
+    const expectedPrefix = `${STORAGE_PREFIX.PENDING}${ownerId}/property/${propertyId}/`;
+    if (!objectKey.startsWith(expectedPrefix)) {
+      throw new AppError(403, 'Invalid or unauthorized object key');
+    }
+    await this.assertPropertyOwned(ownerId, propertyId);
+
+    const bucket = env.B2_BUCKET;
+
+    let head;
+    try {
+      head = await storageProvider.headObject(bucket, objectKey);
+    } catch {
+      throw new AppError(404, 'Uploaded file not found in storage buffer');
+    }
+    if (head.contentLength > PHOTO_MAX_BYTES) {
+      await storageProvider.deleteObject(bucket, objectKey).catch(() => {});
+      throw new AppError(400, 'File exceeds maximum allowed size');
+    }
+
+    const streamResult = await storageProvider.streamAndVerify(bucket, objectKey).catch(() => null);
+    if (!streamResult) {
+      await storageProvider.deleteObject(bucket, objectKey).catch(() => {});
+      throw new AppError(500, 'Failed to inspect uploaded file');
+    }
+    if (!streamResult.magicValid) {
+      await storageProvider.deleteObject(bucket, objectKey).catch(() => {});
+      throw new AppError(422, 'File failed integrity check. Only valid WebP or JPEG images are accepted.');
+    }
+
+    const contentType = streamResult.contentType || head.contentType || 'image/webp';
+    const destKey = objectKey.replace(STORAGE_PREFIX.PENDING, STORAGE_PREFIX.PROPERTY);
+
+    try {
+      await storageProvider.copyObjectPublic(bucket, objectKey, destKey, contentType);
+      await storageProvider.deleteObject(bucket, objectKey);
+    } catch {
+      throw new AppError(500, 'Failed to publish gallery photo');
+    }
+
+    const publicUrl = storageProvider.publicObjectUrl(bucket, destKey);
+    const docRef = adminDb.collection('property_photos').doc();
+    const photoDoc = {
+      id: docRef.id,
+      ownerId,
+      propertyId,
+      category,
+      caption: (caption || '').trim().slice(0, 120) || null,
+      // Only accept known sharing values into the public doc.
+      sharingType: ['1', '2', '3', '4', '5', '6'].includes(sharingType || '') ? sharingType : null,
+      objectKey: destKey,
+      publicUrl,
+      contentType,
+      sizeBytes: streamResult.contentLength,
+      uploadedBy,
+      createdAt: Timestamp.now(),
+    };
+    await docRef.set(photoDoc);
+
+    // Denormalize a cover photo onto the property doc the FIRST time, so public
+    // PG search can show a thumbnail without an N+1 per-listing photo query.
+    const propRef = adminDb.collection('properties').doc(propertyId);
+    const propSnap = await propRef.get();
+    if (propSnap.exists && !propSnap.data()?.coverPhotoUrl) {
+      await propRef.set({ coverPhotoUrl: publicUrl }, { merge: true }).catch(() => {});
+    }
+
+    return photoDoc;
+  }
+
+  /** Public list of a property's gallery photos (no auth needed). */
+  async listPropertyPhotos(propertyId: string, limitCount = PROPERTY_PHOTO_MAX) {
+    const snap = await adminDb
+      .collection('property_photos')
+      .where('propertyId', '==', propertyId)
+      .limit(Math.min(limitCount, 100))
+      .get();
+    const photos = snap.docs.map((d) => d.data());
+    // Sort newest-first in memory to avoid needing a composite index.
+    photos.sort((a: any, b: any) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+    return photos.map((p: any) => ({
+      id: p.id,
+      category: p.category,
+      caption: p.caption || null,
+      sharingType: p.sharingType || null,
+      publicUrl: p.publicUrl,
+      createdAt: p.createdAt?.toDate?.()?.toISOString?.() || null,
+    }));
+  }
+
+  /** Owner deletes a gallery photo (Firestore + public object). */
+  async deletePropertyPhoto(photoId: string, ownerId: string) {
+    const ref = adminDb.collection('property_photos').doc(photoId);
+    const doc = await ref.get();
+    if (!doc.exists) throw new AppError(404, 'Photo not found');
+    const data = doc.data()!;
+    if (data.ownerId !== ownerId) throw new AppError(403, 'Unauthorized');
+    await ref.delete();
+    await storageProvider.deleteObject(env.B2_BUCKET, data.objectKey).catch(() => {});
+
+    // If this was the denormalized cover photo, repoint it to any remaining
+    // photo (or clear it) so public search never shows a dead thumbnail.
+    const propRef = adminDb.collection('properties').doc(data.propertyId);
+    const propSnap = await propRef.get();
+    if (propSnap.exists && propSnap.data()?.coverPhotoUrl === data.publicUrl) {
+      const remaining = await adminDb
+        .collection('property_photos')
+        .where('propertyId', '==', data.propertyId)
+        .limit(1)
+        .get();
+      const nextCover = remaining.empty ? null : remaining.docs[0].data().publicUrl;
+      await propRef.set({ coverPhotoUrl: nextCover }, { merge: true }).catch(() => {});
+    }
     return { success: true };
   }
 }

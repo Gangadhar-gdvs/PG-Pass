@@ -64,6 +64,28 @@ export function withErrorHandler(handler: RouteHandler): RouteHandler {
         );
       }
 
+      // Zod validation errors → clean 400, not an opaque 500. Detected by shape
+      // to avoid importing zod into this low-level handler.
+      if (
+        err &&
+        typeof err === 'object' &&
+        (err as any).name === 'ZodError' &&
+        Array.isArray((err as any).issues)
+      ) {
+        const issues = (err as any).issues as Array<{ path?: (string | number)[]; message: string }>;
+        const first = issues[0];
+        const field = first?.path?.length ? `${first.path.join('.')}: ` : '';
+        reqLogger.warn('Validation error', { durationMs, issues: issues.length });
+        return NextResponse.json(
+          {
+            error: `${field}${first?.message || 'Invalid request'}`,
+            code: 'VALIDATION_ERROR',
+            requestId,
+          },
+          { status: 400, headers: { 'X-Request-Id': requestId } }
+        );
+      }
+
       const errorMessage =
         err instanceof Error ? err.message : 'Internal Server Error';
       const stack = err instanceof Error ? err.stack : undefined;

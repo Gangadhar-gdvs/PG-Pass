@@ -21,6 +21,7 @@ function LoginFormContent() {
   const searchParams = useSearchParams();
   const isExpired = searchParams.get('expired') === 'true';
   const wasKicked = searchParams.get('kicked') === '1';
+  const wasIdle = searchParams.get('idle') === '1';
   const from = searchParams.get('from') || '/dashboard';
 
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
@@ -231,6 +232,12 @@ function LoginFormContent() {
             {wasKicked && (
               <div className="mb-6 p-3 rounded-[8px] bg-[#FFFBEB] border border-[#FDE68A] text-xs text-[#92400E]">
                 You were signed out because this account was logged in on another device.
+              </div>
+            )}
+
+            {wasIdle && (
+              <div className="mb-6 p-3 rounded-[8px] bg-[#FFFBEB] border border-[#FDE68A] text-xs text-[#92400E]">
+                You were signed out automatically after a period of inactivity, for your security.
               </div>
             )}
 

@@ -39,6 +39,7 @@ export const PHOTO_MAX_BYTES = 5_242_880; // 5 MB hard server cap
 export const PHOTO_ALLOWED_TYPES = ['image/webp', 'image/jpeg'] as const;
 export const UPLOAD_URL_TTL_SECONDS = 300; // 5 minutes
 export const PHOTO_URL_TTL_SECONDS = 300; // 5 minutes
+export const PROPERTY_PHOTO_MAX = 30; // max PG gallery photos per property
 
 // Portal & Session limits
 export const PORTAL_TOKEN_TTL_DAYS = 90;
@@ -51,6 +52,18 @@ export const SESSION_COOKIE_NAME = '__session';
 // session-id cookie is matched against `currentSessionId` on the user doc; a
 // newer login supersedes older devices.
 export const SESSION_ID_COOKIE_NAME = '__pgp_sid';
+
+// Idle auto-logout (minutes of inactivity before forced sign-out). Tiered by
+// privilege per OWASP/financial norms: tighter for higher-privilege roles.
+export const IDLE_TIMEOUT_MINUTES: Record<string, number> = {
+  admin: 15,
+  owner: 30,
+  staff: 30,
+  tenant: 60,
+  resident: 60,
+};
+// Warn the user this many seconds before the idle logout fires.
+export const IDLE_WARNING_SECONDS = 60;
 
 // Data Retention & Undo limits
 export const SOFT_DELETE_UNDO_DAYS = 7;

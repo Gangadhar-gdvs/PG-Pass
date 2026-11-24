@@ -56,7 +56,7 @@ export async function generateNumberedReceipt(data: NumberedReceiptData): Promis
   doc.text(`Address: ${owner.address || owner.pgAddress || 'Not specified'}`, margin + 6, 58, {
     maxWidth: pageW - 2 * margin - 12,
   });
-  doc.text(`Owner: ${owner.name}  |  UPI: ${owner.upiId || 'N/A'}${owner.panNumber ? `  |  PAN: ${owner.panNumber}` : ''}`, margin + 6, 65);
+  doc.text(`Owner: ${owner.name}  |  UPI: ${owner.upiId || 'N/A'}`, margin + 6, 65);
 
   // Resident & Room Info Box
   doc.setFillColor(248, 250, 252);

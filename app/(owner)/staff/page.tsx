@@ -24,25 +24,33 @@ import { Drawer } from '@/components/ui/drawer';
 import { Avatar } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { validatePhone, sanitizeText } from '@/lib/security';
+import { OwnerOnlyGuard } from '@/components/owner/OwnerOnlyGuard';
+import { StaffPermissionsEditor } from '@/components/owner/StaffPermissionsEditor';
+import { DEFAULT_STAFF_PERMISSIONS, StaffPermission } from '@/lib/constants/permissions';
+import { Star } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 
 interface StaffMember {
   uid: string;
+  id?: string;
   name: string;
   email: string;
   phone: string;
   role: string;
   accountStatus: string;
   createdAt: string;
+  permissions?: string[];
+  ratingAgg?: { count: number; sum: number };
 }
 
-export default function StaffPage() {
+function StaffPageInner() {
   const { ownerId } = useOwnerSession();
 
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [permsOpenUid, setPermsOpenUid] = useState<string | null>(null);
 
   // Invite modal state
   const [isInviteOpen, setIsInviteOpen] = useState(false);
@@ -251,26 +259,13 @@ export default function StaffPage() {
       <div className="p-4 rounded-[10px] bg-[#F8FAFC] border border-[#E2E8F0] space-y-2 text-xs">
         <div className="flex items-center gap-1.5 font-bold text-[#09090B]">
           <ShieldCheck className="w-4 h-4 text-[#10B981]" />
-          <span>Scoped Warden Permissions Matrix</span>
+          <span>Per-Staff Access Control</span>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[#475569] pt-1">
-          <div className="flex items-center gap-1.5">
-            <span className="text-[#10B981]">✓</span>
-            <span>Check-in residents & assign beds</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-[#10B981]">✓</span>
-            <span>Record rent payments & view receipts</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-[#DC2626]">✕</span>
-            <span>Cannot modify property UPI ID or bank details</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-[#DC2626]">✕</span>
-            <span>Cannot reverse confirmed payments or delete beds</span>
-          </div>
-        </div>
+        <p className="text-[#475569] pt-1 leading-relaxed">
+          Each staff member gets their own access toggles — grant only what that person needs.
+          Permissions are independent per staff (never shared), enforced on the server, and banking
+          settings, subscription and staff management always stay owner-only.
+        </p>
       </div>
 
       {/* Staff List Table / Cards */}
@@ -284,14 +279,16 @@ export default function StaffPage() {
         </div>
       ) : (
         <div className="bg-white border border-[#E2E8F0] rounded-[12px] divide-y divide-[#E2E8F0] shadow-xs">
-          {staffList.map((staff) => (
-            <div
-              key={staff.uid}
-              className="p-4 flex items-center justify-between text-xs"
-            >
-              <div className="flex items-center gap-3">
+          {staffList.map((staff) => {
+            const staffUid = staff.uid || staff.id || '';
+            const agg = staff.ratingAgg || { count: 0, sum: 0 };
+            const ratingAvg = agg.count > 0 ? Math.round((agg.sum / agg.count) * 10) / 10 : 0;
+            return (
+            <div key={staffUid} className="p-4 text-xs">
+             <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-3 min-w-0">
                 <Avatar name={staff.name} size="md" />
-                <div>
+                <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-[#09090B] text-sm">
                       {staff.name}
@@ -305,21 +302,34 @@ export default function StaffPage() {
                     >
                       {staff.accountStatus}
                     </span>
+                    {agg.count > 0 && (
+                      <span className="text-[10px] font-bold text-amber-600 flex items-center gap-0.5">
+                        <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
+                        {ratingAvg} ({agg.count})
+                      </span>
+                    )}
                   </div>
-                  <div className="flex items-center gap-3 text-[#64748B] mt-0.5">
-                    <span className="flex items-center gap-1">
-                      <Mail className="w-3 h-3 text-[#94A3B8]" />
-                      <span>{staff.email}</span>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[#64748B] mt-0.5">
+                    <span className="flex items-center gap-1 min-w-0">
+                      <Mail className="w-3 h-3 text-[#94A3B8] shrink-0" />
+                      <span className="truncate max-w-[180px] sm:max-w-none">{staff.email}</span>
                     </span>
                     <span className="flex items-center gap-1 font-mono">
-                      <Phone className="w-3 h-3 text-[#94A3B8]" />
+                      <Phone className="w-3 h-3 text-[#94A3B8] shrink-0" />
                       <span>+91 {staff.phone}</span>
                     </span>
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setPermsOpenUid(permsOpenUid === staffUid ? null : staffUid)}
+                  className="px-2.5 py-1.5 rounded-[6px] border border-[#E2E8F0] hover:bg-[#F8FAFC] text-[#475569] font-semibold transition-colors cursor-pointer"
+                >
+                  {permsOpenUid === staffUid ? 'Close' : 'Permissions'}
+                </button>
                 <button
                   type="button"
                   onClick={() => handleToggleStatus(staff)}
@@ -341,8 +351,22 @@ export default function StaffPage() {
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>
+             </div>
+
+             {permsOpenUid === staffUid && (
+               <StaffPermissionsEditor
+                 staffUid={staffUid}
+                 initial={(staff.permissions as StaffPermission[]) || DEFAULT_STAFF_PERMISSIONS}
+                 onSaved={(perms) =>
+                   setStaffList((list) =>
+                     list.map((s) => ((s.uid || s.id) === staffUid ? { ...s, permissions: perms } : s))
+                   )
+                 }
+               />
+             )}
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -461,5 +485,13 @@ export default function StaffPage() {
         )}
       </Drawer>
     </div>
+  );
+}
+
+export default function StaffPage() {
+  return (
+    <OwnerOnlyGuard>
+      <StaffPageInner />
+    </OwnerOnlyGuard>
   );
 }

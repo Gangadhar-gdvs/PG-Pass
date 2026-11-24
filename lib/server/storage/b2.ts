@@ -104,6 +104,39 @@ export async function deleteObject(
   await b2.send(command);
 }
 
+/**
+ * Copy an object and mark the destination public-read. Used ONLY for PG gallery
+ * photos (property/ prefix), which prospective residents must view without auth.
+ * All other photo types (ID proof, payment, move-in) stay private.
+ */
+export async function copyObjectPublic(
+  bucket: string,
+  sourceKey: string,
+  destKey: string,
+  contentType: string
+): Promise<void> {
+  const command = new CopyObjectCommand({
+    Bucket: bucket,
+    CopySource: `${bucket}/${sourceKey}`,
+    Key: destKey,
+    ACL: 'public-read',
+    ContentType: contentType,
+    MetadataDirective: 'REPLACE',
+    CacheControl: 'public, max-age=86400',
+  });
+  await b2.send(command);
+}
+
+/**
+ * Stable, non-expiring public URL for a public-read object. Built from the S3
+ * endpoint in path-style (works for both B2 and the local MinIO dev endpoint).
+ */
+export function publicObjectUrl(bucket: string, key: string): string {
+  const base = env.B2_ENDPOINT.replace(/\/+$/, '');
+  const encodedKey = key.split('/').map(encodeURIComponent).join('/');
+  return `${base}/${bucket}/${encodedKey}`;
+}
+
 function verifyMagicBytes(buffer: Buffer): boolean {
   if (buffer.length < 12) return false;
   // JPEG check: FF D8 FF

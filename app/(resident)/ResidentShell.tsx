@@ -4,6 +4,7 @@ import React from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { BottomTabBar } from '@/components/ui/bottom-tab-bar';
+import { IdleLogout } from '@/components/auth/IdleLogout';
 import { Home, Search, LogOut, UserCircle } from 'lucide-react';
 
 export function ResidentShell({ children }: { children: React.ReactNode }) {
@@ -17,6 +18,7 @@ export function ResidentShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="theme-resident min-h-screen app-gradient-tint flex flex-col pb-24">
+      <IdleLogout role="resident" redirectTo="/resident/login" />
       {/* Gradient header band */}
       <header className="app-gradient px-5 pt-5 pb-6 rounded-b-[28px] shadow-[0_8px_24px_-12px_rgba(13,148,136,0.5)]">
         <div className="flex items-center justify-between">

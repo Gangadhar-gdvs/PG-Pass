@@ -5,6 +5,7 @@ import { withRateLimit } from '@/lib/server/api/withRateLimit';
 import { rentService } from '@/lib/server/services/rent.service';
 import { createRentRecordSchema } from '@/lib/validation';
 import { RentStatus } from '@/lib/constants/status';
+import { STAFF_PERMISSIONS } from '@/lib/constants/permissions';
 
 export const GET = withErrorHandler(
   withAuth(
@@ -48,6 +49,6 @@ export const POST = withErrorHandler(
       },
       { tier: 'standard' }
     ),
-    { roles: ['owner', 'staff'] }
+    { roles: ['owner', 'staff'], permission: STAFF_PERMISSIONS.COLLECT_RENT }
   )
 );

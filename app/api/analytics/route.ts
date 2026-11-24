@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withErrorHandler } from '@/lib/server/api/withErrorHandler';
 import { withAuth, AuthContext } from '@/lib/server/api/withAuth';
 import { analyticsService } from '@/lib/server/services/analytics.service';
+import { STAFF_PERMISSIONS, PG_FEATURES } from '@/lib/constants/permissions';
 
 // Per-owner business analytics: occupancy, collection %, 6-month trend, and
 // defaulter aging buckets — computed server-side from the owner's own data.
@@ -13,6 +14,6 @@ export const GET = withErrorHandler(
       const analytics = await analyticsService.getOwnerAnalytics(ownerId, todayIso);
       return NextResponse.json(analytics);
     },
-    { roles: ['owner', 'staff'] }
+    { roles: ['owner', 'staff'], permission: STAFF_PERMISSIONS.VIEW_ANALYTICS, feature: PG_FEATURES.ANALYTICS }
   )
 );

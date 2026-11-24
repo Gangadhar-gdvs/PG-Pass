@@ -28,6 +28,13 @@ export interface StorageProvider {
     sourceKey: string,
     destKey: string
   ): Promise<void>;
+  copyObjectPublic(
+    bucket: string,
+    sourceKey: string,
+    destKey: string,
+    contentType: string
+  ): Promise<void>;
+  publicObjectUrl(bucket: string, key: string): string;
   deleteObject(bucket: string, key: string): Promise<void>;
   streamAndVerify(
     bucket: string,
@@ -46,6 +53,8 @@ export const storageProvider: StorageProvider = {
   putObject: b2Storage.putObject,
   headObject: b2Storage.headObject,
   copyObject: b2Storage.copyObject,
+  copyObjectPublic: b2Storage.copyObjectPublic,
+  publicObjectUrl: b2Storage.publicObjectUrl,
   deleteObject: b2Storage.deleteObject,
   streamAndVerify: b2Storage.streamAndVerify,
 };

@@ -59,7 +59,6 @@ export interface Owner {
   city?: string;
   area?: string;
   isListed?: boolean;
-  panNumber?: string;
   upiId: string;
   upiMerchantName?: string;
   accountStatus?: AccountStatus;
@@ -158,6 +157,22 @@ export interface Property {
   updatedAt?: any;
 }
 
+// PG gallery photo (PUBLIC) — shown to prospective residents in discovery.
+export interface PropertyPhoto {
+  id: string;
+  ownerId: string;
+  propertyId: string;
+  category: 'exterior' | 'room' | 'bathroom' | 'common' | 'food' | 'amenity' | 'other';
+  caption?: string; // e.g. "2-sharing AC room", "1st floor bathroom"
+  sharingType?: '1' | '2' | '3' | '4' | '5' | '6'; // optional, for room photos
+  objectKey: string;
+  publicUrl: string; // stable public-read URL on B2
+  contentType: string;
+  sizeBytes: number;
+  uploadedBy: string;
+  createdAt?: any;
+}
+
 export interface Bed {
   id: string;
   ownerId: string;
@@ -176,6 +191,7 @@ export interface Bed {
   tenantPhone?: string;
   createdAt?: any;
   updatedAt?: any;
+  deletedAt?: any | null; // soft-delete marker; absent/null = active
 }
 
 export interface Tenant {
@@ -260,6 +276,7 @@ export interface Expense {
   period: string; // YYYY-MM (derived from date, for monthly grouping)
   recordedBy: string;
   createdAt?: any;
+  deletedAt?: any | null; // soft-delete marker; absent/null = active
 }
 
 export type RefundStatus = 'pending' | 'issued';

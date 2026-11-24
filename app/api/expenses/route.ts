@@ -3,6 +3,7 @@ import { withErrorHandler, AppError } from '@/lib/server/api/withErrorHandler';
 import { withAuth, AuthContext } from '@/lib/server/api/withAuth';
 import { withRateLimit } from '@/lib/server/api/withRateLimit';
 import { expensesService } from '@/lib/server/services/expenses.service';
+import { STAFF_PERMISSIONS, PG_FEATURES } from '@/lib/constants/permissions';
 
 function currentPeriod() {
   const d = new Date();
@@ -19,7 +20,7 @@ export const GET = withErrorHandler(
       const total = expenses.reduce((s, e) => s + (e.amountPaise || 0), 0);
       return NextResponse.json({ expenses, total, period });
     },
-    { roles: ['owner', 'staff'] }
+    { roles: ['owner', 'staff'], feature: PG_FEATURES.EXPENSES }
   )
 );
 
@@ -60,6 +61,6 @@ export const POST = withErrorHandler(
       },
       { tier: 'standard', key: 'uid' }
     ),
-    { roles: ['owner', 'staff'] }
+    { roles: ['owner', 'staff'], permission: STAFF_PERMISSIONS.MANAGE_EXPENSES, feature: PG_FEATURES.EXPENSES }
   )
 );

@@ -111,6 +111,69 @@ export async function uploadPhotoToB2(
   };
 }
 
+export interface UploadPropertyPhotoOptions {
+  file: File;
+  category: string;
+  caption?: string;
+  sharingType?: string;
+  propertyId?: string;
+  onProgress?: (percent: number) => void;
+}
+
+/**
+ * Uploads a PUBLIC PG gallery photo to B2:
+ * 1. Compress client-side to WebP.
+ * 2. Presigned PUT URL from POST /api/properties/photos.
+ * 3. PUT binary directly to B2 (pending buffer).
+ * 4. Confirm + publish (public-read) via PUT /api/properties/photos.
+ */
+export async function uploadPropertyPhoto(
+  options: UploadPropertyPhotoOptions
+): Promise<{ photoId: string; publicUrl: string }> {
+  const { file, category, caption, sharingType, propertyId, onProgress } = options;
+
+  onProgress?.(15);
+  const compressed = await compressImage(file, 1600, 1600);
+  onProgress?.(35);
+
+  const intentRes = await fetch('/api/properties/photos', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      propertyId,
+      contentType: compressed.blob.type,
+      sizeBytes: compressed.sizeBytes,
+    }),
+  });
+  if (!intentRes.ok) {
+    const e = await intentRes.json().catch(() => ({}));
+    throw new Error(e.error || e.message || 'Failed to initialize upload');
+  }
+  const { uploadUrl, objectKey } = await intentRes.json();
+  onProgress?.(60);
+
+  const putRes = await fetch(uploadUrl, {
+    method: 'PUT',
+    headers: { 'Content-Type': compressed.blob.type },
+    body: compressed.blob,
+  });
+  if (!putRes.ok) throw new Error(`Upload failed (status ${putRes.status}).`);
+  onProgress?.(85);
+
+  const confirmRes = await fetch('/api/properties/photos', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ propertyId, objectKey, category, caption, sharingType }),
+  });
+  if (!confirmRes.ok) {
+    const e = await confirmRes.json().catch(() => ({}));
+    throw new Error(e.error || e.message || 'Failed to publish photo');
+  }
+  const { photo } = await confirmRes.json();
+  onProgress?.(100);
+  return { photoId: photo.id, publicUrl: photo.publicUrl };
+}
+
 /**
  * Fetches short-lived presigned GET URL to view private photos securely.
  */

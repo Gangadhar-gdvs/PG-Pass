@@ -25,7 +25,6 @@ import { Drawer } from '@/components/ui/drawer';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { StatusDot } from '@/components/ui/status-dot';
 import { Avatar } from '@/components/ui/avatar';
-import { validatePan, validateUpi, sanitizeText } from '@/lib/security';
 import { config } from '@/lib/config';
 import {
   Building,

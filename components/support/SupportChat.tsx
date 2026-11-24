@@ -89,6 +89,7 @@ export function SupportChat({
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="Type a message…"
+          maxLength={2000}
           className="flex-1 h-11 px-4 rounded-full border-2 border-slate-200 text-sm focus:border-[color:var(--accent)] focus:outline-none"
         />
         <Button type="submit" variant="solid" size="md" loading={sending} disabled={!text.trim()}>

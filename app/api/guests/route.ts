@@ -3,6 +3,7 @@ import { withErrorHandler, AppError } from '@/lib/server/api/withErrorHandler';
 import { withAuth, AuthContext } from '@/lib/server/api/withAuth';
 import { withRateLimit } from '@/lib/server/api/withRateLimit';
 import { guestsService } from '@/lib/server/services/guests.service';
+import { STAFF_PERMISSIONS, PG_FEATURES } from '@/lib/constants/permissions';
 
 // List guest stays (active + past).
 export const GET = withErrorHandler(
@@ -13,7 +14,7 @@ export const GET = withErrorHandler(
       const guests = await guestsService.list(ownerId, status || undefined);
       return NextResponse.json({ guests });
     },
-    { roles: ['owner', 'staff'] }
+    { roles: ['owner', 'staff'], feature: PG_FEATURES.GUESTS }
   )
 );
 
@@ -57,6 +58,6 @@ export const POST = withErrorHandler(
       },
       { tier: 'standard', key: 'uid' }
     ),
-    { roles: ['owner', 'staff'] }
+    { roles: ['owner', 'staff'], permission: STAFF_PERMISSIONS.MANAGE_GUESTS, feature: PG_FEATURES.GUESTS }
   )
 );

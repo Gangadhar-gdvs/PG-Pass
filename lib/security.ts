@@ -27,17 +27,6 @@ export function validatePhone(phone: string): { valid: boolean; cleaned: string;
   return { valid: true, cleaned: tenDigits };
 }
 
-export function validatePan(pan: string): { valid: boolean; formatted: string; error?: string } {
-  const formatted = pan.trim().toUpperCase();
-  if (!config.security.panRegex.test(formatted)) {
-    return {
-      valid: false,
-      formatted,
-      error: 'Invalid PAN format. Must be 5 letters, 4 digits, 1 letter (e.g., ABCDE1234F)',
-    };
-  }
-  return { valid: true, formatted };
-}
 
 export function validateUpi(upi: string): { valid: boolean; formatted: string; error?: string } {
   const formatted = upi.trim().toLowerCase();

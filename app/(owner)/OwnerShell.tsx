@@ -23,6 +23,7 @@ import {
 import { Avatar } from '@/components/ui/avatar';
 import { PropertySwitcher } from '@/components/owner/PropertySwitcher';
 import { BottomTabBar } from '@/components/ui/bottom-tab-bar';
+import { IdleLogout } from '@/components/auth/IdleLogout';
 
 const navLinks = [
   { href: '/dashboard', label: 'Bed Inventory', icon: LayoutDashboard },
@@ -37,6 +38,11 @@ const navLinks = [
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
+// Pages a staff/warden must not see — these mutate owner-only data (profile,
+// subscription, staff roster) and are already blocked server-side. Hiding them
+// from the nav keeps the staff console to day-to-day operations only.
+const OWNER_ONLY_HREFS = new Set(['/settings', '/billing', '/staff']);
+
 export function OwnerShell({
   session,
   children,
@@ -48,6 +54,10 @@ export function OwnerShell({
   const router = useRouter();
   const pathname = usePathname();
 
+  const isStaff = session.role === 'staff';
+  const visibleFor = <T extends { href: string }>(items: T[]) =>
+    isStaff ? items.filter((i) => !OWNER_ONLY_HREFS.has(i.href)) : items;
+
   const signOut = () => {
     logout();
     router.push('/login');
@@ -57,6 +67,7 @@ export function OwnerShell({
 
   return (
     <OwnerSessionProvider value={session}>
+      <IdleLogout role={session.role} redirectTo="/login" />
       <div className="theme-owner min-h-screen app-gradient-tint text-slate-900 flex flex-col md:flex-row pb-24 md:pb-0">
         {/* Desktop sidebar */}
         <aside className="hidden md:flex flex-col justify-between w-64 shrink-0 bg-white h-screen sticky top-0 px-4 py-5 shadow-[0_0_24px_-12px_rgba(15,23,42,0.1)] border-r border-slate-100">
@@ -76,7 +87,7 @@ export function OwnerShell({
             <PropertySwitcher />
 
             <nav className="space-y-1">
-              {navLinks.map((item) => {
+              {visibleFor(navLinks).map((item) => {
                 const active = pathname === item.href;
                 const Icon = item.icon;
                 return (
@@ -155,14 +166,14 @@ export function OwnerShell({
             { href: '/analytics', label: 'Stats', icon: BarChart3 },
             { href: '/maintenance', label: 'Issues', icon: Wrench },
           ]}
-          more={[
+          more={visibleFor([
             { href: '/guests', label: 'Guests', icon: BedDouble },
             { href: '/expenses', label: 'Expenses', icon: Wallet },
             { href: '/staff', label: 'Staff', icon: UserCheck },
             { href: '/billing', label: 'Billing', icon: CreditCard },
             { href: '/support', label: 'Support', icon: LifeBuoy },
             { href: '/settings', label: 'Settings', icon: Settings },
-          ]}
+          ])}
           center={{ label: 'Add', icon: Plus, onClick: () => router.push('/dashboard') }}
         />
       </div>

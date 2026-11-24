@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
+import { clearLocalData } from '@/lib/client/localData';
 
 export interface AppUser {
   uid: string;
@@ -71,6 +72,8 @@ export function useAuth() {
     } catch (e) {
       console.error('Logout error:', e);
     }
+    // Wipe app-owned local/session storage (selected property, portal PINs).
+    clearLocalData();
     setUser(null);
   };
 

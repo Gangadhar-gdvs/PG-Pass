@@ -4,7 +4,6 @@ import { amountInWords } from './utils';
 export interface HRAData {
   tenantName: string;
   ownerName: string;
-  ownerPan: string;
   pgName: string;
   pgAddress: string;
   bedId: string;
@@ -50,9 +49,6 @@ export async function generateHRAReceipt(data: HRAData): Promise<void> {
     maxWidth: pageW - 2 * margin - 12,
   });
   doc.text(`Owner / Landlord Name: ${data.ownerName || 'Property Owner'}`, margin + 6, 75);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(99, 102, 241);
-  doc.text(`Landlord PAN: ${data.ownerPan || 'XXXXX0000X'}`, margin + 6, 82);
 
   // Rent Details Table Header
   const tableY = 98;

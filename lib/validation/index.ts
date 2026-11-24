@@ -9,7 +9,6 @@ export const ownerProfileSchema = z.object({
   address: z.string().min(5, 'Address must be at least 5 characters'),
   upiId: z.string().regex(/^[\w.-]+@[\w.-]+$/, 'Invalid UPI ID format (e.g. name@bank)'),
   upiMerchantName: z.string().optional(),
-  panNumber: z.string().regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, 'Invalid PAN format').optional().or(z.literal('')),
   pgCategory: z.enum(['gents', 'ladies', 'coliving']).optional(),
   foodPlan: z.enum(['3_meals', '2_meals', 'no_food']).optional(),
   foodCuisine: z.enum(['both', 'south', 'north']).optional(),

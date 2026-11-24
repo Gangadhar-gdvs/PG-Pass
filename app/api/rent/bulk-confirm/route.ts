@@ -3,6 +3,7 @@ import { withErrorHandler, AppError } from '@/lib/server/api/withErrorHandler';
 import { withAuth, AuthContext } from '@/lib/server/api/withAuth';
 import { withRateLimit } from '@/lib/server/api/withRateLimit';
 import { rentService } from '@/lib/server/services/rent.service';
+import { STAFF_PERMISSIONS } from '@/lib/constants/permissions';
 
 // Confirm multiple pending/verify rent records at once (e.g. "mark a whole
 // floor paid"). Returns which succeeded and which failed.
@@ -27,6 +28,6 @@ export const POST = withErrorHandler(
       },
       { tier: 'standard', key: 'uid' }
     ),
-    { roles: ['owner', 'staff'] }
+    { roles: ['owner', 'staff'], permission: STAFF_PERMISSIONS.COLLECT_RENT }
   )
 );

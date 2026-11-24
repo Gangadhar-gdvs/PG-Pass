@@ -6,7 +6,8 @@ import Link from 'next/link';
 import { formatCurrency, formatDateIN } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ShieldCheck, Wrench } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, Wrench, Star } from 'lucide-react';
+import { RateStaffSection } from '@/components/resident/RateStaffSection';
 import toast from 'react-hot-toast';
 
 const STATUS_STYLE: Record<string, string> = {
@@ -23,6 +24,10 @@ export default function TenancyDetail() {
   const [issueOpen, setIssueOpen] = useState(false);
   const [desc, setDesc] = useState('');
   const [sending, setSending] = useState(false);
+  const [pgRating, setPgRating] = useState(0);
+  const [pgText, setPgText] = useState('');
+  const [pgOpen, setPgOpen] = useState(false);
+  const [pgBusy, setPgBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -71,7 +76,37 @@ export default function TenancyDetail() {
   }
   if (!data) return <p className="text-sm text-slate-500 pt-6">Could not load this tenancy.</p>;
 
-  const { tenant, rentHistory, tickets } = data;
+  const { tenant, rentHistory, tickets, staff } = data;
+
+  const submitPgReview = async () => {
+    if (pgRating < 1) {
+      toast.error('Pick a star rating');
+      return;
+    }
+    setPgBusy(true);
+    try {
+      const res = await fetch('/api/reviews', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ownerId: tenant.ownerId,
+          propertyId: tenant.propertyId,
+          rating: pgRating,
+          text: pgText.trim() || undefined,
+        }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error || 'Could not submit review');
+      toast.success('Thanks for reviewing your PG!');
+      setPgOpen(false);
+      setPgText('');
+      setPgRating(0);
+    } catch (e: any) {
+      toast.error(e.message || 'Could not submit review');
+    } finally {
+      setPgBusy(false);
+    }
+  };
 
   return (
     <div className="space-y-5 pt-4">
@@ -121,6 +156,48 @@ export default function TenancyDetail() {
           ))}
         </div>
       </section>
+
+      {/* Review this PG */}
+      <section>
+        <div className="flex items-center justify-between mb-2 px-1">
+          <h2 className="text-sm font-extrabold text-slate-900">Review this PG</h2>
+          {!pgOpen && (
+            <button onClick={() => setPgOpen(true)} className="text-xs font-bold accent-text press">
+              + Write
+            </button>
+          )}
+        </div>
+        {pgOpen && (
+          <div className="app-card p-3.5 space-y-2 animate-pop">
+            <div className="flex items-center gap-0.5">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <button key={n} type="button" onClick={() => setPgRating(n)} className="cursor-pointer" aria-label={`${n} star`}>
+                  <Star className={`w-6 h-6 ${n <= pgRating ? 'fill-amber-500 text-amber-500' : 'text-slate-300'}`} />
+                </button>
+              ))}
+            </div>
+            <textarea
+              value={pgText}
+              onChange={(e) => setPgText(e.target.value)}
+              rows={3}
+              maxLength={1000}
+              placeholder="How is your stay? Cleanliness, food, staff, value…"
+              className="w-full px-3 py-2.5 rounded-[12px] border-2 border-slate-200 text-sm focus:border-[color:var(--accent)] focus:outline-none resize-none"
+            />
+            <div className="flex gap-2">
+              <Button type="button" size="md" variant="solid" loading={pgBusy} onClick={submitPgReview} className="flex-1">
+                Post Review
+              </Button>
+              <Button type="button" size="md" variant="outline" onClick={() => setPgOpen(false)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* Rate individual staff */}
+      <RateStaffSection staff={staff || []} />
 
       {/* Issues */}
       <section>

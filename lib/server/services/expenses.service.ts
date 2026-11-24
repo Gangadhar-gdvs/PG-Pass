@@ -49,6 +49,7 @@ export class ExpensesService {
       date: input.date,
       period: input.date.slice(0, 7),
       recordedBy,
+      deletedAt: null, // explicit so `where('deletedAt','==',null)` matches
       createdAt: Timestamp.now(),
     };
 
@@ -58,10 +59,14 @@ export class ExpensesService {
 
   async listByPeriod(ownerId: string, period: string, limitCount = 100): Promise<Expense[]> {
     const safeLimit = Math.min(limitCount, MAX_LIST_LIMIT);
+    // Exclude soft-deleted in the QUERY so `.limit()` returns a full page of
+    // ACTIVE expenses and `totalForPeriod` isn't under-counted once deletes
+    // exist. Requires index expenses(ownerId, period, deletedAt, date DESC).
     const snap = await adminDb
       .collection('expenses')
       .where('ownerId', '==', ownerId)
       .where('period', '==', period)
+      .where('deletedAt', '==', null)
       .orderBy('date', 'desc')
       .limit(safeLimit)
       .get();
@@ -79,7 +84,9 @@ export class ExpensesService {
     const snap = await ref.get();
     if (!snap.exists) throw new AppError(404, 'Expense not found');
     if ((snap.data() as Expense).ownerId !== ownerId) throw new AppError(403, 'Unauthorized');
-    await ref.delete();
+    // SOFT delete — keep the record for financial history/audit; exclude from
+    // listings and analytics totals via the deletedAt filter.
+    await ref.update({ deletedAt: Timestamp.now() });
   }
 }
 
