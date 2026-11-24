@@ -20,23 +20,42 @@ export function Drawer({
   footer,
   width = "md",
 }: DrawerProps) {
+  const titleId = React.useId();
+  const descId = React.useId();
+  const panelRef = React.useRef<HTMLDivElement>(null);
+
   React.useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
+    if (!isOpen) return;
+    document.body.style.overflow = "hidden";
+
+    // Move focus into the dialog so keyboard/screen-reader users land here and
+    // Escape / tabbing operate within the drawer rather than the page behind it.
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const focusTarget =
+      panelRef.current?.querySelector<HTMLElement>(
+        'input, select, textarea, button, [href], [tabindex]:not([tabindex="-1"])'
+      ) || panelRef.current;
+    focusTarget?.focus?.();
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
     return () => {
       document.body.style.overflow = "";
+      window.removeEventListener("keydown", onKey);
+      previouslyFocused?.focus?.();
     };
-  }, [isOpen]);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
-  const widths = {
-    sm: "max-w-md",
-    md: "max-w-lg",
-    lg: "max-w-xl",
+  // Static class names so Tailwind can see them (a `md:${...}` template literal
+  // compiles to nothing, which previously left the drawer full-width on desktop).
+  const widths: Record<NonNullable<DrawerProps["width"]>, string> = {
+    sm: "md:max-w-md",
+    md: "md:max-w-lg",
+    lg: "md:max-w-xl",
   };
 
   return (
@@ -50,25 +69,33 @@ export function Drawer({
 
       {/* Drawer Container */}
       <div
-        className={`relative z-50 flex h-full w-full flex-col bg-white shadow-[0_25px_50px_-12px_rgba(0,0,0,0.15)] md:${widths[width]} border-l border-[#E2E8F0] animate-in slide-in-from-right duration-200`}
+        ref={panelRef}
+        tabIndex={-1}
+        className={`relative z-50 flex h-full w-full flex-col bg-white shadow-[0_25px_50px_-12px_rgba(0,0,0,0.15)] ${widths[width]} border-l border-[#E2E8F0] animate-in slide-in-from-right duration-200 focus:outline-none`}
         role="dialog"
         aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={description ? descId : undefined}
+        style={{
+          paddingTop: "env(safe-area-inset-top)",
+          paddingRight: "env(safe-area-inset-right)",
+        }}
       >
         {/* Header */}
         <div className="flex items-start justify-between border-b border-[#E2E8F0] px-6 py-4.5 bg-[#F8FAFC]">
           <div className="space-y-0.5">
-            <h3 className="text-base font-bold text-[#09090B] tracking-tight">{title}</h3>
+            <h3 id={titleId} className="text-base font-bold text-[#09090B] tracking-tight">{title}</h3>
             {description && (
-              <p className="text-xs text-[#64748B]">{description}</p>
+              <p id={descId} className="text-xs text-[#64748B]">{description}</p>
             )}
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-[6px] p-1.5 text-[#64748B] hover:bg-[#E2E8F0] hover:text-[#09090B] transition-colors cursor-pointer"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-[6px] text-[#64748B] hover:bg-[#E2E8F0] hover:text-[#09090B] transition-colors cursor-pointer"
             aria-label="Close"
           >
-            <X className="h-4 w-4" />
+            <X className="h-5 w-5" />
           </button>
         </div>
 
@@ -77,7 +104,10 @@ export function Drawer({
 
         {/* Footer */}
         {footer && (
-          <div className="border-t border-[#E2E8F0] bg-[#F8FAFC] px-6 py-4">
+          <div
+            className="border-t border-[#E2E8F0] bg-[#F8FAFC] px-6 py-4"
+            style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}
+          >
             {footer}
           </div>
         )}

@@ -10,6 +10,12 @@ export interface NotificationPayload {
   relatedTenantId?: string;
 }
 
+export interface OwnerNotificationPayload {
+  ownerId: string;
+  type: 'subscription' | 'payment' | 'moveout' | 'system';
+  message: string;
+}
+
 export class NotificationsService {
   async notify(payload: NotificationPayload): Promise<void> {
     const docRef = adminDb.collection('admin_notifications').doc();
@@ -19,6 +25,22 @@ export class NotificationsService {
       status: 'unread',
       resolvedBy: null,
       resolvedAt: null,
+      createdAt: Timestamp.now(),
+    });
+  }
+
+  /**
+   * Owner-facing notification (e.g. "your plan upgrade was approved"), stored in
+   * `owner_notifications` and surfaced in the owner console.
+   */
+  async notifyOwner(payload: OwnerNotificationPayload): Promise<void> {
+    const docRef = adminDb.collection('owner_notifications').doc();
+    await docRef.set({
+      id: docRef.id,
+      ownerId: payload.ownerId,
+      type: payload.type,
+      message: payload.message,
+      status: 'unread',
       createdAt: Timestamp.now(),
     });
   }

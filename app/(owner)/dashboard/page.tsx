@@ -1,14 +1,14 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '@/hooks/useAuth';
+import { useOwnerSession } from '@/hooks/useOwner';
 import { useBeds } from '@/hooks/useBeds';
 import { useTenants } from '@/hooks/useTenants';
 import {
   subscribeToOwnerRentRecords,
 } from '@/lib/firestore';
 import { getPhotoViewUrl } from '@/lib/client/uploader';
-import { getCurrentMonthYear, formatCurrency, getWhatsAppLink } from '@/lib/utils';
+import { getCurrentPeriod, formatCurrency, getWhatsAppLink } from '@/lib/utils';
 import { Bed, Owner, RentRecord, Tenant } from '@/types';
 import { StatsBar } from '@/components/owner/StatsBar';
 import { BedGrid } from '@/components/owner/BedGrid';
@@ -16,9 +16,12 @@ import { AddTenantModal } from '@/components/owner/AddTenantModal';
 import { WhatsAppReminderModal } from '@/components/owner/WhatsAppReminderModal';
 import { BankCsvReconciler } from '@/components/owner/BankCsvReconciler';
 import { PropertySetupWizard } from '@/components/owner/PropertySetupWizard';
+import { DocumentUploader } from '@/components/owner/DocumentUploader';
+import { TenantPhotoGallery } from '@/components/owner/TenantPhotoGallery';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Drawer } from '@/components/ui/drawer';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { StatusDot } from '@/components/ui/status-dot';
 import { Avatar } from '@/components/ui/avatar';
 import { validatePan, validateUpi, sanitizeText } from '@/lib/security';
@@ -37,20 +40,35 @@ import {
   FileSpreadsheet,
   ArrowLeft,
   Layers,
+  IndianRupee,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function OwnerDashboardPage() {
-  const { user, loading: authLoading } = useAuth();
-  const ownerId = user?.uid || '';
+  const { ownerId, phoneNumber, properties, selectedPropertyId } = useOwnerSession();
+
+  // IMPORTANT backward-compat rule: only filter by property when the owner
+  // actually has >1 property. Legacy single-PG data has no `propertyId` field,
+  // so filtering on it would hide everything. With one property we stay
+  // owner-wide (undefined), which matches both legacy and new docs.
+  const propertyFilter = properties.length > 1 ? selectedPropertyId : undefined;
 
   const [owner, setOwner] = useState<Owner | null>(null);
   const [loadingOwner, setLoadingOwner] = useState(true);
 
   // Active Hooks for Beds, Tenants, Records
-  const { beds } = useBeds(ownerId);
-  const { tenants } = useTenants(ownerId);
+  const { beds } = useBeds(ownerId, propertyFilter);
+  const { tenants } = useTenants(ownerId, propertyFilter);
   const [rentRecords, setRentRecords] = useState<RentRecord[]>([]);
+  const [selectedPeriod, setSelectedPeriod] = useState(getCurrentPeriod());
+  const [defaulters, setDefaulters] = useState<
+    Array<RentRecord & { daysOverdue: number; lateFeePaise: number; outstandingPaise: number }>
+  >([]);
+  const [showDefaulters, setShowDefaulters] = useState(false);
+  const [pendingRefunds, setPendingRefunds] = useState<
+    Array<{ id: string; tenantName?: string; amountPaise: number }>
+  >([]);
+  const [refundBusyId, setRefundBusyId] = useState<string | null>(null);
 
   // Modals & Drawer State
   const [showSetupWizard, setShowSetupWizard] = useState(false);
@@ -60,10 +78,12 @@ export default function OwnerDashboardPage() {
   const [proofModalRecord, setProofModalRecord] = useState<{ bed: Bed; record: RentRecord } | null>(null);
   const [activeBedDrawer, setActiveBedDrawer] = useState<Bed | null>(null);
   const [confirmVacateBed, setConfirmVacateBed] = useState<Bed | null>(null);
+  const [reverseTarget, setReverseTarget] = useState<{ bed: Bed; record: RentRecord } | null>(null);
+  const [reverseBusy, setReverseBusy] = useState(false);
+  const [actionBusy, setActionBusy] = useState(false); // in-flight guard for paid/approve/vacate
 
   // Load Owner Profile
   useEffect(() => {
-    if (authLoading) return;
     if (!ownerId) {
       setLoadingOwner(false);
       return;
@@ -84,20 +104,89 @@ export default function OwnerDashboardPage() {
     }
 
     loadOwner();
-  }, [ownerId, authLoading]);
+  }, [ownerId]);
 
-  // Subscribe to real-time Rent Records for the current month
+  // Subscribe to real-time Rent Records for the selected billing period.
+  // Re-subscribes when the owner navigates to a different month so past-due and
+  // future months can be viewed and collected, not just the current month.
   useEffect(() => {
     if (!ownerId) return;
-    const currentMonth = getCurrentMonthYear();
-    const unsub = subscribeToOwnerRentRecords(ownerId, currentMonth, (records) => {
-      setRentRecords(records);
-    });
+    const unsub = subscribeToOwnerRentRecords(
+      ownerId,
+      selectedPeriod,
+      (records) => {
+        setRentRecords(records);
+      },
+      propertyFilter
+    );
     return unsub;
-  }, [ownerId]);
+  }, [ownerId, selectedPeriod, propertyFilter]);
+
+  // Load the defaulter / aging report (overdue unpaid rent across all months).
+  useEffect(() => {
+    if (!ownerId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/rent/defaulters');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled) setDefaulters(data.defaulters || []);
+      } catch {
+        /* non-fatal */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [ownerId, rentRecords.length]);
+
+  // Load pending security-deposit refunds (owed to departed/departing tenants).
+  const refundsRefreshKey = beds.length; // refresh when bed/tenant set changes
+  useEffect(() => {
+    if (!ownerId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/deposits/refunds');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled) setPendingRefunds(data.refunds || []);
+      } catch {
+        /* non-fatal */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [ownerId, refundsRefreshKey]);
+
+  const markRefundIssued = async (depositId: string) => {
+    if (refundBusyId) return;
+    setRefundBusyId(depositId);
+    try {
+      const res = await fetch(`/api/deposits/refunds/${depositId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || 'Could not update refund');
+      }
+      toast.success('Refund marked as paid out');
+      setPendingRefunds((list) => list.filter((r) => r.id !== depositId));
+    } catch (e: any) {
+      toast.error(e.message || 'Could not update refund');
+    } finally {
+      setRefundBusyId(null);
+    }
+  };
 
   // Mark Paid via POST /api/rent/[id]/confirm
   const handleMarkPaid = async (bed: Bed, record?: RentRecord) => {
+    if (actionBusy) return; // double-submit guard
+    setActionBusy(true);
     try {
       if (record?.id && !record.id.startsWith('temp_')) {
         const res = await fetch(`/api/rent/${record.id}/confirm`, {
@@ -107,7 +196,7 @@ export default function OwnerDashboardPage() {
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.message || 'Confirmation failed');
-        toast.success(`Bed ${bed.bedLabel} marked Paid! Receipt REC-#{String(data.record.receiptNumber).padStart(5, '0')} issued.`);
+        toast.success(`Bed ${bed.bedLabel} marked Paid! Receipt REC-${String(data.record.receiptNumber).padStart(5, '0')} issued.`);
       } else {
         toast.success(`Bed ${bed.bedLabel} marked as Paid`);
       }
@@ -116,22 +205,90 @@ export default function OwnerDashboardPage() {
       }
     } catch (err: any) {
       toast.error(err.message || 'Failed to update status');
+    } finally {
+      setActionBusy(false);
     }
   };
 
-  // Reverse Paid via POST /api/rent/[id]/reverse
-  const handleReversePaid = async (bed: Bed, record: RentRecord) => {
-    const reason = prompt('Please enter reason for reversing this payment:');
-    if (!reason || !reason.trim()) {
-      toast.error('Reversal reason is required');
+  // Bulk-confirm all pending/verify rent records in the current view.
+  const bulkConfirmPending = async () => {
+    if (actionBusy) return;
+    const ids = rentRecords
+      .filter((r) => r.status !== 'paid' && r.id && !r.id.startsWith('temp_'))
+      .map((r) => r.id as string);
+    if (ids.length === 0) {
+      toast('Nothing pending to confirm');
       return;
     }
+    setActionBusy(true);
+    try {
+      const res = await fetch('/api/rent/bulk-confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recordIds: ids }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Bulk confirm failed');
+      const okCount = data.confirmed?.length || 0;
+      const failCount = data.failed?.length || 0;
+      toast.success(
+        `Confirmed ${okCount} payment${okCount === 1 ? '' : 's'}${failCount ? ` · ${failCount} skipped` : ''}`
+      );
+    } catch (e: any) {
+      toast.error(e.message || 'Bulk confirm failed');
+    } finally {
+      setActionBusy(false);
+    }
+  };
 
+  // Record a partial / advance payment toward the active rent record.
+  const [partialAmount, setPartialAmount] = useState('');
+  const handleRecordPartial = async (record: RentRecord) => {
+    if (actionBusy) return;
+    const rupees = Number(partialAmount);
+    if (!rupees || rupees <= 0) {
+      toast.error('Enter a valid amount');
+      return;
+    }
+    setActionBusy(true);
+    try {
+      const res = await fetch(`/api/rent/${record.id}/partial`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amountRupees: rupees }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Could not record payment');
+      const paid = (data.record?.amountPaidPaise ?? 0) / 100;
+      const due = (data.record?.amountDuePaise ?? 0) / 100;
+      if (data.record?.status === 'paid') {
+        toast.success('Rent fully paid — receipt issued.');
+      } else {
+        toast.success(`Recorded ₹${rupees}. Paid ₹${paid} of ₹${due}.`);
+      }
+      setPartialAmount('');
+    } catch (e: any) {
+      toast.error(e.message || 'Could not record payment');
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
+  // Reverse Paid: open a styled confirm dialog that collects a required reason
+  // (replaces a raw window.prompt on a money-mutating action).
+  const handleReversePaid = (bed: Bed, record: RentRecord) => {
+    setReverseTarget({ bed, record });
+  };
+
+  const doReversePaid = async (reason: string) => {
+    if (!reverseTarget) return;
+    const { bed, record } = reverseTarget;
+    setReverseBusy(true);
     try {
       const res = await fetch(`/api/rent/${record.id}/reverse`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reversalReason: reason.trim() }),
+        body: JSON.stringify({ reversalReason: reason }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Reversal failed');
@@ -140,16 +297,20 @@ export default function OwnerDashboardPage() {
       if (activeBedDrawer?.id === bed.id) {
         setActiveBedDrawer({ ...activeBedDrawer, status: 'occupied' });
       }
+      setReverseTarget(null);
     } catch (err: any) {
       toast.error(err.message || 'Could not reverse payment');
+    } finally {
+      setReverseBusy(false);
     }
   };
 
   // Approve payment from screenshot proof via POST /api/rent/[id]/confirm
   const handleApproveProof = async () => {
-    if (!proofModalRecord) return;
+    if (!proofModalRecord || actionBusy) return;
     const { bed, record } = proofModalRecord;
 
+    setActionBusy(true);
     try {
       const res = await fetch(`/api/rent/${record.id}/confirm`, {
         method: 'POST',
@@ -159,20 +320,23 @@ export default function OwnerDashboardPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Could not confirm payment');
 
-      toast.success(`Payment approved for ${bed.tenantName}! Receipt REC-#{String(data.record.receiptNumber).padStart(5, '0')} issued.`);
+      toast.success(`Payment approved for ${bed.tenantName}! Receipt REC-${String(data.record.receiptNumber).padStart(5, '0')} issued.`);
       setProofModalRecord(null);
       if (activeBedDrawer?.id === bed.id) {
         setActiveBedDrawer({ ...activeBedDrawer, status: 'paid' });
       }
     } catch (e: any) {
       toast.error(e.message || 'Could not approve payment');
+    } finally {
+      setActionBusy(false);
     }
   };
 
   // Handle Vacate Tenant via POST /api/tenants/[id]/moveout
   const handleConfirmVacate = async () => {
-    if (!confirmVacateBed || !confirmVacateBed.tenantId) return;
+    if (!confirmVacateBed || !confirmVacateBed.tenantId || actionBusy) return;
 
+    setActionBusy(true);
     try {
       const res = await fetch(`/api/tenants/${confirmVacateBed.tenantId}/moveout`, {
         method: 'POST',
@@ -189,6 +353,8 @@ export default function OwnerDashboardPage() {
       setActiveBedDrawer(null);
     } catch (e: any) {
       toast.error(e.message || 'Could not vacate bed');
+    } finally {
+      setActionBusy(false);
     }
   };
 
@@ -205,7 +371,7 @@ export default function OwnerDashboardPage() {
   if (!owner) {
     return (
       <PropertySetupWizard
-        initialOwnerPhone={user?.phoneNumber || '9876543210'}
+        initialOwnerPhone={phoneNumber || '9876543210'}
         onComplete={(newOwner) => setOwner(newOwner)}
       />
     );
@@ -235,7 +401,7 @@ export default function OwnerDashboardPage() {
           </Button>
         </div>
         <PropertySetupWizard
-          initialOwnerPhone={user?.phoneNumber || owner.phone || '9876543210'}
+          initialOwnerPhone={phoneNumber || owner.phone || '9876543210'}
           existingOwner={owner}
           onCancel={() => setShowSetupWizard(false)}
           onComplete={(newOwner) => {
@@ -247,6 +413,19 @@ export default function OwnerDashboardPage() {
       </div>
     );
   }
+
+  // Period navigation helpers (YYYY-MM)
+  const shiftPeriod = (period: string, delta: number): string => {
+    const [y, m] = period.split('-').map(Number);
+    const d = new Date(y, m - 1 + delta, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  };
+  const labelPeriod = (period: string): string => {
+    const [y, m] = period.split('-').map(Number);
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `${months[m - 1]} ${y}`;
+  };
+  const isCurrentPeriod = selectedPeriod === getCurrentPeriod();
 
   const activeRecord = activeBedDrawer
     ? rentRecords.find((r) => r.bedId === activeBedDrawer.id)
@@ -338,6 +517,147 @@ export default function OwnerDashboardPage() {
           </Button>
         </div>
       )}
+
+      {/* Defaulter / aging report — overdue unpaid rent across all months */}
+      {defaulters.length > 0 && (
+        <div className="bg-[#FEF2F2] border border-[#FECACA] rounded-[10px] overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setShowDefaulters((s) => !s)}
+            className="w-full flex items-center justify-between px-4 py-3 text-left"
+          >
+            <div className="flex items-center gap-2">
+              <ShieldAlert className="w-4 h-4 text-[#DC2626]" />
+              <span className="text-sm font-bold text-[#991B1B]">
+                {defaulters.length} overdue {defaulters.length === 1 ? 'payment' : 'payments'}
+              </span>
+              <span className="text-xs text-[#B91C1C] font-mono-numbers">
+                · {formatCurrency(defaulters.reduce((s, d) => s + d.outstandingPaise, 0) / 100)} outstanding
+              </span>
+            </div>
+            <span className="text-xs text-[#B91C1C] font-semibold">
+              {showDefaulters ? 'Hide' : 'View'}
+            </span>
+          </button>
+          {showDefaulters && (
+            <div className="divide-y divide-[#FECACA] border-t border-[#FECACA]">
+              {defaulters.slice(0, 10).map((d) => (
+                <div key={d.id} className="flex items-center justify-between px-4 py-2.5 bg-white/40">
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold text-[#09090B] truncate">
+                      {d.tenantName || 'Resident'}{' '}
+                      <span className="font-normal text-[#64748B]">· {d.bedLabel || ''} · {d.period}</span>
+                    </div>
+                    <div className="text-[11px] text-[#B91C1C]">
+                      {d.daysOverdue} days overdue
+                      {d.lateFeePaise > 0 && ` · late fee ${formatCurrency(d.lateFeePaise / 100)}`}
+                    </div>
+                  </div>
+                  <span className="text-xs font-bold font-mono-numbers text-[#991B1B] shrink-0">
+                    {formatCurrency(d.outstandingPaise / 100)}
+                  </span>
+                </div>
+              ))}
+              {defaulters.length > 10 && (
+                <div className="px-4 py-2 text-[11px] text-[#B91C1C] bg-white/40">
+                  +{defaulters.length - 10} more…
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Pending deposit refunds owed to tenants */}
+      {pendingRefunds.length > 0 && (
+        <div className="bg-[#EFF6FF] border border-[#BFDBFE] rounded-[10px] p-3 space-y-2">
+          <div className="flex items-center gap-2">
+            <IndianRupee className="w-4 h-4 text-[#1D4ED8]" />
+            <span className="text-sm font-bold text-[#1E3A8A]">
+              {pendingRefunds.length} pending deposit {pendingRefunds.length === 1 ? 'refund' : 'refunds'}
+            </span>
+          </div>
+          <div className="divide-y divide-[#BFDBFE]">
+            {pendingRefunds.slice(0, 8).map((r) => (
+              <div key={r.id} className="flex items-center justify-between py-2">
+                <div className="min-w-0">
+                  <span className="text-xs font-semibold text-[#09090B] truncate block">
+                    {r.tenantName || 'Resident'}
+                  </span>
+                  <span className="text-[11px] font-mono-numbers text-[#1D4ED8]">
+                    {formatCurrency(r.amountPaise / 100)} to refund
+                  </span>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={refundBusyId === r.id}
+                  onClick={() => markRefundIssued(r.id)}
+                >
+                  Mark Paid Out
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Billing period navigator — view/collect rent for any month */}
+      <div className="flex items-center justify-between bg-white border border-[#E2E8F0] rounded-[10px] px-3 py-2 shadow-xs">
+        <button
+          type="button"
+          onClick={() => setSelectedPeriod((p) => shiftPeriod(p, -1))}
+          className="inline-flex items-center justify-center h-11 w-11 rounded-[8px] text-[#64748B] hover:bg-[#F8FAFC] hover:text-[#09090B] transition-colors"
+          aria-label="Previous month"
+        >
+          <ArrowLeft className="w-4 h-4" />
+        </button>
+        <div className="text-center">
+          <div className="text-sm font-bold text-[#09090B]">{labelPeriod(selectedPeriod)}</div>
+          {!isCurrentPeriod && (
+            <button
+              type="button"
+              onClick={() => setSelectedPeriod(getCurrentPeriod())}
+              className="text-[11px] text-[#D97706] font-semibold"
+            >
+              Jump to current month
+            </button>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => setSelectedPeriod((p) => shiftPeriod(p, 1))}
+          className="inline-flex items-center justify-center h-11 w-11 rounded-[8px] text-[#64748B] hover:bg-[#F8FAFC] hover:text-[#09090B] transition-colors"
+          aria-label="Next month"
+        >
+          <ArrowLeft className="w-4 h-4 rotate-180" />
+        </button>
+      </div>
+
+      {/* Bulk confirm — mark every pending/verify record this month paid at once */}
+      {(() => {
+        const pendingCount = rentRecords.filter(
+          (r) => r.status !== 'paid' && r.id && !r.id.startsWith('temp_')
+        ).length;
+        if (pendingCount < 2) return null;
+        return (
+          <div className="flex items-center justify-between bg-[#ECFDF5] border border-[#A7F3D0] rounded-[10px] px-3 py-2">
+            <span className="text-xs font-semibold text-[#065F46]">
+              {pendingCount} payments pending this month
+            </span>
+            <Button
+              size="sm"
+              variant="solid"
+              className="bg-[#10B981] hover:bg-[#059669]"
+              disabled={actionBusy}
+              onClick={bulkConfirmPending}
+            >
+              <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+              Mark All Paid
+            </Button>
+          </div>
+        );
+      })()}
 
       {/* Bento Live HUD Telemetry Strip */}
       <StatsBar
@@ -507,6 +827,50 @@ export default function OwnerDashboardPage() {
                   </div>
                 </div>
 
+                {/* Partial / advance payment — shown while the active record is not fully paid */}
+                {activeRecord && activeRecord.status !== 'paid' && (activeRecord.amountDuePaise ?? 0) > 0 && (
+                  <div className="p-3.5 rounded-[8px] border border-[#E2E8F0] bg-white space-y-2.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-[#334155]">Collection Progress</span>
+                      <span className="font-mono-numbers text-[#64748B]">
+                        {formatCurrency((activeRecord.amountPaidPaise ?? 0) / 100)} / {formatCurrency((activeRecord.amountDuePaise ?? 0) / 100)}
+                      </span>
+                    </div>
+                    <div className="h-2 w-full rounded-full bg-[#F1F5F9] overflow-hidden">
+                      <div
+                        className="h-full bg-[#10B981] rounded-full transition-all"
+                        style={{
+                          width: `${Math.min(
+                            100,
+                            Math.round(
+                              ((activeRecord.amountPaidPaise ?? 0) / Math.max(1, activeRecord.amountDuePaise ?? 1)) * 100
+                            )
+                          )}%`,
+                        }}
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min={1}
+                        inputMode="numeric"
+                        placeholder="Amount (₹)"
+                        value={partialAmount}
+                        onChange={(e) => setPartialAmount(e.target.value)}
+                        className="flex-1 h-11 px-3 rounded-[8px] border border-[#CBD5E1] text-sm text-[#09090B] focus:border-[#D97706] focus:outline-none"
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={actionBusy}
+                        onClick={() => handleRecordPartial(activeRecord)}
+                      >
+                        Record Part Payment
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Direct Resident Contact Actions */}
                 {activeBedDrawer.tenantPhone && (
                   <div className="space-y-2">
@@ -534,6 +898,49 @@ export default function OwnerDashboardPage() {
                         <span>WhatsApp</span>
                       </a>
                     </div>
+                  </div>
+                )}
+
+                {/* Document capture: ID proof + rental agreement */}
+                {activeTenant?.id && (
+                  <div className="space-y-2">
+                    <DocumentUploader tenantId={activeTenant.id} photoType="id_proof" />
+                    <DocumentUploader tenantId={activeTenant.id} photoType="agreement" />
+                  </div>
+                )}
+
+                {/* Photo gallery (move-in / ID / payment proofs) */}
+                {activeTenant?.id && (
+                  <div className="space-y-2">
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-[#64748B] block">
+                      Document & Photo Vault
+                    </span>
+                    <TenantPhotoGallery tenantId={activeTenant.id} />
+                  </div>
+                )}
+
+                {/* Emergency Contact */}
+                {activeTenant?.emergencyContactPhone && (
+                  <div className="p-3.5 rounded-[8px] bg-[#F8FAFC] border border-[#E2E8F0] flex items-center justify-between">
+                    <div className="min-w-0">
+                      <span className="text-[11px] font-semibold uppercase tracking-wider text-[#64748B] block">
+                        Emergency Contact
+                      </span>
+                      <span className="text-xs text-[#09090B] font-semibold">
+                        {activeTenant.emergencyContactName || 'Contact'}
+                        {activeTenant.emergencyContactRelation ? ` · ${activeTenant.emergencyContactRelation}` : ''}
+                      </span>
+                      <span className="text-[11px] font-mono-numbers text-[#64748B] block">
+                        {activeTenant.emergencyContactPhone}
+                      </span>
+                    </div>
+                    <a
+                      href={`tel:${activeTenant.emergencyContactPhone}`}
+                      className="inline-flex items-center justify-center h-11 w-11 rounded-[8px] border border-[#E2E8F0] text-[#64748B] hover:bg-white transition-colors shrink-0"
+                      aria-label="Call emergency contact"
+                    >
+                      <Phone className="w-4 h-4" />
+                    </a>
                   </div>
                 )}
 
@@ -694,6 +1101,24 @@ export default function OwnerDashboardPage() {
           </div>
         </Drawer>
       )}
+
+      {/* REVERSE PAID — styled confirm with required reason */}
+      <ConfirmDialog
+        open={!!reverseTarget}
+        tone="danger"
+        title="Reverse this payment?"
+        message={
+          reverseTarget
+            ? `Bed ${reverseTarget.bed.bedLabel} will return to pending. This is recorded in the audit log.`
+            : ''
+        }
+        reasonLabel="Reason for reversal"
+        reasonPlaceholder="e.g. Duplicate entry, wrong tenant, refund issued"
+        confirmLabel="Reverse Payment"
+        busy={reverseBusy}
+        onConfirm={doReversePaid}
+        onCancel={() => setReverseTarget(null)}
+      />
 
       {/* BANK CSV STATEMENT RECONCILER */}
       <BankCsvReconciler

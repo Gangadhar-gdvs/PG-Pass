@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useOwnerSession } from '@/hooks/useOwner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -57,6 +58,13 @@ export function PropertySetupWizard({
   onCancel,
   onComplete,
 }: PropertySetupWizardProps) {
+  const { ownerId, properties, selectedPropertyId } = useOwnerSession();
+  // When setting up a NON-primary property, tag the new beds with its id so they
+  // are scoped correctly. For the primary (or single-property owners), leave it
+  // undefined so beds stay owner-wide (matches legacy data).
+  const targetPropertyId =
+    properties.length > 1 && selectedPropertyId !== ownerId ? selectedPropertyId : undefined;
+
   // Step navigation (1: Info, 2: Amenities, 3: Sharing Formats & Pricing, 4: Floor Distribution)
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [submitting, setSubmitting] = useState(false);
@@ -324,7 +332,10 @@ export function PropertySetupWizard({
       const bedsRes = await fetch('/api/beds/batch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ beds: generatedBeds }),
+        body: JSON.stringify({
+          beds: generatedBeds,
+          ...(targetPropertyId ? { propertyId: targetPropertyId } : {}),
+        }),
       });
 
       if (!bedsRes.ok) {

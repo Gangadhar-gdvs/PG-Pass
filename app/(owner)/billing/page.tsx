@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '@/hooks/useAuth';
+import { useOwnerSession } from '@/hooks/useOwner';
 import { useBeds } from '@/hooks/useBeds';
 import { PLAN_LIMITS } from '@/lib/constants/limits';
 import { PLAN_TIER, PlanTier } from '@/lib/constants/status';
@@ -23,13 +23,13 @@ import {
 import { Button } from '@/components/ui/button';
 import { Drawer } from '@/components/ui/drawer';
 import { ProgressBar } from '@/components/ui/progress-bar';
+import { Skeleton } from '@/components/ui/skeleton';
 import toast from 'react-hot-toast';
 
 const ADMIN_BILLING_UPI = 'pgpass.billing@icici';
 
 export default function BillingPage() {
-  const { user } = useAuth();
-  const ownerId = user?.uid || '';
+  const { ownerId } = useOwnerSession();
   const { beds } = useBeds(ownerId);
 
   const [profile, setProfile] = useState<any>(null);
@@ -136,9 +136,14 @@ export default function BillingPage() {
 
   if (loading) {
     return (
-      <div className="py-20 flex flex-col items-center justify-center">
-        <div className="w-8 h-8 border-2 border-[#D97706] border-t-transparent rounded-full animate-spin mb-3" />
-        <span className="text-xs text-[#64748B]">Loading subscription details...</span>
+      <div className="max-w-3xl mx-auto space-y-4">
+        <Skeleton className="h-8 w-56" />
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-28" />
+          ))}
+        </div>
+        <Skeleton className="h-40" />
       </div>
     );
   }

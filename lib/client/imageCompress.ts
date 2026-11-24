@@ -1,4 +1,4 @@
-import { PHOTO_TARGET_BYTES, PHOTO_MAX_BYTES } from '@/lib/constants/limits';
+import { PHOTO_TARGET_BYTES } from '@/lib/constants/limits';
 
 export interface CompressedImageResult {
   file: File;
@@ -7,6 +7,14 @@ export interface CompressedImageResult {
   height: number;
   sizeBytes: number;
 }
+
+// Reject the raw file before we ever allocate a canvas. A 40–60 MP phone photo
+// (20+ MB) decoded at full resolution can freeze or crash a mid-range mobile
+// browser for 15–30 s. Real camera JPEGs are comfortably under this; anything
+// larger is almost certainly not a photo we want to process on the main thread.
+const MAX_INPUT_BYTES = 25 * 1024 * 1024; // 25 MB
+// Guard against decompression-bomb / absurd dimensions even within the byte cap.
+const MAX_INPUT_PIXELS = 50 * 1_000_000; // 50 MP
 
 /**
  * Compresses an image in the browser on a HTML5 Canvas.
@@ -29,6 +37,17 @@ export async function compressImage(
     };
   }
 
+  // Up-front guards — reject before allocating any canvas / decoding the image.
+  if (!file.type.startsWith('image/')) {
+    throw new Error('Please choose an image file (JPG, PNG, or WebP).');
+  }
+  if (file.size > MAX_INPUT_BYTES) {
+    const mb = (file.size / (1024 * 1024)).toFixed(1);
+    throw new Error(
+      `This image is too large (${mb} MB). Please pick one under 25 MB.`
+    );
+  }
+
   return new Promise((resolve, reject) => {
     const img = new Image();
     const objectUrl = URL.createObjectURL(file);
@@ -37,6 +56,13 @@ export async function compressImage(
       URL.revokeObjectURL(objectUrl);
 
       let { width, height } = img;
+
+      if (width * height > MAX_INPUT_PIXELS) {
+        reject(
+          new Error('This image has too many pixels to process. Please pick a smaller one.')
+        );
+        return;
+      }
 
       // Scale down proportionally
       if (width > maxWidth || height > maxHeight) {

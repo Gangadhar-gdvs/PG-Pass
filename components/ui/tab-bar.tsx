@@ -33,7 +33,7 @@ export function TabBar({
               key={tab.id}
               type="button"
               onClick={() => onChange(tab.id)}
-              className={`px-3.5 py-1.5 rounded-[6px] font-semibold transition-all select-none cursor-pointer ${
+              className={`inline-flex items-center justify-center min-h-[40px] px-4 py-2 rounded-[6px] font-semibold transition-all select-none cursor-pointer ${
                 isActive
                   ? "bg-white text-[#09090B] shadow-[0_1px_2px_0_rgba(0,0,0,0.06)]"
                   : "text-[#64748B] hover:text-[#09090B] hover:bg-white/50"

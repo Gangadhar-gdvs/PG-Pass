@@ -56,9 +56,44 @@ export function DataTable<T extends Record<string, any>>({
     });
   }, [data, sortKey, sortDirection]);
 
+  const alignClass = (align?: Column<T>["align"]) =>
+    align === "right" ? "text-right" : align === "center" ? "text-center" : "text-left";
+
   return (
     <div className={`w-full overflow-hidden rounded-[10px] border border-[#E2E8F0] bg-white shadow-xs ${className}`}>
-      <div className="overflow-x-auto">
+      {/* Mobile (<sm): stacked cards — avoids the horizontal scroll a wide table
+          forces on a 375px phone. */}
+      <div className="sm:hidden divide-y divide-[#E2E8F0]">
+        {sortedData.length === 0 ? (
+          <div className="px-4 py-8 text-center text-xs text-[#64748B]">{emptyText}</div>
+        ) : (
+          sortedData.map((row) => (
+            <button
+              key={keyExtractor(row)}
+              type="button"
+              onClick={() => onRowClick && onRowClick(row)}
+              disabled={!onRowClick}
+              className={`block w-full text-left px-4 py-3 space-y-1.5 ${
+                onRowClick ? "active:bg-[#F8FAFC] cursor-pointer" : "cursor-default"
+              }`}
+            >
+              {columns.map((col) => (
+                <div key={col.key} className="flex items-start justify-between gap-3 min-h-[24px]">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-[#64748B] shrink-0">
+                    {col.header}
+                  </span>
+                  <span className="text-[13px] text-[#09090B] text-right">
+                    {col.render ? col.render(row) : row[col.key]}
+                  </span>
+                </div>
+              ))}
+            </button>
+          ))
+        )}
+      </div>
+
+      {/* Desktop/tablet (>=sm): full table */}
+      <div className="hidden sm:block overflow-x-auto">
         <table className="w-full text-left text-[13px] border-collapse">
           <thead>
             <tr className="border-b border-[#E2E8F0] bg-[#F8FAFC] text-[11px] font-semibold uppercase tracking-wider text-[#64748B]">

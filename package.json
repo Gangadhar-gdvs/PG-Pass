@@ -23,7 +23,6 @@
     "clsx": "^2.1.1",
     "firebase": "^13.4.0",
     "firebase-admin": "^13.10.0",
-    "framer-motion": "^14.14.0",
     "jspdf": "^4.2.1",
     "lucide-react": "^1.73.0",
     "next": "16.4.6",
@@ -35,6 +34,11 @@
     "server-only": "^0.0.1",
     "tailwind-merge": "^3.7.0",
     "zod": "^4.6.7"
+  },
+  "overridesComment": "uuid -> GHSA-w5hq-g745-h8pq (buffer-bounds fix in 11.1.1); firebase-admin's transitive chain pins ^9 but only calls uuid.v4() with no buffer arg, so the bump is safe. @grpc/grpc-js -> GHSA-m9gg-hp2v-232j / GHSA-f596-whhp-79r4 (server-side gRPC); only the browser firebase SDK pulled the vulnerable 1.9.x and it never runs the Node gRPC transport, so exposure is nil.",
+  "overrides": {
+    "uuid": "^11.1.1",
+    "@grpc/grpc-js": "^1.14.7"
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "4.3.3",

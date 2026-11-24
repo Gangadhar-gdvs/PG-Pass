@@ -9,14 +9,19 @@ import {
   PORTAL_TOKEN_TTL_DAYS,
 } from '@/lib/constants/limits';
 import { generatePortalToken, hashToken } from '../security/tokens';
+import { rentDueDate } from '@/lib/utils';
 import { env } from '@/lib/env';
 import { Timestamp } from 'firebase-admin/firestore';
 
 export interface CreateTenantInput {
   bedId: string;
+  propertyId?: string; // defaults to ownerId (primary property)
   name: string;
   phone: string;
   idProofType: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  emergencyContactRelation?: string;
   securityDepositPaise: number;
   depositPaidPaise?: number;
   moveInDate: string;
@@ -129,6 +134,7 @@ export class TenantsService {
       createdTenant = {
         id: tenantRef.id,
         ownerId,
+        propertyId: input.propertyId || bedData.propertyId || ownerId,
         ownerName: ownerData.name,
         bedId: input.bedId,
         roomNumber: bedData.roomNumber,
@@ -137,6 +143,9 @@ export class TenantsService {
         phone: phoneCleaned,
         phoneLast4,
         idProofType: input.idProofType,
+        emergencyContactName: input.emergencyContactName?.trim() || undefined,
+        emergencyContactPhone: input.emergencyContactPhone?.replace(/\D/g, '') || undefined,
+        emergencyContactRelation: input.emergencyContactRelation?.trim() || undefined,
         accountStatus: ACCOUNT_STATUS.ACTIVE,
         securityDepositPaise: input.securityDepositPaise,
         depositPaidPaise: depositPaid,
@@ -193,6 +202,7 @@ export class TenantsService {
       transaction.set(rentRef, {
         id: rentRef.id,
         ownerId,
+        propertyId: input.propertyId || bedData.propertyId || ownerId,
         tenantId: tenantRef.id,
         period: currentPeriod,
         roomNumber: bedData.roomNumber, // Snapshotted
@@ -202,7 +212,7 @@ export class TenantsService {
         amountDuePaise: rentAmount,
         amountPaidPaise: 0,
         status: RENT_STATUS.PENDING,
-        dueDate: `${currentPeriod}-05`,
+        dueDate: rentDueDate(currentPeriod, ownerData.rentDueDay),
         createdAt: now,
         updatedAt: now,
       });
@@ -347,6 +357,7 @@ export class TenantsService {
         transaction.set(deductionRef, {
           id: deductionRef.id,
           ownerId,
+          propertyId: tenant.propertyId || ownerId,
           tenantId,
           type: 'deduction',
           amountPaise: params.depositDeductionsPaise,
@@ -356,16 +367,20 @@ export class TenantsService {
         });
       }
 
-      // 4. Record deposit refund if any
+      // 4. Record deposit refund if any — starts as a pending obligation that
+      //    the owner later marks 'issued' once actually paid out.
       if (params.refundPaise && params.refundPaise > 0) {
         const refundRef = adminDb.collection('deposits').doc();
         transaction.set(refundRef, {
           id: refundRef.id,
           ownerId,
+          propertyId: tenant.propertyId || ownerId,
           tenantId,
+          tenantName: tenant.name,
           type: 'refund',
           amountPaise: params.refundPaise,
           reason: 'Security deposit final refund',
+          refundStatus: 'pending',
           recordedBy: ownerId,
           createdAt: now,
         });
@@ -384,7 +399,35 @@ export class TenantsService {
     });
     await batch.commit();
 
-    return { success: true };
+    // 6. Owner-facing notification with the settlement summary, so the owner
+    //    has a record (and can share a refund/deduction breakdown with the
+    //    tenant — the UI builds a WhatsApp message from this).
+    const refundPaise = params.refundPaise || 0;
+    const deductionsPaise = params.depositDeductionsPaise || 0;
+    const notifRef = adminDb.collection('owner_notifications').doc();
+    await notifRef.set({
+      id: notifRef.id,
+      ownerId,
+      type: 'moveout',
+      message: `Move-out settled for ${tenant.name} (Bed ${tenant.bedLabel || ''}). Refund ₹${Math.round(
+        refundPaise / 100
+      )}, deductions ₹${Math.round(deductionsPaise / 100)}.`,
+      status: 'unread',
+      createdAt: now,
+    });
+
+    return {
+      success: true,
+      settlement: {
+        tenantName: tenant.name,
+        tenantPhone: tenant.phone,
+        bedLabel: tenant.bedLabel || '',
+        moveOutDate: params.moveOutDate,
+        refundPaise,
+        deductionsPaise,
+        deductionReason: params.deductionReason || '',
+      },
+    };
   }
 }
 

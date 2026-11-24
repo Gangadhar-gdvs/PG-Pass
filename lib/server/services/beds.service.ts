@@ -49,6 +49,7 @@ export class BedsService {
       bedLabel: string;
       rentAmountPaise: number;
       floor?: number;
+      propertyId?: string; // defaults to ownerId (primary property)
       sharingType?: '1' | '2' | '3' | '4' | '5' | '6';
       acType?: 'ac' | 'non-ac';
       roomAmenities?: string[];
@@ -74,7 +75,11 @@ export class BedsService {
       );
     }
 
-    const bedId = `${ownerId}_${data.roomNumber}_${data.bedLabel}`.replace(/[\s/]/g, '-');
+    // Bed id is scoped to the property so two properties of one owner can reuse
+    // room/bed labels without colliding. For the primary property
+    // (propertyId == ownerId) this matches the legacy scheme exactly.
+    const propertyId = data.propertyId || ownerId;
+    const bedId = `${propertyId}_${data.roomNumber}_${data.bedLabel}`.replace(/[\s/]/g, '-');
     const bedRef = adminDb.collection('beds').doc(bedId);
 
     const existing = await bedRef.get();
@@ -85,6 +90,7 @@ export class BedsService {
     const newBed: Bed = {
       id: bedId,
       ownerId,
+      propertyId,
       roomNumber: data.roomNumber.trim(),
       bedLabel: data.bedLabel.trim(),
       rentAmountPaise: data.rentAmountPaise,
@@ -115,8 +121,10 @@ export class BedsService {
       sharingType?: '1' | '2' | '3' | '4' | '5' | '6';
       acType?: 'ac' | 'non-ac';
       roomAmenities?: string[];
-    }>
+    }>,
+    propertyId?: string
   ): Promise<{ count: number }> {
+    const effPropertyId = propertyId || ownerId; // primary property == ownerId
     const ownerDoc = await adminDb.collection('owners').doc(ownerId).get();
     if (!ownerDoc.exists) {
       throw new AppError(404, 'Owner profile not found. Please complete setup.');
@@ -148,11 +156,12 @@ export class BedsService {
     let addedCount = 0;
 
     for (const data of bedsList) {
-      const bedId = `${ownerId}_${data.roomNumber}_${data.bedLabel}`.replace(/[\s/]/g, '-');
+      const bedId = `${effPropertyId}_${data.roomNumber}_${data.bedLabel}`.replace(/[\s/]/g, '-');
       const bedRef = adminDb.collection('beds').doc(bedId);
       const newBed: Bed = {
         id: bedId,
         ownerId,
+        propertyId: effPropertyId,
         roomNumber: data.roomNumber.trim(),
         bedLabel: data.bedLabel.trim(),
         rentAmountPaise: data.rentAmountPaise,
@@ -217,7 +226,8 @@ export async function createBedsBatch(
     sharingType?: '1' | '2' | '3' | '4' | '5' | '6';
     acType?: 'ac' | 'non-ac';
     roomAmenities?: string[];
-  }>
+  }>,
+  propertyId?: string
 ): Promise<{ count: number }> {
-  return bedsService.createBedsBatch(ownerId, bedsList);
+  return bedsService.createBedsBatch(ownerId, bedsList, propertyId);
 }

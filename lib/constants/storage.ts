@@ -3,6 +3,8 @@ export const STORAGE_PREFIX = {
   MOVEIN: 'movein/',
   MOVEOUT: 'moveout/',
   PAYMENT_PROOF: 'payment_proof/',
+  ID_PROOF: 'id_proof/',
+  AGREEMENT: 'agreement/',
 } as const;
 
 export const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/webp'] as const;

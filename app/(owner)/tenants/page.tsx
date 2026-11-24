@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useAuth } from '@/hooks/useAuth';
+import { useOwnerSession } from '@/hooks/useOwner';
 import { useTenants } from '@/hooks/useTenants';
 import { useBeds } from '@/hooks/useBeds';
 import { formatCurrency, getWhatsAppLink } from '@/lib/utils';
@@ -20,15 +20,18 @@ import { Button } from '@/components/ui/button';
 import { DataTable, Column } from '@/components/ui/data-table';
 import { Avatar } from '@/components/ui/avatar';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Skeleton } from '@/components/ui/skeleton';
 import toast from 'react-hot-toast';
 
 export default function TenantsPage() {
-  const { user } = useAuth();
-  const ownerId = user?.uid || '';
-  const { tenants, loading } = useTenants(ownerId);
-  const { beds } = useBeds(ownerId);
+  const { ownerId, properties, selectedPropertyId } = useOwnerSession();
+  const propertyFilter = properties.length > 1 ? selectedPropertyId : undefined;
+  const { tenants, loading } = useTenants(ownerId, propertyFilter);
+  const { beds } = useBeds(ownerId, propertyFilter);
 
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 20;
 
   const bedMap = new Map();
   beds.forEach((b) => bedMap.set(b.id, b));
@@ -41,6 +44,19 @@ export default function TenantsPage() {
     const matchBed = t.bedLabel?.toLowerCase().includes(q) || false;
     return matchName || matchPhone || matchBed;
   });
+
+  // Client-side pagination so a large directory doesn't render hundreds of rows
+  // (and DOM nodes) at once on mobile. Reset to the first page when the search
+  // narrows/changes the result set.
+  const pageCount = Math.max(1, Math.ceil(filteredTenants.length / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount - 1);
+  const pagedTenants = filteredTenants.slice(
+    safePage * PAGE_SIZE,
+    safePage * PAGE_SIZE + PAGE_SIZE
+  );
+  React.useEffect(() => {
+    setPage(0);
+  }, [search]);
 
   const handleCopyLink = (token?: string) => {
     if (!token) {
@@ -227,9 +243,14 @@ export default function TenantsPage() {
 
       {/* Data Table */}
       {loading ? (
-        <div className="py-12 flex flex-col items-center justify-center">
-          <div className="w-8 h-8 border-2 border-[#D97706] border-t-transparent rounded-full animate-spin mb-3" />
-          <span className="text-xs text-[#64748B]">Loading directory...</span>
+        <div className="rounded-[10px] border border-[#E2E8F0] bg-white p-4 space-y-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-3">
+              <Skeleton className="h-9 w-9 rounded-full" />
+              <Skeleton className="h-4 flex-1" />
+              <Skeleton className="h-4 w-20" />
+            </div>
+          ))}
         </div>
       ) : filteredTenants.length === 0 ? (
         <EmptyState
@@ -242,11 +263,43 @@ export default function TenantsPage() {
           }
         />
       ) : (
-        <DataTable
-          columns={columns}
-          data={filteredTenants}
-          keyExtractor={(t) => t.id}
-        />
+        <>
+          <DataTable
+            columns={columns}
+            data={pagedTenants}
+            keyExtractor={(t) => t.id}
+          />
+          {pageCount > 1 && (
+            <div className="flex items-center justify-between mt-3 text-xs">
+              <span className="text-[#64748B]">
+                Showing {safePage * PAGE_SIZE + 1}–
+                {Math.min(filteredTenants.length, safePage * PAGE_SIZE + PAGE_SIZE)} of{' '}
+                {filteredTenants.length}
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={safePage === 0}
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                >
+                  Previous
+                </Button>
+                <span className="text-[#64748B] font-semibold">
+                  {safePage + 1} / {pageCount}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={safePage >= pageCount - 1}
+                  onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

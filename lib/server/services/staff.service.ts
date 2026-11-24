@@ -39,7 +39,11 @@ export class StaffService {
   /**
    * Invites or creates a staff/warden account scoped strictly to this ownerId.
    */
-  async inviteStaff(ownerId: string, input: InviteStaffInput, actorUid: string): Promise<StaffMember> {
+  async inviteStaff(
+    ownerId: string,
+    input: InviteStaffInput,
+    actorUid: string
+  ): Promise<StaffMember & { setupLink?: string }> {
     const ownerDoc = await adminDb.collection('owners').doc(ownerId).get();
     if (!ownerDoc.exists) throw new AppError(404, 'Owner profile not found');
 
@@ -116,7 +120,18 @@ export class StaffService {
       createdAt: now,
     });
 
-    return staffDoc;
+    // Generate a password-setup link the owner can forward to the warden
+    // (zero-cost delivery — no email/SMS provider required). The warden sets a
+    // password via this link, then signs in with email + password. Best-effort:
+    // if link generation fails, the invite still succeeds.
+    let setupLink: string | undefined;
+    try {
+      setupLink = await adminAuth.generatePasswordResetLink(email);
+    } catch {
+      setupLink = undefined;
+    }
+
+    return { ...staffDoc, setupLink };
   }
 
   /**

@@ -30,6 +30,9 @@ export interface Owner {
   pgName: string;
   pgAddress: string;
   address?: string;
+  city?: string;
+  area?: string;
+  isListed?: boolean;
   panNumber?: string;
   upiId: string;
   upiMerchantName?: string;
@@ -49,7 +52,59 @@ export interface Owner {
   foodPlan?: '3_meals' | '2_meals' | 'no_food';
   foodCuisine?: 'both' | 'south' | 'north';
   noticePeriodDays?: number;
+  rentDueDay?: number; // day of month rent is due (1–28); defaults to 5
+  lateFeePerDayPaise?: number; // optional late fee accrued per overdue day
+  lateFeeGraceDays?: number; // days after due date before late fee starts
   pgAmenities?: string[];
+  createdAt?: any;
+  updatedAt?: any;
+}
+
+export interface Resident {
+  id: string; // Firebase Auth UID
+  name: string;
+  phone: string; // cleaned 10-digit; the key that links to tenant records
+  email?: string;
+  createdAt?: any;
+  updatedAt?: any;
+}
+
+/** A resident's request to join a PG they discovered publicly. */
+export interface JoinRequest {
+  id: string;
+  propertyId: string;
+  ownerId: string;
+  residentId: string;
+  residentName: string;
+  residentPhone: string;
+  message?: string;
+  status: 'pending' | 'approved' | 'declined';
+  createdAt?: any;
+  reviewedAt?: any;
+  reviewedBy?: string;
+}
+
+export interface Property {
+  id: string; // random; the PRIMARY property's id equals the owner's uid
+  ownerId: string;
+  isPrimary?: boolean;
+  pgName: string;
+  pgAddress?: string;
+  city?: string; // for public discovery / search
+  area?: string;
+  isListed?: boolean; // owner opted this property into public discovery
+  pgCategory?: 'gents' | 'ladies' | 'coliving';
+  foodPlan?: '3_meals' | '2_meals' | 'no_food';
+  foodCuisine?: 'both' | 'south' | 'north';
+  totalFloors?: number;
+  roomsPerFloor?: number;
+  bedsPerRoom?: number;
+  monthlyRent?: number;
+  rentDueDay?: number;
+  lateFeePerDayPaise?: number;
+  lateFeeGraceDays?: number;
+  pgAmenities?: string[];
+  nextReceiptSeq?: number; // per-property receipt counter
   createdAt?: any;
   updatedAt?: any;
 }
@@ -57,6 +112,7 @@ export interface Owner {
 export interface Bed {
   id: string;
   ownerId: string;
+  propertyId?: string; // defaults to ownerId (primary property) for legacy data
   floor: number;
   roomNumber: string;
   bedLabel: string;
@@ -76,6 +132,7 @@ export interface Bed {
 export interface Tenant {
   id: string;
   ownerId: string;
+  propertyId?: string; // defaults to ownerId (primary property) for legacy data
   ownerName?: string;
   bedId: string;
   bedLabel?: string;
@@ -84,6 +141,10 @@ export interface Tenant {
   phone: string;
   phoneLast4?: string;
   idProofType?: string;
+  idProofPhotoId?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  emergencyContactRelation?: string;
   accountStatus?: AccountStatus;
   securityDepositPaise?: number;
   depositPaidPaise?: number;
@@ -99,21 +160,84 @@ export interface Tenant {
   updatedAt?: any;
 }
 
+export type MaintenanceCategory =
+  | 'plumbing'
+  | 'electrical'
+  | 'wifi'
+  | 'furniture'
+  | 'cleaning'
+  | 'appliance'
+  | 'other';
+export type MaintenanceStatus = 'open' | 'in_progress' | 'resolved';
+
+export interface MaintenanceTicket {
+  id: string;
+  ownerId: string;
+  propertyId?: string;
+  tenantId: string;
+  tenantName?: string;
+  bedLabel?: string;
+  roomNumber?: string;
+  category: MaintenanceCategory;
+  description: string;
+  photoId?: string;
+  status: MaintenanceStatus;
+  resolvedBy?: string;
+  resolvedAt?: any;
+  resolutionNote?: string;
+  createdAt?: any;
+  updatedAt?: any;
+}
+
+export type ExpenseCategory =
+  | 'salary'
+  | 'utilities'
+  | 'maintenance'
+  | 'supplies'
+  | 'food'
+  | 'rent'
+  | 'internet'
+  | 'other';
+
+export interface Expense {
+  id: string;
+  ownerId: string;
+  propertyId?: string;
+  category: ExpenseCategory;
+  amountPaise: number;
+  note?: string;
+  vendor?: string;
+  date: string; // YYYY-MM-DD
+  period: string; // YYYY-MM (derived from date, for monthly grouping)
+  recordedBy: string;
+  createdAt?: any;
+}
+
+export type RefundStatus = 'pending' | 'issued';
+
 export interface DepositRecord {
   id: string;
   ownerId: string;
+  propertyId?: string;
   tenantId: string;
   type: 'installment' | 'deduction' | 'refund';
   amountPaise: number;
   reason: string;
   reference?: string;
   recordedBy: string;
+  // Only meaningful for type==='refund': tracks whether the money has actually
+  // been paid out to the tenant yet.
+  refundStatus?: RefundStatus;
+  issuedBy?: string;
+  issuedAt?: any;
+  tenantName?: string;
   createdAt: any;
 }
 
 export interface RentRecord {
   id: string;
   ownerId: string;
+  propertyId?: string;
   tenantId: string;
   tenantName?: string;
   bedId?: string;
@@ -146,6 +270,7 @@ export interface RentRecord {
 export interface MoveInPhoto {
   id: string;
   ownerId: string;
+  propertyId?: string;
   tenantId: string;
   rentRecordId?: string;
   photoType?: PhotoType;

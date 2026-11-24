@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Tenant, Owner, RentRecord } from '@/types';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, validateUtr } from '@/lib/utils';
 import { generateNumberedReceipt } from '@/lib/client/receiptPdf';
 import { generateQrDataUrl } from '@/lib/client/qrcode';
 import { buildUpiPayload } from '@/lib/client/upi';
@@ -136,11 +136,16 @@ export function RentStatusCard({
   // Handle UTR claim submission
   const handleSubmitClaim = async (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanUtr = utrInput.trim().toUpperCase();
-    if (!cleanUtr || cleanUtr.length < 6) {
-      toast.error('Please enter a valid UPI Reference / UTR Number (min 6 characters)');
+
+    // Double-submit guard: ignore re-entry while a claim is already in flight.
+    if (submittingClaim) return;
+
+    const utr = validateUtr(utrInput);
+    if (!utr.valid) {
+      toast.error(utr.error || 'Please enter a valid UPI Reference / UTR Number');
       return;
     }
+    const cleanUtr = utr.value;
 
     if (!rentRecord?.id) {
       toast.error('No active rent record to claim against');
@@ -379,18 +384,29 @@ export function RentStatusCard({
                       </div>
 
                       <div>
-                        <label className="text-[11px] font-semibold text-[#64748B] block mb-1">
+                        <label htmlFor="utr-input" className="text-[11px] font-semibold text-[#64748B] block mb-1">
                           12-digit UTR / UPI Transaction ID:
                         </label>
                         <input
+                          id="utr-input"
                           type="text"
+                          inputMode="numeric"
                           required
                           maxLength={32}
                           placeholder="e.g. 432198765432"
                           value={utrInput}
                           onChange={(e) => setUtrInput(e.target.value)}
-                          className="w-full h-9 px-3 rounded-[6px] border border-[#CBD5E1] bg-white text-xs font-mono text-[#09090B] placeholder:text-[#94A3B8] focus:outline-none focus:border-[#D97706]"
+                          className="w-full h-11 px-3 rounded-[6px] border border-[#CBD5E1] bg-white text-xs font-mono text-[#09090B] placeholder:text-[#94A3B8] focus:outline-none focus:border-[#D97706]"
                         />
+                        <details className="mt-1.5">
+                          <summary className="text-[11px] text-[#D97706] cursor-pointer select-none">
+                            Where do I find my UTR?
+                          </summary>
+                          <div className="mt-1.5 text-[11px] text-[#64748B] leading-relaxed space-y-1 pl-1">
+                            <p>Open your UPI app (GPay / PhonePe / Paytm) → tap the payment you just made → look for <strong>UTR</strong>, <strong>UPI Ref No.</strong>, or <strong>Transaction ID</strong>. It is a 12-digit number.</p>
+                            <p>Attach a screenshot below so your manager can verify faster.</p>
+                          </div>
+                        </details>
                       </div>
 
                       {/* Screenshot Uploader */}

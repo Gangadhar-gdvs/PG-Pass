@@ -38,6 +38,26 @@ export async function mintPresignedPut(
   return getSignedUrl(b2, command, { expiresIn: ttlSeconds });
 }
 
+/**
+ * Directly upload a server-generated buffer to object storage.
+ * Used by trusted server-side jobs (e.g. nightly encrypted backups) that already
+ * hold the payload in memory and should NOT round-trip through a presigned URL.
+ */
+export async function putObject(
+  bucket: string,
+  key: string,
+  body: Buffer,
+  contentType: string
+): Promise<void> {
+  const command = new PutObjectCommand({
+    Bucket: bucket,
+    Key: key,
+    Body: body,
+    ContentType: contentType,
+  });
+  await b2.send(command);
+}
+
 export async function mintPresignedGet(
   bucket: string,
   key: string,

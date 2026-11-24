@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withErrorHandler, AppError } from '@/lib/server/api/withErrorHandler';
 import { withAuth, AuthContext } from '@/lib/server/api/withAuth';
+import { withRateLimit } from '@/lib/server/api/withRateLimit';
 import { subscriptionsService } from '@/lib/server/services/subscriptions.service';
 import { adminDb } from '@/lib/server/firebase-admin';
 
@@ -22,23 +23,26 @@ export const GET = withErrorHandler(
 
 export const POST = withErrorHandler(
   withAuth(
-    async (req: NextRequest, ctx: { auth: AuthContext }) => {
-      let body: { requestId?: string; action?: 'approve' | 'reject' };
-      try {
-        body = await req.json();
-      } catch {
-        throw new AppError(400, 'Invalid JSON body');
-      }
+    withRateLimit(
+      async (req: NextRequest, ctx: { auth: AuthContext }) => {
+        let body: { requestId?: string; action?: 'approve' | 'reject' };
+        try {
+          body = await req.json();
+        } catch {
+          throw new AppError(400, 'Invalid JSON body');
+        }
 
-      if (!body.requestId) throw new AppError(400, 'requestId is required');
+        if (!body.requestId) throw new AppError(400, 'requestId is required');
 
-      if (body.action === 'approve') {
-        await subscriptionsService.approveUpgrade(body.requestId, ctx.auth.uid);
-        return NextResponse.json({ success: true, message: 'Plan upgrade approved' });
-      }
+        if (body.action === 'approve') {
+          await subscriptionsService.approveUpgrade(body.requestId, ctx.auth.uid);
+          return NextResponse.json({ success: true, message: 'Plan upgrade approved' });
+        }
 
-      throw new AppError(400, 'Invalid action');
-    },
+        throw new AppError(400, 'Invalid action');
+      },
+      { tier: 'standard', key: 'uid' }
+    ),
     { roles: ['admin'] }
   )
 );

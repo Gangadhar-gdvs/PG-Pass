@@ -37,6 +37,9 @@ export function BedGrid({
   onConfigureRooms,
 }: BedGridProps) {
   const [selectedFloor, setSelectedFloor] = useState<string>('all');
+  // Windowing: in the "all floors" view, render floors incrementally so a large
+  // PG (100+ beds) doesn't mount every bed card at once on mobile.
+  const [floorsShown, setFloorsShown] = useState(3);
   const [activeFilter, setActiveFilter] = useState<'all' | 'paid' | 'pending' | 'verify' | 'vacant'>('all');
   const [sharingFilter, setSharingFilter] = useState<string>('all');
   const [acFilter, setAcFilter] = useState<string>('all');
@@ -95,10 +98,13 @@ export function BedGrid({
     return true;
   });
 
-  const displayFloors =
+  const allFloors =
     selectedFloor === 'all'
       ? Array.from(new Set(filteredBeds.map((b) => b.floor))).sort((a, b) => a - b)
       : [Number(selectedFloor)];
+  // Only window the "all floors" view; a single selected floor renders fully.
+  const displayFloors = selectedFloor === 'all' ? allFloors.slice(0, floorsShown) : allFloors;
+  const hasMoreFloors = selectedFloor === 'all' && allFloors.length > displayFloors.length;
 
   return (
     <div className="space-y-4 text-left">
@@ -118,7 +124,7 @@ export function BedGrid({
           <select
             value={activeFilter}
             onChange={(e) => setActiveFilter(e.target.value as any)}
-            className="h-9 rounded-[8px] border border-[#CBD5E1] bg-white px-2.5 text-xs font-semibold text-[#09090B] focus:border-[#D97706] focus:outline-none"
+            className="h-11 rounded-[8px] border border-[#CBD5E1] bg-white px-2.5 text-xs font-semibold text-[#09090B] focus:border-[#D97706] focus:outline-none"
           >
             <option value="all">All Statuses</option>
             <option value="pending">Pending Rent</option>
@@ -131,7 +137,7 @@ export function BedGrid({
           <select
             value={sharingFilter}
             onChange={(e) => setSharingFilter(e.target.value)}
-            className="h-9 rounded-[8px] border border-[#CBD5E1] bg-white px-2.5 text-xs font-semibold text-[#09090B] focus:border-[#D97706] focus:outline-none"
+            className="h-11 rounded-[8px] border border-[#CBD5E1] bg-white px-2.5 text-xs font-semibold text-[#09090B] focus:border-[#D97706] focus:outline-none"
           >
             <option value="all">All Sharing Formats</option>
             <option value="1">Single Room (1-Share)</option>
@@ -146,7 +152,7 @@ export function BedGrid({
           <select
             value={acFilter}
             onChange={(e) => setAcFilter(e.target.value)}
-            className="h-9 rounded-[8px] border border-[#CBD5E1] bg-white px-2.5 text-xs font-semibold text-[#09090B] focus:border-[#D97706] focus:outline-none"
+            className="h-11 rounded-[8px] border border-[#CBD5E1] bg-white px-2.5 text-xs font-semibold text-[#09090B] focus:border-[#D97706] focus:outline-none"
           >
             <option value="all">All Climate</option>
             <option value="ac">AC Only</option>
@@ -160,7 +166,7 @@ export function BedGrid({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search bed, room, resident..."
-              className="w-full h-9 pl-8 pr-3 rounded-[8px] border border-[#E2E8F0] text-xs text-[#09090B] placeholder:text-[#94A3B8] bg-white focus:border-[#D97706] focus:outline-none"
+              className="w-full h-11 pl-8 pr-3 rounded-[8px] border border-[#E2E8F0] text-xs text-[#09090B] placeholder:text-[#94A3B8] bg-white focus:border-[#D97706] focus:outline-none"
             />
           </div>
 
@@ -329,6 +335,16 @@ export function BedGrid({
               </div>
             );
           })}
+
+          {hasMoreFloors && (
+            <button
+              type="button"
+              onClick={() => setFloorsShown((n) => n + 3)}
+              className="w-full h-11 rounded-[8px] border border-[#CBD5E1] bg-white text-xs font-semibold text-[#334155] hover:bg-[#F8FAFC] transition-colors"
+            >
+              Show more floors ({allFloors.length - displayFloors.length} left) · or pick a floor above
+            </button>
+          )}
         </div>
       )}
     </div>

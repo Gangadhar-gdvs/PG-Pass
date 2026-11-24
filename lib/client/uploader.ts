@@ -4,7 +4,7 @@ import { compressImage } from './imageCompress';
 
 export interface UploadPhotoOptions {
   file: File;
-  photoType: 'move_in' | 'move_out' | 'payment_proof';
+  photoType: 'move_in' | 'move_out' | 'payment_proof' | 'id_proof' | 'agreement';
   tenantId?: string;
   rentRecordId?: string;
   portalAuth?: {

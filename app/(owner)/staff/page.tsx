@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '@/hooks/useAuth';
+import { useOwnerSession } from '@/hooks/useOwner';
 import { PLAN_LIMITS } from '@/lib/constants/limits';
 import { PLAN_TIER, PlanTier, ACCOUNT_STATUS } from '@/lib/constants/status';
 import {
@@ -22,6 +22,7 @@ import { Input } from '@/components/ui/input';
 import { PhoneInput } from '@/components/ui/phone-input';
 import { Drawer } from '@/components/ui/drawer';
 import { Avatar } from '@/components/ui/avatar';
+import { Skeleton } from '@/components/ui/skeleton';
 import { validatePhone, sanitizeText } from '@/lib/security';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
@@ -37,8 +38,7 @@ interface StaffMember {
 }
 
 export default function StaffPage() {
-  const { user } = useAuth();
-  const ownerId = user?.uid || '';
+  const { ownerId } = useOwnerSession();
 
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
   const [profile, setProfile] = useState<any>(null);
@@ -51,6 +51,7 @@ export default function StaffPage() {
   const [phone, setPhone] = useState('');
   const [phoneError, setPhoneError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [setupLinkInfo, setSetupLinkInfo] = useState<{ name: string; link: string } | null>(null);
 
   const loadData = async () => {
     try {
@@ -120,6 +121,11 @@ export default function StaffPage() {
       setName('');
       setEmail('');
       setPhone('');
+      if (data.setupLink) {
+        // Surface the one-time password-setup link so the owner can forward it
+        // to the warden (there is no automated email/SMS delivery).
+        setSetupLinkInfo({ name: cleanName, link: data.setupLink });
+      }
       await loadData();
     } catch (err: any) {
       toast.error(err.message || 'Invitation failed');
@@ -179,9 +185,13 @@ export default function StaffPage() {
 
   if (loading) {
     return (
-      <div className="py-20 flex flex-col items-center justify-center">
-        <div className="w-8 h-8 border-2 border-[#D97706] border-t-transparent rounded-full animate-spin mb-3" />
-        <span className="text-xs text-[#64748B]">Loading staff directory...</span>
+      <div className="max-w-3xl mx-auto space-y-4">
+        <Skeleton className="h-8 w-48" />
+        <div className="space-y-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-20" />
+          ))}
+        </div>
       </div>
     );
   }
@@ -403,6 +413,52 @@ export default function StaffPage() {
             will automatically scope all their reads to your PG.
           </div>
         </form>
+      </Drawer>
+
+      {/* Setup-link share: shown once right after inviting a warden */}
+      <Drawer
+        isOpen={!!setupLinkInfo}
+        onClose={() => setSetupLinkInfo(null)}
+        title="Share Warden Setup Link"
+        description={setupLinkInfo ? `For ${setupLinkInfo.name}` : ''}
+        width="md"
+      >
+        {setupLinkInfo && (
+          <div className="space-y-4">
+            <p className="text-xs text-[#64748B] leading-relaxed">
+              Send this one-time link to the warden so they can set their password and sign in.
+              It is shown only now — you can regenerate it later via “Forgot password”.
+            </p>
+            <div className="p-3 rounded-[8px] bg-[#F8FAFC] border border-[#E2E8F0] break-all text-xs font-mono text-[#334155]">
+              {setupLinkInfo.link}
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button
+                type="button"
+                variant="solid"
+                className="flex-1"
+                onClick={() => {
+                  navigator.clipboard?.writeText(setupLinkInfo.link);
+                  toast.success('Setup link copied');
+                }}
+              >
+                Copy Link
+              </Button>
+              <a
+                className="flex-1"
+                href={`https://wa.me/?text=${encodeURIComponent(
+                  `Hi ${setupLinkInfo.name}, set up your PGPass warden login here: ${setupLinkInfo.link}`
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Button type="button" variant="outline" className="w-full">
+                  Share on WhatsApp
+                </Button>
+              </a>
+            </div>
+          </div>
+        )}
       </Drawer>
     </div>
   );

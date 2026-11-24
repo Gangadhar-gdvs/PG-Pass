@@ -65,6 +65,43 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    match /maintenance_tickets/{ticketId} {
+      allow get:   if canReadOwnerScope(resource.data.ownerId);
+      allow list:  if canReadOwnerScope(resource.data.ownerId) && boundedList();
+      allow write: if false; // created by tenant via /api/maintenance, resolved via Admin SDK
+    }
+
+    match /owner_notifications/{id} {
+      allow get:   if canReadOwnerScope(resource.data.ownerId);
+      allow list:  if canReadOwnerScope(resource.data.ownerId) && boundedList();
+      allow write: if false;
+    }
+
+    match /expenses/{expenseId} {
+      allow get:   if canReadOwnerScope(resource.data.ownerId);
+      allow list:  if canReadOwnerScope(resource.data.ownerId) && boundedList();
+      allow write: if false; // created/deleted via /api/expenses (Admin SDK)
+    }
+
+    match /properties/{propertyId} {
+      allow get:   if canReadOwnerScope(resource.data.ownerId);
+      allow list:  if canReadOwnerScope(resource.data.ownerId) && boundedList();
+      allow write: if false; // managed via /api/properties (Admin SDK)
+    }
+
+    // Resident self-service accounts. A resident reads only their own profile;
+    // all discovery/join data is served via the Admin SDK through /api/**.
+    match /residents/{uid} {
+      allow get:   if notSuspended() && request.auth.uid == uid;
+      allow list, write: if false;
+    }
+
+    // Join requests are read/written server-side only (owner sees them via API,
+    // resident creates them via API). No direct client access.
+    match /join_requests/{id} {
+      allow read, write: if false;
+    }
+
     match /audit_logs/{logId}           { allow get, list: if isAdmin() && boundedList(); allow write: if false; }
     match /admin_notifications/{id}     { allow get, list: if isAdmin() && boundedList(); allow write: if false; }
     match /support_flags/{flagId}       { allow get, list: if isAdmin() && boundedList(); allow write: if false; }

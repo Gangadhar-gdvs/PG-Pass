@@ -4,6 +4,7 @@ import { SubscriptionRequest } from '@/types';
 import { AppError } from '../api/withErrorHandler';
 import { SUBSCRIPTION_REQUEST_STATUS, PLAN_TIER, PlanTier } from '@/lib/constants/status';
 import { PLAN_LIMITS } from '@/lib/constants/limits';
+import { emailService, subscriptionApprovedEmail } from './email.service';
 import { Timestamp } from 'firebase-admin/firestore';
 
 export interface SubmitUpgradeParams {
@@ -40,6 +41,8 @@ export class SubscriptionsService {
   async approveUpgrade(reqId: string, adminUid: string): Promise<void> {
     const reqRef = adminDb.collection('subscription_requests').doc(reqId);
     const now = Timestamp.now();
+    let ownerEmail: string | undefined;
+    let approvedPlan: string | undefined;
 
     await adminDb.runTransaction(async (transaction) => {
       const reqDoc = await transaction.get(reqRef);
@@ -53,8 +56,10 @@ export class SubscriptionsService {
       const ownerRef = adminDb.collection('owners').doc(reqData.ownerId);
       const ownerDoc = await transaction.get(ownerRef);
       if (!ownerDoc.exists) throw new AppError(404, 'Owner profile not found');
+      ownerEmail = ownerDoc.data()?.email;
 
       const targetPlan = reqData.requestedPlan;
+      approvedPlan = targetPlan;
       const limits = PLAN_LIMITS[targetPlan] || PLAN_LIMITS.free;
 
       // Calculate expiration: 30 days for monthly, 365 days for yearly
@@ -92,7 +97,26 @@ export class SubscriptionsService {
         newPlan: targetPlan,
         createdAt: now,
       });
+
+      // 4. Owner-facing notification so the owner learns the upgrade landed
+      //    without having to refresh and guess.
+      const notifRef = adminDb.collection('owner_notifications').doc();
+      transaction.set(notifRef, {
+        id: notifRef.id,
+        ownerId: reqData.ownerId,
+        type: 'subscription',
+        message: `Your ${targetPlan} plan upgrade has been approved. New limits are active.`,
+        status: 'unread',
+        createdAt: now,
+      });
     });
+
+    // Best-effort owner email (no-op unless email provider is configured and the
+    // owner has an email on file). Never blocks the approval.
+    if (ownerEmail && approvedPlan) {
+      const { subject, html } = subscriptionApprovedEmail({ plan: approvedPlan });
+      await emailService.send({ to: ownerEmail, subject, html });
+    }
   }
 }
 

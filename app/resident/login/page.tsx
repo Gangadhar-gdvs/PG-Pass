@@ -1,0 +1,135 @@
+'use client';
+
+import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import {
+  signInWithPopup,
+  GoogleAuthProvider,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+} from 'firebase/auth';
+import { auth } from '@/lib/firebase';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { PhoneInput } from '@/components/ui/phone-input';
+import { validatePhone } from '@/lib/security';
+import { UserCircle } from 'lucide-react';
+import toast from 'react-hot-toast';
+
+export default function ResidentLoginPage() {
+  const router = useRouter();
+  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  // After Firebase auth: (optionally) register as resident, then mint session.
+  const finish = async (idToken: string, isNew: boolean) => {
+    if (isNew) {
+      const pv = validatePhone(phone);
+      if (!pv.valid) throw new Error(pv.error || 'Enter a valid 10-digit phone');
+      const reg = await fetch('/api/resident/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken, name: name.trim(), phone: pv.cleaned, email }),
+      });
+      if (!reg.ok) {
+        const e = await reg.json().catch(() => ({}));
+        throw new Error(e.error || e.message || 'Registration failed');
+      }
+      // Re-fetch token to pick up the new resident claim.
+      idToken = await auth.currentUser!.getIdToken(true);
+    }
+    const res = await fetch('/api/auth/session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken }),
+    });
+    if (!res.ok) throw new Error('Could not start session');
+    router.push('/resident/home');
+  };
+
+  const handleGoogle = async () => {
+    setBusy(true);
+    try {
+      if (mode === 'signup') {
+        const pv = validatePhone(phone);
+        if (!pv.valid) throw new Error('Enter your phone number first');
+        if (name.trim().length < 2) throw new Error('Enter your name first');
+      }
+      const cred = await signInWithPopup(auth, new GoogleAuthProvider());
+      const idToken = await cred.user.getIdToken();
+      await finish(idToken, mode === 'signup');
+    } catch (e: any) {
+      toast.error(e.message || 'Google sign-in failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    try {
+      const cred =
+        mode === 'signup'
+          ? await createUserWithEmailAndPassword(auth, email.trim(), password)
+          : await signInWithEmailAndPassword(auth, email.trim(), password);
+      const idToken = await cred.user.getIdToken();
+      await finish(idToken, mode === 'signup');
+    } catch (e: any) {
+      toast.error(e.message?.replace('Firebase:', '').trim() || 'Sign-in failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-[#F0FDFA] flex flex-col items-center justify-center p-4">
+      <div className="w-full max-w-sm bg-white rounded-[16px] border border-[#CCFBF1] shadow-sm p-6 space-y-5">
+        <div className="text-center space-y-1">
+          <div className="w-12 h-12 mx-auto rounded-[12px] bg-[#0D9488] text-white flex items-center justify-center">
+            <UserCircle className="w-6 h-6" />
+          </div>
+          <h1 className="text-lg font-bold">Resident {mode === 'signup' ? 'Sign Up' : 'Login'}</h1>
+          <p className="text-xs text-[#64748B]">Access your PG, payments and issues.</p>
+        </div>
+
+        {mode === 'signup' && (
+          <>
+            <Input label="Your Name" value={name} onChange={(e) => setName(e.target.value)} disabled={busy} />
+            <PhoneInput label="Phone (links you to your PG)" value={phone} onChange={setPhone} disabled={busy} />
+          </>
+        )}
+
+        <form onSubmit={handleEmail} className="space-y-3">
+          <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required disabled={busy} />
+          <Input label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required disabled={busy} />
+          <Button type="submit" variant="solid" loading={busy} className="w-full bg-[#0D9488] hover:bg-[#0F766E]">
+            {mode === 'signup' ? 'Create Account' : 'Login'}
+          </Button>
+        </form>
+
+        <div className="relative text-center">
+          <span className="text-[11px] text-[#94A3B8] bg-white px-2 relative z-10">or</span>
+          <div className="absolute inset-x-0 top-1/2 h-px bg-[#E2E8F0]" />
+        </div>
+
+        <Button variant="outline" onClick={handleGoogle} disabled={busy} className="w-full">
+          Continue with Google
+        </Button>
+
+        <button
+          type="button"
+          onClick={() => setMode(mode === 'signup' ? 'signin' : 'signup')}
+          className="w-full text-xs text-[#0D9488] font-semibold"
+        >
+          {mode === 'signup' ? 'Already have an account? Login' : 'New here? Create an account'}
+        </button>
+      </div>
+    </div>
+  );
+}

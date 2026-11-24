@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '@/hooks/useAuth';
+import { useOwnerSession } from '@/hooks/useOwner';
+import { AddPropertyCard } from '@/components/owner/AddPropertyCard';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { validatePan, validateUpi, sanitizeText } from '@/lib/security';
 import {
@@ -15,8 +17,7 @@ import {
 import toast from 'react-hot-toast';
 
 export default function SettingsPage() {
-  const { user } = useAuth();
-  const ownerId = user?.uid || '';
+  const { ownerId } = useOwnerSession();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -27,6 +28,9 @@ export default function SettingsPage() {
   const [upiId, setUpiId] = useState('');
   const [panNumber, setPanNumber] = useState('');
   const [phone, setPhone] = useState('');
+  const [rentDueDay, setRentDueDay] = useState('5');
+  const [lateFeePerDay, setLateFeePerDay] = useState('0');
+  const [lateFeeGraceDays, setLateFeeGraceDays] = useState('0');
 
   useEffect(() => {
     async function load() {
@@ -40,6 +44,9 @@ export default function SettingsPage() {
           setUpiId(profile.upiId || '');
           setPanNumber(profile.panNumber || '');
           setPhone(profile.phone || '');
+          setRentDueDay(String(profile.rentDueDay ?? 5));
+          setLateFeePerDay(String(Math.round((profile.lateFeePerDayPaise ?? 0) / 100)));
+          setLateFeeGraceDays(String(profile.lateFeeGraceDays ?? 0));
         }
       } catch (e) {
         console.error('Error fetching settings:', e);
@@ -86,6 +93,9 @@ export default function SettingsPage() {
           upiId: upiValidation.formatted,
           panNumber: panValidation.formatted,
           phone: phone.replace(/\D/g, '').slice(-10) || '9876543210',
+          rentDueDay: Math.min(28, Math.max(1, Number(rentDueDay) || 5)),
+          lateFeePerDayPaise: Math.max(0, Math.round((Number(lateFeePerDay) || 0) * 100)),
+          lateFeeGraceDays: Math.max(0, Math.min(28, Number(lateFeeGraceDays) || 0)),
         }),
       });
 
@@ -104,15 +114,20 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <div className="py-20 flex flex-col items-center justify-center">
-        <div className="w-8 h-8 border-2 border-[#D97706] border-t-transparent rounded-full animate-spin mb-3" />
-        <span className="text-xs text-[#64748B]">Loading settings...</span>
+      <div className="max-w-2xl mx-auto py-8 space-y-4">
+        <Skeleton className="h-24" />
+        <Skeleton className="h-8 w-56" />
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Skeleton key={i} className="h-11" />
+        ))}
       </div>
     );
   }
 
   return (
-    <div className="max-w-2xl mx-auto py-8">
+    <div className="max-w-2xl mx-auto py-8 space-y-5">
+      <AddPropertyCard />
+
       <div className="bg-white border border-[#E2E8F0] rounded-[12px] p-6 sm:p-8 shadow-xs">
         <div className="flex items-center gap-3 pb-5 mb-6 border-b border-[#E2E8F0]">
           <div className="w-10 h-10 rounded-[8px] bg-[#FEF3C7] border border-[#FDE68A] text-[#D97706] flex items-center justify-center shrink-0">
@@ -185,6 +200,65 @@ export default function SettingsPage() {
               disabled={saving}
               maxLength={10}
             />
+          </div>
+
+          <div className="space-y-4 pt-4 border-t border-[#E2E8F0]">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-[#94A3B8] flex items-center gap-1.5">
+              <CreditCard className="w-3.5 h-3.5 text-[#D97706]" />
+              <span>Rent Collection</span>
+            </h2>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="space-y-1.5">
+                <label htmlFor="rent-due-day" className="text-xs font-semibold text-[#334155]">
+                  Rent Due Day (of month)
+                </label>
+                <input
+                  id="rent-due-day"
+                  type="number"
+                  min={1}
+                  max={28}
+                  value={rentDueDay}
+                  onChange={(e) => setRentDueDay(e.target.value)}
+                  disabled={saving}
+                  className="w-full h-11 rounded-[8px] border border-[#CBD5E1] px-3 text-sm text-[#09090B] focus:border-[#D97706] focus:outline-none disabled:opacity-50"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label htmlFor="late-fee" className="text-xs font-semibold text-[#334155]">
+                  Late Fee / day (₹)
+                </label>
+                <input
+                  id="late-fee"
+                  type="number"
+                  min={0}
+                  value={lateFeePerDay}
+                  onChange={(e) => setLateFeePerDay(e.target.value)}
+                  disabled={saving}
+                  className="w-full h-11 rounded-[8px] border border-[#CBD5E1] px-3 text-sm text-[#09090B] focus:border-[#D97706] focus:outline-none disabled:opacity-50"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label htmlFor="late-grace" className="text-xs font-semibold text-[#334155]">
+                  Grace Days
+                </label>
+                <input
+                  id="late-grace"
+                  type="number"
+                  min={0}
+                  max={28}
+                  value={lateFeeGraceDays}
+                  onChange={(e) => setLateFeeGraceDays(e.target.value)}
+                  disabled={saving}
+                  className="w-full h-11 rounded-[8px] border border-[#CBD5E1] px-3 text-sm text-[#09090B] focus:border-[#D97706] focus:outline-none disabled:opacity-50"
+                />
+              </div>
+            </div>
+            <p className="text-[11px] text-[#64748B]">
+              Due day applies to newly generated rent records. Set late fee to ₹0 to disable penalties.
+            </p>
           </div>
 
           <div className="p-4 rounded-[8px] bg-[#ECFDF5] border border-[#A7F3D0] flex items-start gap-2.5">

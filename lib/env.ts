@@ -33,6 +33,17 @@ const serverEnvSchema = z.object({
   BACKUP_ENCRYPTION_KEY: z.string().optional(),
   CRON_SECRET: z.string().default('dev-cron-secret'),
   LOG_LEVEL: z.enum(['info', 'warn', 'error', 'debug']).default('info'),
+  // Optional transactional email (Resend HTTP API). When RESEND_API_KEY is
+  // unset, email sending is a silent no-op — the app stays zero-cost/card-free
+  // by default and only emails when a free-tier key is provided.
+  RESEND_API_KEY: z.string().optional(),
+  EMAIL_FROM: z.string().optional(),
+  // Optional transactional SMS (generic HTTP provider, e.g. Fast2SMS / MSG91).
+  // No-op unless SMS_API_URL + SMS_API_KEY are set — keeps the app card-free by
+  // default; reminders then fall back to the free "open WhatsApp" client flow.
+  SMS_API_URL: z.string().optional(),
+  SMS_API_KEY: z.string().optional(),
+  SMS_SENDER_ID: z.string().optional(),
 });
 
 const isServer = typeof window === 'undefined';

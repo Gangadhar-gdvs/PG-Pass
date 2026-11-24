@@ -13,6 +13,12 @@ export interface StorageProvider {
     key: string,
     ttlSeconds?: number
   ): Promise<string>;
+  putObject(
+    bucket: string,
+    key: string,
+    body: Buffer,
+    contentType: string
+  ): Promise<void>;
   headObject(
     bucket: string,
     key: string
@@ -37,6 +43,7 @@ export interface StorageProvider {
 export const storageProvider: StorageProvider = {
   mintPresignedPut: b2Storage.mintPresignedPut,
   mintPresignedGet: b2Storage.mintPresignedGet,
+  putObject: b2Storage.putObject,
   headObject: b2Storage.headObject,
   copyObject: b2Storage.copyObject,
   deleteObject: b2Storage.deleteObject,

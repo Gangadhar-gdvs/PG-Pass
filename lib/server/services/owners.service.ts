@@ -27,6 +27,12 @@ export class OwnersService {
       foodPlan?: '3_meals' | '2_meals' | 'no_food';
       foodCuisine?: 'both' | 'south' | 'north';
       noticePeriodDays?: number;
+      city?: string;
+      area?: string;
+      isListed?: boolean;
+      rentDueDay?: number;
+      lateFeePerDayPaise?: number;
+      lateFeeGraceDays?: number;
       pgAmenities?: string[];
       totalFloors?: number;
     }
@@ -81,12 +87,50 @@ export class OwnersService {
       ...(data.foodPlan ? { foodPlan: data.foodPlan } : {}),
       ...(data.foodCuisine ? { foodCuisine: data.foodCuisine } : {}),
       ...(data.noticePeriodDays ? { noticePeriodDays: data.noticePeriodDays } : {}),
+      ...(data.city !== undefined ? { city: data.city.trim() } : {}),
+      ...(data.area !== undefined ? { area: data.area.trim() } : {}),
+      ...(data.isListed !== undefined ? { isListed: data.isListed } : {}),
+      ...(data.rentDueDay !== undefined ? { rentDueDay: data.rentDueDay } : {}),
+      ...(data.lateFeePerDayPaise !== undefined ? { lateFeePerDayPaise: data.lateFeePerDayPaise } : {}),
+      ...(data.lateFeeGraceDays !== undefined ? { lateFeeGraceDays: data.lateFeeGraceDays } : {}),
       ...(data.pgAmenities ? { pgAmenities: data.pgAmenities } : {}),
       ...(data.totalFloors ? { totalFloors: data.totalFloors } : {}),
       updatedAt: Timestamp.now(),
     };
 
     await docRef.update(updateData as any);
+
+    // Mirror public-listing fields onto the PRIMARY property doc (id == ownerId)
+    // so PG discovery (which reads `properties`) stays in sync even if the owner
+    // never opened the properties UI.
+    if (
+      data.pgName !== undefined ||
+      data.city !== undefined ||
+      data.area !== undefined ||
+      data.isListed !== undefined ||
+      data.address !== undefined ||
+      data.pgCategory !== undefined
+    ) {
+      await adminDb
+        .collection('properties')
+        .doc(ownerId)
+        .set(
+          {
+            id: ownerId,
+            ownerId,
+            isPrimary: true,
+            pgName: data.pgName?.trim(),
+            pgAddress: data.address?.trim(),
+            ...(data.city !== undefined ? { city: data.city.trim() } : {}),
+            ...(data.area !== undefined ? { area: data.area.trim() } : {}),
+            ...(data.isListed !== undefined ? { isListed: data.isListed } : {}),
+            ...(data.pgCategory ? { pgCategory: data.pgCategory } : {}),
+            updatedAt: Timestamp.now(),
+          },
+          { merge: true }
+        );
+    }
+
     return {
       ...(existing.data() as Owner),
       ...updateData,

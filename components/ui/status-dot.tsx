@@ -33,13 +33,25 @@ export function StatusDot({
     amber: "text-[#92400E]",
   };
 
+  // Human-readable default so status is never conveyed by colour alone
+  // (colourblind users) — used for the sr-only text when no visible label.
+  const defaultLabels: Record<StatusType, string> = {
+    paid: "Paid",
+    pending: "Pending",
+    verify: "Awaiting verification",
+    vacant: "Vacant",
+    danger: "Attention",
+    neutral: "Status",
+    amber: "Notice",
+  };
+
   return (
     <span
       className={`inline-flex items-center gap-1.5 text-xs font-semibold select-none ${textColors[status]} ${className}`}
       {...props}
     >
-      <span className={`h-2 w-2 rounded-full shrink-0 ${dots[status]}`} />
-      {label && <span>{label}</span>}
+      <span className={`h-2 w-2 rounded-full shrink-0 ${dots[status]}`} aria-hidden="true" />
+      {label ? <span>{label}</span> : <span className="sr-only">{defaultLabels[status]}</span>}
     </span>
   );
 }

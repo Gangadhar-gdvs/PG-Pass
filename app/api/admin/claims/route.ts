@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withErrorHandler, AppError } from '@/lib/server/api/withErrorHandler';
 import { withAuth, AuthContext } from '@/lib/server/api/withAuth';
+import { withRateLimit } from '@/lib/server/api/withRateLimit';
 import { adminAuth, adminDb } from '@/lib/server/firebase-admin';
 import { Timestamp } from 'firebase-admin/firestore';
 import { z } from 'zod';
@@ -12,6 +13,7 @@ const grantAdminSchema = z.object({
 
 export const POST = withErrorHandler(
   withAuth(
+    withRateLimit(
     async (req: NextRequest, ctx: { auth: AuthContext }) => {
       let body;
       try {
@@ -49,6 +51,8 @@ export const POST = withErrorHandler(
         message: `Super Admin role successfully granted to UID ${targetUid}`,
       });
     },
+      { tier: 'sensitive', key: 'uid', maxRequests: 10, windowSeconds: 60 }
+    ),
     { roles: ['admin'] }
   )
 );

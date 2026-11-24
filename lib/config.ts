@@ -48,11 +48,11 @@ export const config = {
     tokenLength: 12,
   },
 
-  admin: {
-    // Master secret key for super admin portal (accessible only by you)
-    secretKey: process.env.NEXT_PUBLIC_ADMIN_SECRET_KEY || 'pgpass_admin_secret_2026',
-    adminPhone: process.env.NEXT_PUBLIC_ADMIN_PHONE || '919876543210',
-  },
+  // NOTE: Super-admin authorization is enforced SERVER-SIDE ONLY via the
+  // Firebase custom claim `{ admin: true }` (bootstrapped by scripts/bootstrapAdmin.ts
+  // and verified in lib/server/api/withAuth.ts). There is deliberately no
+  // client-readable admin secret here — a NEXT_PUBLIC_ secret would ship to the
+  // browser bundle and let anyone enumerate every PG's data.
 } as const;
 
 export default config;

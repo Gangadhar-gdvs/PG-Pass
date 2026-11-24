@@ -30,11 +30,16 @@ export function AddTenantModal({
   );
   const [rent, setRent] = useState(String(bed.monthlyRent || 8500));
   const [deposit, setDeposit] = useState(String(bed.monthlyRent || 8500));
+  const [idProofType, setIdProofType] = useState('aadhaar');
+  const [emName, setEmName] = useState('');
+  const [emPhone, setEmPhone] = useState('');
+  const [emRelation, setEmRelation] = useState('');
   const [loading, setLoading] = useState(false);
   const [phoneError, setPhoneError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return; // double-submit guard
     setPhoneError('');
 
     const sanitizedName = sanitizeText(name, 60);
@@ -65,6 +70,10 @@ export function AddTenantModal({
           name: sanitizedName,
           phone: cleanPhone,
           moveInDate,
+          idProofType,
+          emergencyContactName: emName.trim() || undefined,
+          emergencyContactPhone: emPhone.replace(/\D/g, '').slice(-10) || undefined,
+          emergencyContactRelation: emRelation.trim() || undefined,
           securityDepositPaise: Math.round(depositVal * 100),
           depositPaidPaise: Math.round(depositVal * 100),
           initialRentAmountPaise: Math.round(rentVal * 100),
@@ -153,14 +162,71 @@ export function AddTenantModal({
           />
         </div>
 
-        <Input
-          label="Move-In Date"
-          type="date"
-          value={moveInDate}
-          onChange={(e) => setMoveInDate(e.target.value)}
-          required
-          disabled={loading}
-        />
+        <div className="grid grid-cols-2 gap-3">
+          <Input
+            label="Move-In Date"
+            type="date"
+            value={moveInDate}
+            onChange={(e) => setMoveInDate(e.target.value)}
+            required
+            disabled={loading}
+          />
+
+          <div className="space-y-1.5">
+            <label
+              htmlFor="add-tenant-idproof"
+              className="text-xs font-semibold text-[#334155]"
+            >
+              ID Proof Type
+            </label>
+            <select
+              id="add-tenant-idproof"
+              value={idProofType}
+              onChange={(e) => setIdProofType(e.target.value)}
+              disabled={loading}
+              className="w-full h-11 rounded-[8px] border border-[#CBD5E1] bg-white px-2.5 text-sm text-[#09090B] focus:border-[#D97706] focus:outline-none disabled:opacity-50"
+            >
+              <option value="aadhaar">Aadhaar Card</option>
+              <option value="pan">PAN Card</option>
+              <option value="driving_license">Driving License</option>
+              <option value="voter_id">Voter ID</option>
+              <option value="passport">Passport</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Emergency contact (optional) */}
+        <div className="space-y-3 pt-1">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-[#94A3B8]">
+            Emergency Contact (optional)
+          </span>
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="Contact Name"
+              placeholder="e.g. Parent / Guardian"
+              value={emName}
+              onChange={(e) => setEmName(e.target.value)}
+              disabled={loading}
+            />
+            <Input
+              label="Relation"
+              placeholder="e.g. Father"
+              value={emRelation}
+              onChange={(e) => setEmRelation(e.target.value)}
+              disabled={loading}
+            />
+          </div>
+          <Input
+            label="Contact Phone"
+            type="tel"
+            inputMode="numeric"
+            placeholder="10-digit mobile"
+            value={emPhone}
+            onChange={(e) => setEmPhone(e.target.value)}
+            disabled={loading}
+          />
+        </div>
 
         <div className="p-3.5 rounded-[8px] bg-[#F8FAFC] border border-[#E2E8F0] text-xs text-[#64748B] leading-relaxed">
           Assigning this bed will atomically issue an unguessable cryptographic resident pass URL.

@@ -34,10 +34,62 @@ export function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
+/**
+ * Validate a UPI transaction reference (UTR / RRN). UPI UTRs are 12 digits;
+ * some bank apps show a longer alphanumeric reference, so accept 12–22
+ * alphanumerics but require at least the canonical 12-digit form to pass the
+ * strict check. Returns the normalised (uppercased, trimmed) value.
+ */
+export function validateUtr(raw: string): { valid: boolean; value: string; error?: string } {
+  const value = (raw || '').trim().toUpperCase();
+  if (!value) return { valid: false, value, error: 'Enter the UPI reference / UTR number' };
+  if (/^\d{12}$/.test(value)) return { valid: true, value };
+  if (/^[A-Z0-9]{12,22}$/.test(value)) return { valid: true, value };
+  return {
+    valid: false,
+    value,
+    error: 'UTR should be the 12-digit reference from your UPI app',
+  };
+}
+
+/** Format an ISO date (YYYY-MM-DD) or Date as DD/MM/YYYY for Indian users. */
+export function formatDateIN(value?: string | Date | null): string {
+  if (!value) return '';
+  const d = typeof value === 'string' ? new Date(value) : value;
+  if (isNaN(d.getTime())) return typeof value === 'string' ? value : '';
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  return `${dd}/${mm}/${d.getFullYear()}`;
+}
+
 export function getCurrentMonthYear(): string {
   const d = new Date();
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   return `${months[d.getMonth()]}-${d.getFullYear()}`;
+}
+
+/**
+ * Current billing period in canonical YYYY-MM form (e.g. "2026-11").
+ * This is the `period` field actually stored on rent_records by the server
+ * services; `getCurrentMonthYear()` returns the legacy "Nov-2026" display
+ * string and must NOT be used for Firestore queries.
+ */
+export function getCurrentPeriod(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/**
+ * Compute the rent due date (YYYY-MM-DD) for a billing period given the PG's
+ * configured day-of-month. Clamps to 1–28 so it is always a valid day in every
+ * month. Defaults to the 5th when no day is configured.
+ */
+export function rentDueDate(period: string, dueDay?: number): string {
+  // Note: use a null/undefined check, NOT `dueDay || 5` — a configured value of
+  // 0 is falsy and must clamp to 1, not fall back to the default.
+  const raw = dueDay === undefined || dueDay === null ? 5 : Math.floor(dueDay);
+  const day = Math.min(28, Math.max(1, raw));
+  return `${period}-${String(day).padStart(2, '0')}`;
 }
 
 export function getWhatsAppLink(phone: string, message: string): string {

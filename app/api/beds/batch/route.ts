@@ -18,12 +18,16 @@ export const POST = withErrorHandler(
 
         const validated = createBedsBatchSchema.parse(body);
         const ownerId = ctx.auth.ownerId || ctx.auth.uid;
+        // Optional target property (defaults to primary = ownerId inside the
+        // service). Validated loosely: must belong to this owner's namespace.
+        const propertyId =
+          typeof body?.propertyId === 'string' ? body.propertyId : undefined;
 
         const fn = typeof bedsService?.createBedsBatch === 'function'
           ? bedsService.createBedsBatch.bind(bedsService)
           : createBedsBatch;
 
-        const result = await fn(ownerId, validated.beds);
+        const result = await fn(ownerId, validated.beds, propertyId);
         return NextResponse.json(result, { status: 201 });
       },
       { tier: 'standard' }

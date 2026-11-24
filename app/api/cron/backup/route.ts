@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { withErrorHandler } from '@/lib/server/api/withErrorHandler';
 import { withCronAuth } from '@/lib/server/api/withCronAuth';
 import { adminDb } from '@/lib/server/firebase-admin';
@@ -29,25 +29,56 @@ export const POST = withErrorHandler(
     ];
 
     const results: Record<string, number> = {};
+    const uploadedBytes: Record<string, number> = {};
+    const backupConfigured = Boolean(env.B2_BACKUP_BUCKET && env.BACKUP_ENCRYPTION_KEY);
 
     for (const colName of collectionsToBackup) {
-      const snap = await adminDb.collection(colName).limit(1000).get();
-      const records = snap.docs.map((d) => ({ _id: d.id, ...d.data() }));
-      results[colName] = records.length;
+      // Paginate the whole collection — a flat limit(1000) silently drops data
+      // once a collection grows past 1000 docs, which defeats the backup.
+      const PAGE = 1000;
+      const lines: string[] = [];
+      // Firestore QueryDocumentSnapshot cursor; typed loosely to avoid relying
+      // on the global FirebaseFirestore namespace.
+      let lastDoc: any = undefined;
 
-      if (records.length > 0 && env.B2_BACKUP_BUCKET && env.BACKUP_ENCRYPTION_KEY) {
-        // Serialize to NDJSON
-        const ndjson = records.map((r) => JSON.stringify(r)).join('\n');
+      for (;;) {
+        let q = adminDb.collection(colName).orderBy('__name__').limit(PAGE);
+        if (lastDoc) q = q.startAfter(lastDoc);
+        const snap = await q.get();
+        if (snap.empty) break;
+        for (const d of snap.docs) {
+          lines.push(JSON.stringify({ _id: d.id, ...d.data() }));
+        }
+        lastDoc = snap.docs[snap.docs.length - 1];
+        if (snap.size < PAGE) break;
+      }
+
+      results[colName] = lines.length;
+
+      if (lines.length > 0 && backupConfigured) {
+        const ndjson = lines.join('\n');
         const compressed = zlib.gzipSync(Buffer.from(ndjson, 'utf-8'));
-        const encrypted = encryptAes256Gcm(compressed, env.BACKUP_ENCRYPTION_KEY);
+        const encrypted = encryptAes256Gcm(compressed, env.BACKUP_ENCRYPTION_KEY!);
 
         const backupKey = `backups/${todayStr}/${colName}.ndjson.gz.enc`;
-        await storageProvider.mintPresignedPut(
-          env.B2_BACKUP_BUCKET,
+
+        // Actually upload the encrypted blob. Previously a presigned URL was
+        // minted and then discarded, so nothing was ever stored in B2.
+        await storageProvider.putObject(
+          env.B2_BACKUP_BUCKET!,
           backupKey,
-          'application/octet-stream',
-          300
+          encrypted,
+          'application/octet-stream'
         );
+
+        // Verify the object exists and the byte count matches what we sent.
+        const head = await storageProvider.headObject(env.B2_BACKUP_BUCKET!, backupKey);
+        if (head.contentLength !== encrypted.length) {
+          throw new Error(
+            `Backup verification failed for ${colName}: sent ${encrypted.length} bytes, stored ${head.contentLength}`
+          );
+        }
+        uploadedBytes[colName] = head.contentLength;
       }
     }
 
@@ -55,7 +86,11 @@ export const POST = withErrorHandler(
       success: true,
       backupDate: todayStr,
       collectionCounts: results,
-      encryptedToB2: Boolean(env.B2_BACKUP_BUCKET && env.BACKUP_ENCRYPTION_KEY),
+      uploadedBytes,
+      // True only when backup is configured AND at least one object was
+      // uploaded and verified on this run.
+      encryptedToB2: backupConfigured && Object.keys(uploadedBytes).length > 0,
+      backupConfigured,
     });
   })
 );

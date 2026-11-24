@@ -6,13 +6,13 @@ import { SESSION_COOKIE_NAME } from '@/lib/constants/limits';
 
 export interface AuthContext {
   uid: string;
-  role: 'owner' | 'staff' | 'admin' | 'tenant';
+  role: 'owner' | 'staff' | 'admin' | 'tenant' | 'resident';
   ownerId?: string;
   email?: string;
 }
 
 export interface WithAuthOptions {
-  roles?: Array<'owner' | 'staff' | 'admin' | 'tenant'>;
+  roles?: Array<'owner' | 'staff' | 'admin' | 'tenant' | 'resident'>;
 }
 
 // In-memory 60s cache for account status to eliminate redundant Firestore queries on every API request
@@ -66,7 +66,7 @@ export function withAuth(
 
     const uid = decodedClaims.uid;
     const isAdmin = decodedClaims.admin === true;
-    const role: 'owner' | 'staff' | 'admin' | 'tenant' = isAdmin
+    const role: 'owner' | 'staff' | 'admin' | 'tenant' | 'resident' = isAdmin
       ? 'admin'
       : (decodedClaims.role as any) || 'owner';
     const ownerId = isAdmin

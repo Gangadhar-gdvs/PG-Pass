@@ -32,10 +32,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Drawer } from '@/components/ui/drawer';
 import { formatCurrency } from '@/lib/utils';
-import {
-  getSuperAdminPlatformOverview,
-  SuperAdminPgOverview,
-} from '@/lib/firestore';
+import type { SuperAdminPgOverview } from '@/lib/server/services/adminOverview.service';
 import { config } from '@/lib/config';
 import { Avatar } from '@/components/ui/avatar';
 import { StatusDot } from '@/components/ui/status-dot';
@@ -163,7 +160,11 @@ export default function SuperAdminPortalPage() {
   const loadPlatformData = async () => {
     setLoadingStats(true);
     try {
-      const data = await getSuperAdminPlatformOverview();
+      const res = await fetch('/api/admin/overview');
+      if (!res.ok) {
+        throw new Error('Failed to load platform telemetry');
+      }
+      const data = await res.json();
       setStats(data);
       if (data.allPgs.length > 0 && !selectedPgId) {
         setSelectedPgId(data.allPgs[0].owner.id);

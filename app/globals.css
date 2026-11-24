@@ -88,6 +88,88 @@ body {
   animation: shimmer 1.5s infinite;
 }
 
+/* ==========================================================================
+   DESIGN SYSTEM v2 — "bold & vibrant mobile-app"
+   Per-panel theming via CSS vars. Each panel layout adds a theme-* class; all
+   themed components reference var(--accent) / var(--accent-2) / var(--accent-soft).
+   ========================================================================== */
+
+:root {
+  --accent: #0D9488;        /* default = resident teal */
+  --accent-2: #14B8A6;
+  --accent-soft: #CCFBF1;
+  --accent-tint: #F0FDFA;
+  --accent-ink: #115E59;
+  --radius-xl: 20px;
+  --radius-lg: 14px;
+  --shadow-card: 0 2px 8px -2px rgba(15, 23, 42, 0.08), 0 4px 24px -8px rgba(15, 23, 42, 0.10);
+  --shadow-float: 0 10px 40px -10px rgba(15, 23, 42, 0.25);
+}
+
+.theme-resident { --accent: #0D9488; --accent-2: #14B8A6; --accent-soft: #CCFBF1; --accent-tint: #F0FDFA; --accent-ink: #115E59; }
+.theme-owner    { --accent: #D97706; --accent-2: #F59E0B; --accent-soft: #FDE68A; --accent-tint: #FFFBEB; --accent-ink: #92400E; }
+.theme-admin    { --accent: #4F46E5; --accent-2: #6366F1; --accent-soft: #C7D2FE; --accent-tint: #EEF2FF; --accent-ink: #3730A3; }
+
+/* Gradient header band — bold, colorful top section */
+.app-gradient {
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+  color: #fff;
+}
+.app-gradient-tint { background: linear-gradient(180deg, var(--accent-tint) 0%, #FFFFFF 70%); }
+
+/* Card stack — the primary surface */
+.app-card {
+  background: #fff;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  border: 1px solid rgba(15, 23, 42, 0.04);
+}
+
+/* Accent helpers */
+.accent-bg { background: var(--accent); color: #fff; }
+.accent-text { color: var(--accent); }
+.accent-soft-bg { background: var(--accent-soft); color: var(--accent-ink); }
+.accent-ring:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent); }
+
+/* Pill button */
+.btn-pill {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+  height: 3rem; padding: 0 1.25rem; border-radius: 9999px;
+  font-weight: 700; font-size: 0.875rem; transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  background: var(--accent); color: #fff; box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--accent) 60%, transparent);
+}
+.btn-pill:active { transform: scale(0.96); }
+.btn-pill:disabled { opacity: 0.5; }
+
+/* Bouncy + smooth motion */
+@keyframes pop-in {
+  0% { opacity: 0; transform: translateY(8px) scale(0.98); }
+  60% { opacity: 1; transform: translateY(-2px) scale(1.01); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.animate-pop { animation: pop-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@keyframes fade-up {
+  0% { opacity: 0; transform: translateY(10px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up { animation: fade-up 0.35s ease both; }
+/* Stagger children: add .stagger to a container, items fade-up in sequence */
+.stagger > * { animation: fade-up 0.4s ease both; }
+.stagger > *:nth-child(1) { animation-delay: 0.02s; }
+.stagger > *:nth-child(2) { animation-delay: 0.06s; }
+.stagger > *:nth-child(3) { animation-delay: 0.10s; }
+.stagger > *:nth-child(4) { animation-delay: 0.14s; }
+.stagger > *:nth-child(5) { animation-delay: 0.18s; }
+.stagger > *:nth-child(6) { animation-delay: 0.22s; }
+
+.press { transition: transform 0.12s ease; }
+.press:active { transform: scale(0.97); }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-pop, .animate-fade-up, .stagger > * { animation: none !important; }
+}
+
 /* Crisp Clean Scrollbars */
 ::-webkit-scrollbar {
   width: 5px;

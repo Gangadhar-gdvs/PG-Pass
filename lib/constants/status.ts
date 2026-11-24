@@ -26,6 +26,8 @@ export const PHOTO_TYPE = {
   MOVE_IN: 'move_in',
   MOVE_OUT: 'move_out',
   PAYMENT_PROOF: 'payment_proof',
+  ID_PROOF: 'id_proof',
+  AGREEMENT: 'agreement',
 } as const;
 
 export type PhotoType = (typeof PHOTO_TYPE)[keyof typeof PHOTO_TYPE];
@@ -52,6 +54,7 @@ export const ROLE = {
   STAFF: 'staff',
   ADMIN: 'admin',
   TENANT: 'tenant',
+  RESIDENT: 'resident', // self-service resident account (logs in, linked by phone)
 } as const;
 
 export type Role = (typeof ROLE)[keyof typeof ROLE];

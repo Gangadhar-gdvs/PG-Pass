@@ -1,6 +1,9 @@
 [
   {
-    "AllowedOrigins": ["*"],
+    "AllowedOrigins": [
+      "https://REPLACE_WITH_PROD_ORIGIN",
+      "https://www.REPLACE_WITH_PROD_ORIGIN"
+    ],
     "AllowedMethods": ["GET", "PUT", "HEAD"],
     "AllowedHeaders": ["*"],
     "ExposeHeaders": ["ETag"],

@@ -166,6 +166,10 @@ export class PhotosService {
       targetPrefix = STORAGE_PREFIX.MOVEOUT;
     } else if (photoType === 'payment_proof') {
       targetPrefix = STORAGE_PREFIX.PAYMENT_PROOF;
+    } else if (photoType === 'id_proof') {
+      targetPrefix = STORAGE_PREFIX.ID_PROOF;
+    } else if (photoType === 'agreement') {
+      targetPrefix = STORAGE_PREFIX.AGREEMENT;
     } else {
       targetPrefix = STORAGE_PREFIX.MOVEIN;
     }
@@ -184,6 +188,7 @@ export class PhotosService {
     const photoDoc = {
       id: photoDocRef.id,
       ownerId,
+      propertyId: ownerId, // primary property; threaded per-property in a later phase
       tenantId,
       rentRecordId: rentRecordId || null,
       photoType,
@@ -199,6 +204,30 @@ export class PhotosService {
     await photoDocRef.set(photoDoc);
 
     return photoDoc;
+  }
+
+  /**
+   * Lists a tenant's photo metadata (not the bytes) for the owner gallery.
+   * Owner-scoped: the caller's ownerId must match the photo's ownerId.
+   */
+  async listTenantPhotos(ownerId: string, tenantId: string, limitCount = 50) {
+    const snap = await adminDb
+      .collection('movein_photos')
+      .where('ownerId', '==', ownerId)
+      .where('tenantId', '==', tenantId)
+      .orderBy('createdAt', 'desc')
+      .limit(Math.min(limitCount, 100))
+      .get();
+
+    return snap.docs.map((d) => {
+      const data = d.data();
+      return {
+        id: d.id,
+        photoType: data.photoType,
+        rentRecordId: data.rentRecordId || null,
+        createdAt: data.createdAt || null,
+      };
+    });
   }
 
   /**

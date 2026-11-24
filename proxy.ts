@@ -8,6 +8,9 @@ const PROTECTED_PREFIXES = [
   '/dashboard',
   '/beds',
   '/tenants',
+  '/analytics',
+  '/maintenance',
+  '/expenses',
   '/deposits',
   '/rent',
   '/staff',
@@ -34,10 +37,17 @@ export function proxy(request: NextRequest) {
   const nonce = crypto.randomBytes(16).toString('base64');
   const cspHeader = buildCsp(nonce);
 
-  // 3. Inject nonce into request headers for downstream server components
+  // Enforce CSP in production; keep Report-Only in dev/staging so new sources
+  // can be surfaced via violation reports before they start getting blocked.
+  const cspHeaderName =
+    process.env.NODE_ENV === 'production'
+      ? 'Content-Security-Policy'
+      : 'Content-Security-Policy-Report-Only';
+
+  // 3. Inject nonce + the active CSP into request headers for downstream RSC
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-nonce', nonce);
-  requestHeaders.set('Content-Security-Policy-Report-Only', cspHeader);
+  requestHeaders.set(cspHeaderName, cspHeader);
 
   const response = NextResponse.next({
     request: {
@@ -45,8 +55,8 @@ export function proxy(request: NextRequest) {
     },
   });
 
-  // 4. Set CSP in Report-Only mode during staging/pilot soak
-  response.headers.set('Content-Security-Policy-Report-Only', cspHeader);
+  // 4. Set the response CSP header (enforcing in prod, report-only elsewhere)
+  response.headers.set(cspHeaderName, cspHeader);
 
   return response;
 }

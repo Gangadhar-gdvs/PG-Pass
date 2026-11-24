@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { RentStatusCard } from '@/components/tenant/RentStatusCard';
 import { DepositVault } from '@/components/tenant/DepositVault';
+import { RaiseIssue } from '@/components/tenant/RaiseIssue';
 import {
   Building,
   Phone,
@@ -262,6 +263,9 @@ export function TenantPortalView({ token }: TenantPortalViewProps) {
           token={token}
           portalAuth={portalAuth}
         />
+
+        {/* Raise a maintenance issue */}
+        <RaiseIssue portalAuth={portalAuth} />
 
         {/* Contact PG Manager Action */}
         {portalData.pg.phone && (
