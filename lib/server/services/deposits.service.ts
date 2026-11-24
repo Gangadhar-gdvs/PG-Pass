@@ -2,6 +2,7 @@ import 'server-only';
 import { adminDb } from '../firebase-admin';
 import { DepositRecord } from '@/types';
 import { AppError } from '../api/withErrorHandler';
+import { recordEvent } from './systemLogs.service';
 import { Timestamp } from 'firebase-admin/firestore';
 
 export interface RecordDepositInput {
@@ -19,6 +20,7 @@ export class DepositsService {
       .where('ownerId', '==', ownerId)
       .where('tenantId', '==', tenantId)
       .orderBy('createdAt', 'desc')
+      .limit(100)
       .get();
 
     return snap.docs.map((d) => ({ id: d.id, ...d.data() } as DepositRecord));
@@ -100,6 +102,18 @@ export class DepositsService {
     if (reference) update.reference = reference.trim();
 
     await ref.update(update);
+
+    await recordEvent({
+      category: 'refund',
+      message: `Deposit refund ₹${Math.round((data.amountPaise || 0) / 100)} marked issued for ${
+        data.tenantName || 'tenant'
+      }`,
+      ownerId,
+      actorUid,
+      targetId: depositId,
+      amountPaise: data.amountPaise,
+    });
+
     return { ...data, ...update, id: depositId };
   }
 

@@ -8,10 +8,11 @@ export const GET = withErrorHandler(
     async (req: NextRequest) => {
       const { searchParams } = new URL(req.url);
       const level = searchParams.get('level') || 'all';
+      const category = searchParams.get('category') || 'all';
       const limitParam = parseInt(searchParams.get('limit') || '100', 10);
       const limit = isNaN(limitParam) ? 100 : Math.min(limitParam, 200);
 
-      const logs = await fetchSystemLogs(limit, level);
+      const logs = await fetchSystemLogs(limit, level, category);
       return NextResponse.json({ logs });
     },
     { roles: ['admin'] }

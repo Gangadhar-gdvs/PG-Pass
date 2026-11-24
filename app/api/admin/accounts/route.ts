@@ -3,6 +3,7 @@ import { withErrorHandler, AppError } from '@/lib/server/api/withErrorHandler';
 import { withAuth, AuthContext } from '@/lib/server/api/withAuth';
 import { withRateLimit } from '@/lib/server/api/withRateLimit';
 import { adminAuth, adminDb } from '@/lib/server/firebase-admin';
+import { recordEvent } from '@/lib/server/services/systemLogs.service';
 import { ACCOUNT_STATUS } from '@/lib/constants/status';
 import { Timestamp } from 'firebase-admin/firestore';
 import { z } from 'zod';
@@ -93,7 +94,7 @@ export const POST = withErrorHandler(
         }
       }
 
-      // Write mandatory audit log
+      // Write mandatory audit log + surface to the admin log stream.
       await adminDb.collection('audit_logs').add({
         actorUid: ctx.auth.uid,
         actorRole: 'admin',
@@ -102,6 +103,13 @@ export const POST = withErrorHandler(
         targetId,
         reason,
         createdAt: now,
+      });
+      await recordEvent({
+        category: 'account',
+        level: action === 'suspend' ? 'warn' : 'info',
+        message: `Admin ${action}ed ${targetType} ${targetId} · reason: ${reason}`,
+        actorUid: ctx.auth.uid,
+        targetId,
       });
 
       return NextResponse.json({

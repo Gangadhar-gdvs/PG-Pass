@@ -55,18 +55,15 @@ export class BedsService {
       roomAmenities?: string[];
     }
   ): Promise<Bed> {
-    // 1. Quota check
-    const ownerDoc = await adminDb.collection('owners').doc(ownerId).get();
+    // 1. Quota check — owner read + bed count in parallel.
+    const [ownerDoc, countSnap] = await Promise.all([
+      adminDb.collection('owners').doc(ownerId).get(),
+      adminDb.collection('beds').where('ownerId', '==', ownerId).count().get(),
+    ]);
     if (!ownerDoc.exists) {
       throw new AppError(404, 'Owner profile not found. Please complete setup.');
     }
     const maxBeds = ownerDoc.data()?.maxBeds ?? 20;
-
-    const countSnap = await adminDb
-      .collection('beds')
-      .where('ownerId', '==', ownerId)
-      .count()
-      .get();
 
     if (countSnap.data().count >= maxBeds) {
       throw new AppError(
@@ -125,20 +122,30 @@ export class BedsService {
     propertyId?: string
   ): Promise<{ count: number }> {
     const effPropertyId = propertyId || ownerId; // primary property == ownerId
-    const ownerDoc = await adminDb.collection('owners').doc(ownerId).get();
+    // If a non-primary property is targeted, verify it belongs to this owner —
+    // never trust a client-supplied propertyId for ID generation/scoping.
+    if (propertyId && propertyId !== ownerId) {
+      const propDoc = await adminDb.collection('properties').doc(propertyId).get();
+      if (!propDoc.exists || propDoc.data()?.ownerId !== ownerId) {
+        throw new AppError(403, 'Invalid property for this account');
+      }
+    }
+    const [ownerDoc, countSnap] = await Promise.all([
+      adminDb.collection('owners').doc(ownerId).get(),
+      adminDb.collection('beds').where('ownerId', '==', ownerId).count().get(),
+    ]);
     if (!ownerDoc.exists) {
       throw new AppError(404, 'Owner profile not found. Please complete setup.');
     }
     const planLimit = ownerDoc.data()?.maxBeds ?? 20;
 
-    const countSnap = await adminDb
-      .collection('beds')
-      .where('ownerId', '==', ownerId)
-      .count()
-      .get();
-
     const currentCount = countSnap.data().count;
-    const maxBeds = currentCount === 0 ? Math.max(planLimit, bedsList.length) : planLimit;
+    // First-setup grace: a brand-new PG may generate its full bed layout in one
+    // batch even if it exceeds the default free limit — but never beyond a hard
+    // ceiling, so the grace can't be abused to create an unbounded inventory.
+    const FIRST_SETUP_HARD_CAP = 500;
+    const maxBeds =
+      currentCount === 0 ? Math.min(FIRST_SETUP_HARD_CAP, Math.max(planLimit, bedsList.length)) : planLimit;
 
     if (currentCount + bedsList.length > maxBeds) {
       throw new AppError(
@@ -202,7 +209,8 @@ export class BedsService {
     };
 
     await adminDb.collection('beds').doc(bedId).update(updatePayload);
-    return this.getBed(bedId, ownerId);
+    // Return the locally-merged result — no extra read round-trip.
+    return { ...bed, ...updatePayload };
   }
 
   async deleteBed(bedId: string, ownerId: string): Promise<void> {

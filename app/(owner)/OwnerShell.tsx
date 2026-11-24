@@ -18,6 +18,7 @@ import {
   Wallet,
   Plus,
   BedDouble,
+  LifeBuoy,
 } from 'lucide-react';
 import { Avatar } from '@/components/ui/avatar';
 import { PropertySwitcher } from '@/components/owner/PropertySwitcher';
@@ -32,6 +33,7 @@ const navLinks = [
   { href: '/maintenance', label: 'Maintenance', icon: Wrench },
   { href: '/staff', label: 'Wardens & Staff', icon: UserCheck },
   { href: '/billing', label: 'Subscription', icon: CreditCard },
+  { href: '/support', label: 'Support', icon: LifeBuoy },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
@@ -158,6 +160,7 @@ export function OwnerShell({
             { href: '/expenses', label: 'Expenses', icon: Wallet },
             { href: '/staff', label: 'Staff', icon: UserCheck },
             { href: '/billing', label: 'Billing', icon: CreditCard },
+            { href: '/support', label: 'Support', icon: LifeBuoy },
             { href: '/settings', label: 'Settings', icon: Settings },
           ]}
           center={{ label: 'Add', icon: Plus, onClick: () => router.push('/dashboard') }}

@@ -101,6 +101,9 @@ export const POST = withErrorHandler(
       response.headers.set('X-Robots-Tag', 'noindex, nofollow');
       return response;
     },
-    { tier: 'sensitive', key: 'ip', maxRequests: 15, windowSeconds: 60 }
+    // Raised IP limit so many residents behind ONE shared IP (college/PG wifi,
+    // NAT) aren't collectively blocked on rent day. Real brute-force is still
+    // stopped by the per-token PIN lockout in portalAuth (per tenant, not per IP).
+    { tier: 'sensitive', key: 'ip', maxRequests: 60, windowSeconds: 60 }
   )
 );

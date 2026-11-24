@@ -101,6 +101,8 @@ export const confirmRentSchema = z.object({
 export const subscriptionUpgradeSchema = z.object({
   requestedPlan: z.enum([PLAN_TIER.GROWTH, PLAN_TIER.PRO]),
   billingCycle: z.enum(['monthly', 'yearly']),
-  amountPaise: z.number().int().positive(),
+  // amountPaise is accepted for backward-compat but IGNORED — the server computes
+  // the canonical price (see subscriptions.service PLAN_PRICES_PAISE).
+  amountPaise: z.number().int().positive().optional(),
   utrReference: z.string().min(6, 'Please enter a valid 12-digit UTR reference'),
 });

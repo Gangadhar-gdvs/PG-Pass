@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useOwnerSession } from '@/hooks/useOwner';
 import { AddPropertyCard } from '@/components/owner/AddPropertyCard';
+import { SupportLink } from '@/components/ui/support-link';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -279,6 +280,10 @@ export default function SettingsPage() {
             <span>Save Configuration</span>
           </Button>
         </form>
+      </div>
+
+      <div className="flex justify-center pt-1">
+        <SupportLink subject="Owner support request" />
       </div>
     </div>
   );

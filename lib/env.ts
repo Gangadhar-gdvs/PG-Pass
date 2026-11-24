@@ -12,6 +12,9 @@ const publicEnvSchema = z.object({
     .transform((val) => val === 'true'),
   NEXT_PUBLIC_SAAS_UPI_ID: z.string().optional(),
   NEXT_PUBLIC_SAAS_UPI_NAME: z.string().optional(),
+  // Support contact shown to residents/owners (so they can reach the platform).
+  // Overridable via env; defaults to the current support inbox.
+  NEXT_PUBLIC_SUPPORT_EMAIL: z.string().default('vektorsynapse@gmail.com'),
 });
 
 const serverEnvSchema = z.object({
@@ -57,6 +60,7 @@ export const publicEnv = publicEnvSchema.parse({
   NEXT_PUBLIC_USE_EMULATORS: process.env.NEXT_PUBLIC_USE_EMULATORS,
   NEXT_PUBLIC_SAAS_UPI_ID: process.env.NEXT_PUBLIC_SAAS_UPI_ID,
   NEXT_PUBLIC_SAAS_UPI_NAME: process.env.NEXT_PUBLIC_SAAS_UPI_NAME,
+  NEXT_PUBLIC_SUPPORT_EMAIL: process.env.NEXT_PUBLIC_SUPPORT_EMAIL,
 });
 
 export const serverEnv = isServer

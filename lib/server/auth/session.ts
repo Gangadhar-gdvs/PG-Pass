@@ -1,7 +1,8 @@
 import 'server-only';
 import { cookies } from 'next/headers';
 import { adminAuth } from '../firebase-admin';
-import { SESSION_COOKIE_NAME } from '@/lib/constants/limits';
+import { SESSION_COOKIE_NAME, SESSION_ID_COOKIE_NAME } from '@/lib/constants/limits';
+import { isSessionCurrent } from './sessionRegistry';
 
 export interface ServerUser {
   uid: string;
@@ -42,6 +43,14 @@ export async function getServerUser(): Promise<ServerUser | null> {
       : role === 'owner'
         ? claims.uid
         : (claims.ownerId as string | undefined);
+
+    // Single-active-session: a page load from a device whose session was taken
+    // over on another device is treated as signed-out (callers redirect).
+    if (!isAdmin) {
+      const sid = store.get(SESSION_ID_COOKIE_NAME)?.value;
+      const current = await isSessionCurrent(role, claims.uid, sid);
+      if (!current) return null;
+    }
 
     return {
       uid: claims.uid,

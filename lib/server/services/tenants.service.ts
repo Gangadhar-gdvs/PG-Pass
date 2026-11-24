@@ -75,20 +75,21 @@ export class TenantsService {
    * Atomic bed booking + tenant creation + portal token generation + initial rent record.
    */
   async createTenant(ownerId: string, input: CreateTenantInput) {
-    const ownerDoc = await adminDb.collection('owners').doc(ownerId).get();
+    // Owner read + quota count are independent → run in parallel.
+    const [ownerDoc, activeCountSnap] = await Promise.all([
+      adminDb.collection('owners').doc(ownerId).get(),
+      adminDb
+        .collection('tenants')
+        .where('ownerId', '==', ownerId)
+        .where('deletedAt', '==', null)
+        .count()
+        .get(),
+    ]);
     if (!ownerDoc.exists) {
       throw new AppError(404, 'Owner profile not found');
     }
     const ownerData = ownerDoc.data()!;
     const maxTenants = ownerData.maxTenants ?? 20;
-
-    // Check active tenants quota
-    const activeCountSnap = await adminDb
-      .collection('tenants')
-      .where('ownerId', '==', ownerId)
-      .where('deletedAt', '==', null)
-      .count()
-      .get();
 
     if (activeCountSnap.data().count >= maxTenants) {
       throw new AppError(
@@ -330,6 +331,24 @@ export class TenantsService {
     }
   ) {
     const tenant = await this.getTenant(tenantId, ownerId);
+
+    // Block double move-out (would create duplicate deduction/refund records).
+    if (tenant.moveOutDate) {
+      throw new AppError(400, 'This resident has already been moved out.');
+    }
+    // Guard: deductions + refund cannot exceed the deposit actually paid.
+    const deductions = params.depositDeductionsPaise || 0;
+    const refund = params.refundPaise || 0;
+    const depositPaid = tenant.depositPaidPaise ?? tenant.securityDepositPaise ?? 0;
+    if (deductions + refund > depositPaid) {
+      throw new AppError(
+        400,
+        `Deductions + refund (₹${Math.round((deductions + refund) / 100)}) exceed the deposit on file (₹${Math.round(
+          depositPaid / 100
+        )}).`
+      );
+    }
+
     const tenantRef = adminDb.collection('tenants').doc(tenantId);
     const bedRef = adminDb.collection('beds').doc(tenant.bedId);
     const now = Timestamp.now();

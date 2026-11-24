@@ -42,13 +42,37 @@ export default function ResidentLoginPage() {
       // Re-fetch token to pick up the new resident claim.
       idToken = await auth.currentUser!.getIdToken(true);
     }
+    await mintSession(idToken, false);
+    router.push('/resident/home');
+  };
+
+  // Single-active-session: mint the server session for this (verified) resident.
+  // If the account is already active on another device, confirm takeover first
+  // — shown only post-authentication, never before.
+  const mintSession = async (idToken: string, takeover: boolean): Promise<void> => {
     const res = await fetch('/api/auth/session', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idToken }),
+      body: JSON.stringify({
+        idToken,
+        mode: 'login',
+        takeover,
+        device: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+      }),
     });
+    if (res.status === 409) {
+      const data = await res.json().catch(() => ({}));
+      if (data.code === 'ACTIVE_SESSION_EXISTS' && !takeover) {
+        const proceed =
+          typeof window !== 'undefined' &&
+          window.confirm(
+            'This account is already signed in on another device. Only one active session is allowed.\n\nLog in here and sign out the other device?'
+          );
+        if (!proceed) throw new Error('Sign-in cancelled — the other device is still active.');
+        return mintSession(idToken, true);
+      }
+    }
     if (!res.ok) throw new Error('Could not start session');
-    router.push('/resident/home');
   };
 
   const handleGoogle = async () => {

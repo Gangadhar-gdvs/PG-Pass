@@ -86,6 +86,29 @@ export interface Owner {
   updatedAt?: any;
 }
 
+/** Owner↔admin support thread (one per owner). Messages live in a subcollection. */
+export interface SupportThread {
+  id: string; // == ownerId
+  ownerId: string;
+  ownerName?: string;
+  pgName?: string;
+  lastMessage?: string;
+  lastSender?: 'owner' | 'admin';
+  lastAt?: any;
+  unreadForAdmin?: number;
+  unreadForOwner?: number;
+  createdAt?: any;
+}
+
+export interface SupportMessage {
+  id: string;
+  threadId: string; // == ownerId
+  sender: 'owner' | 'admin';
+  senderUid: string;
+  text: string;
+  createdAt?: any;
+}
+
 export interface Resident {
   id: string; // Firebase Auth UID
   name: string;

@@ -47,6 +47,10 @@ export const PORTAL_PIN_MAX_ATTEMPTS = 5;
 export const PORTAL_PIN_LOCKOUT_MINUTES = 15;
 export const SESSION_MAX_AGE_DAYS = 7;
 export const SESSION_COOKIE_NAME = '__session';
+// Single-active-session (one login per account, Jio/Hotstar style). The
+// session-id cookie is matched against `currentSessionId` on the user doc; a
+// newer login supersedes older devices.
+export const SESSION_ID_COOKIE_NAME = '__pgp_sid';
 
 // Data Retention & Undo limits
 export const SOFT_DELETE_UNDO_DAYS = 7;

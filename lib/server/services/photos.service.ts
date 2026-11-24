@@ -56,8 +56,13 @@ export class PhotosService {
       );
     }
 
-    // 3. Verify tenant belongs to owner and is not deleted
-    const tenantDoc = await adminDb.collection('tenants').doc(tenantId).get();
+    // 3+4. Tenant, owner, and photo count are independent reads → run in parallel.
+    const [tenantDoc, ownerDoc, photosCountSnap] = await Promise.all([
+      adminDb.collection('tenants').doc(tenantId).get(),
+      adminDb.collection('owners').doc(ownerId).get(),
+      adminDb.collection('movein_photos').where('ownerId', '==', ownerId).count().get(),
+    ]);
+
     if (!tenantDoc.exists) {
       throw new AppError(404, 'Tenant record not found');
     }
@@ -69,18 +74,8 @@ export class PhotosService {
       throw new AppError(400, 'Cannot upload photos for a deleted tenant');
     }
 
-    // 4. Verify owner photo quota
-    const ownerDoc = await adminDb.collection('owners').doc(ownerId).get();
     if (ownerDoc.exists) {
-      const ownerData = ownerDoc.data()!;
-      const maxPhotos = ownerData.maxPhotos ?? 40; // Default Free tier: 40 photos
-
-      const photosCountSnap = await adminDb
-        .collection('movein_photos')
-        .where('ownerId', '==', ownerId)
-        .count()
-        .get();
-
+      const maxPhotos = ownerDoc.data()!.maxPhotos ?? 40; // Default Free tier: 40 photos
       if (photosCountSnap.data().count >= maxPhotos) {
         throw new AppError(
           403,

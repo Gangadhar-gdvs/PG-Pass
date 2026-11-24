@@ -20,6 +20,7 @@ function LoginFormContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isExpired = searchParams.get('expired') === 'true';
+  const wasKicked = searchParams.get('kicked') === '1';
   const from = searchParams.get('from') || '/dashboard';
 
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
@@ -29,17 +30,42 @@ function LoginFormContent() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Exchange Firebase ID token for httpOnly session cookie
-  const establishSession = async (user: any) => {
+  // Exchange Firebase ID token for httpOnly session cookie. Runs only AFTER
+  // Firebase has verified the user's credentials, so the "log out other device"
+  // prompt is shown exclusively to an authenticated user — never before.
+  const establishSession = async (user: any, takeover = false) => {
     const idToken = await user.getIdToken();
     const res = await fetch('/api/auth/session', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idToken }),
+      body: JSON.stringify({
+        idToken,
+        mode: 'login',
+        takeover,
+        device: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+      }),
     });
 
+    // Single-active-session: account is already signed in elsewhere. Only now —
+    // post-authentication — do we offer to log the other device out.
+    if (res.status === 409) {
+      const data = await res.json().catch(() => ({}));
+      if (data.code === 'ACTIVE_SESSION_EXISTS' && !takeover) {
+        const proceed =
+          typeof window !== 'undefined' &&
+          window.confirm(
+            'This account is already signed in on another device. Only one active session is allowed.\n\nLog in here and sign out the other device?'
+          );
+        if (!proceed) {
+          // User chose to stay logged out here; the other device remains active.
+          throw new Error('Sign-in cancelled — the other device is still active.');
+        }
+        return establishSession(user, true); // retry, taking over the session
+      }
+    }
+
     if (!res.ok) {
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       throw new Error(data.error || 'Failed to establish server session');
     }
 
@@ -199,6 +225,12 @@ function LoginFormContent() {
             {isExpired && (
               <div className="mb-6 p-3 rounded-[8px] bg-[#FFFBEB] border border-[#FDE68A] text-xs text-[#92400E]">
                 Your session has expired. Please sign in to continue.
+              </div>
+            )}
+
+            {wasKicked && (
+              <div className="mb-6 p-3 rounded-[8px] bg-[#FFFBEB] border border-[#FDE68A] text-xs text-[#92400E]">
+                You were signed out because this account was logged in on another device.
               </div>
             )}
 

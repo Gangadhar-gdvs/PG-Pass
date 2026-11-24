@@ -2,6 +2,7 @@ import 'server-only';
 import { adminDb } from '../firebase-admin';
 import { AppError } from '../api/withErrorHandler';
 import { JoinRequest } from '@/types';
+import { recordEvent } from './systemLogs.service';
 import { Timestamp } from 'firebase-admin/firestore';
 
 export interface PublicListing {
@@ -118,7 +119,16 @@ export class DiscoveryService {
     const doc = await ref.get();
     if (!doc.exists) throw new AppError(404, 'Request not found');
     if ((doc.data() as JoinRequest).ownerId !== ownerId) throw new AppError(403, 'Unauthorized');
+    const req = doc.data() as JoinRequest;
     await ref.update({ status: action, reviewedAt: Timestamp.now(), reviewedBy: reviewerUid });
+
+    await recordEvent({
+      category: 'discovery',
+      message: `Join request ${action} for ${req.residentName} (${req.residentPhone})`,
+      ownerId,
+      actorUid: reviewerUid,
+      targetId: requestId,
+    });
     // Approval just signals the owner to create the tenancy (phone links it to
     // the resident automatically). No tenant doc is auto-created here.
   }

@@ -6,6 +6,7 @@ import { RENT_STATUS, RentStatus } from '@/lib/constants/status';
 import { MAX_LIST_LIMIT } from '@/lib/constants/limits';
 import { smsService } from './sms.service';
 import { emailService } from './email.service';
+import { recordEvent } from './systemLogs.service';
 import { Timestamp, FieldValue, Transaction, DocumentReference } from 'firebase-admin/firestore';
 
 export interface CreateRentRecordInput {
@@ -262,6 +263,17 @@ export class RentService {
       };
     });
 
+    await recordEvent({
+      category: 'payment',
+      message: `Rent confirmed for ${updatedRecord!.tenantName || 'tenant'} (${updatedRecord!.period}) · receipt REC-${String(
+        updatedRecord!.receiptNumber
+      ).padStart(5, '0')}`,
+      ownerId,
+      actorUid: confirmedBy,
+      targetId: recordId,
+      amountPaise: updatedRecord!.amountDuePaise,
+    });
+
     return updatedRecord!;
   }
 
@@ -300,7 +312,15 @@ export class RentService {
 
       const due = recordData.amountDuePaise ?? 0;
       const alreadyPaid = recordData.amountPaidPaise ?? 0;
-      const newPaid = alreadyPaid + params.amountPaise;
+      const remaining = Math.max(0, due - alreadyPaid);
+      // Reject overpayment rather than silently losing the excess.
+      if (params.amountPaise > remaining && remaining > 0) {
+        throw new AppError(
+          400,
+          `Amount exceeds what's due. Only ₹${Math.round(remaining / 100)} remains on this rent.`
+        );
+      }
+      const newPaid = Math.min(due, alreadyPaid + params.amountPaise);
       const fullyPaid = newPaid >= due;
 
       const updatePayload: Record<string, any> = {
@@ -328,6 +348,17 @@ export class RentService {
 
       transaction.update(recordRef, updatePayload);
       updatedRecord = { ...recordData, ...updatePayload };
+    });
+
+    await recordEvent({
+      category: 'payment',
+      message: `Partial payment ₹${Math.round(params.amountPaise / 100)} recorded for ${
+        updatedRecord!.tenantName || 'tenant'
+      } (${updatedRecord!.period})${updatedRecord!.status === RENT_STATUS.PAID ? ' · now fully paid' : ''}`,
+      ownerId,
+      actorUid: confirmedBy,
+      targetId: recordId,
+      amountPaise: params.amountPaise,
     });
 
     return updatedRecord!;
@@ -447,6 +478,14 @@ export class RentService {
       /* best-effort; stamping already succeeded */
     }
 
+    // Record the reminder + which auto-channels fired (visible to admin).
+    await recordEvent({
+      category: 'comms',
+      message: `Rent reminder sent (${record.tenantName || 'tenant'}, ${record.period}) · sms:${channels.sms} email:${channels.email}`,
+      ownerId,
+      targetId: recordId,
+    });
+
     return channels;
   }
 
@@ -492,6 +531,15 @@ export class RentService {
         previousReceiptNumber: data.receiptNumber || null,
         createdAt: now,
       });
+    });
+
+    await recordEvent({
+      category: 'payment',
+      level: 'warn',
+      message: `Rent payment REVERSED for record ${recordId} · reason: ${reversalReason.trim()}`,
+      ownerId,
+      actorUid,
+      targetId: recordId,
     });
   }
 }

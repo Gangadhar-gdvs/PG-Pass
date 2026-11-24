@@ -19,11 +19,12 @@ export const POST = withErrorHandler(
         const validated = subscriptionUpgradeSchema.parse(body);
         const ownerId = ctx.auth.uid; // Only owner can submit plan upgrade
 
+        // Note: amountPaise is intentionally NOT passed — the server computes the
+        // canonical price itself so the client can't understate it.
         const result = await subscriptionsService.submitUpgrade({
           ownerId,
           requestedPlan: validated.requestedPlan,
           billingCycle: validated.billingCycle,
-          amountPaise: validated.amountPaise,
           utrReference: validated.utrReference,
         });
 

@@ -20,7 +20,9 @@ import {
   Terminal,
   Bug,
   RefreshCw,
+  MessageSquare,
 } from 'lucide-react';
+import { AdminSupportPanel } from '@/components/support/AdminSupportPanel';
 import {
   signInWithEmailAndPassword,
   signOut,
@@ -65,7 +67,7 @@ export default function SuperAdminPortalPage() {
   const [selectedPgId, setSelectedPgId] = useState<string | null>(null);
 
   // Tab State
-  const [activeTab, setActiveTab] = useState<'telemetry' | 'upgrades' | 'logs'>('telemetry');
+  const [activeTab, setActiveTab] = useState<'telemetry' | 'upgrades' | 'logs' | 'support'>('telemetry');
   const [upgradeRequests, setUpgradeRequests] = useState<any[]>([]);
   const [loadingUpgrades, setLoadingUpgrades] = useState(false);
 
@@ -505,10 +507,24 @@ export default function SuperAdminPortalPage() {
             </span>
           )}
         </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('support')}
+          className={`py-3 border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${
+            activeTab === 'support'
+              ? 'border-[#D97706] text-[#D97706]'
+              : 'border-transparent text-[#64748B] hover:text-[#09090B]'
+          }`}
+        >
+          <MessageSquare className="w-3.5 h-3.5" />
+          <span>Owner Support</span>
+        </button>
       </div>
 
       {/* Main Content Area */}
-      {activeTab === 'upgrades' ? (
+      {activeTab === 'support' ? (
+        <AdminSupportPanel />
+      ) : activeTab === 'upgrades' ? (
         <div className="flex-1 p-6 overflow-y-auto max-w-5xl mx-auto w-full space-y-4 text-left">
           <div className="flex items-center justify-between">
             <div>

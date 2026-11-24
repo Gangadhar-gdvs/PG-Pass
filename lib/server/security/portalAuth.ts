@@ -2,6 +2,7 @@ import 'server-only';
 import { adminDb } from '../firebase-admin';
 import { hashToken, constantTimeEqual } from './tokens';
 import { AppError } from '../api/withErrorHandler';
+import { recordEvent } from '../services/systemLogs.service';
 import {
   PORTAL_PIN_MAX_ATTEMPTS,
   PORTAL_PIN_LOCKOUT_MINUTES,
@@ -113,6 +114,13 @@ export async function verifyPortalSession(
     );
 
     if (willLock) {
+      await recordEvent({
+        category: 'security',
+        level: 'warn',
+        message: `Portal PIN lockout after ${currentAttempts} failed attempts for tenant ${tokenData.tenantId}`,
+        ownerId: tokenData.ownerId,
+        targetId: tokenData.tenantId,
+      });
       throw new AppError(
         429,
         `Too many failed attempts. Account locked for ${PORTAL_PIN_LOCKOUT_MINUTES} minutes.`

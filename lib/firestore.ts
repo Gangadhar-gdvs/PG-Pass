@@ -4,9 +4,10 @@ import {
   query,
   where,
   onSnapshot,
+  orderBy,
   limit,
 } from 'firebase/firestore';
-import { Bed, Tenant, RentRecord } from '@/types';
+import { Bed, Tenant, RentRecord, SupportMessage, SupportThread } from '@/types';
 import { config } from './config';
 
 /**
@@ -122,6 +123,53 @@ export function subscribeToOwnerRentRecords(
     (snap) => callback(snap.docs.map((d) => ({ ...d.data(), id: d.id } as RentRecord))),
     (error) => {
       console.warn('Firestore rent-records subscription error:', error.code);
+      callback([]);
+    }
+  );
+}
+
+// ---------------- SUPPORT CHAT (live, push via onSnapshot — not polling) ----------------
+export function subscribeToSupportMessages(
+  ownerId: string,
+  callback: (messages: SupportMessage[]) => void
+): () => void {
+  if (!ownerId || !isFirebaseConfigured()) {
+    callback([]);
+    return noop;
+  }
+  const q = query(
+    collection(db, 'support_threads', ownerId, 'messages'),
+    orderBy('createdAt', 'asc'),
+    limit(100)
+  );
+  return onSnapshot(
+    q,
+    (snap) => callback(snap.docs.map((d) => ({ ...d.data(), id: d.id } as SupportMessage))),
+    (error) => {
+      console.warn('Support messages subscription error:', error.code);
+      callback([]);
+    }
+  );
+}
+
+// Admin: live list of all support threads, most recently active first.
+export function subscribeToSupportThreads(
+  callback: (threads: SupportThread[]) => void
+): () => void {
+  if (!isFirebaseConfigured()) {
+    callback([]);
+    return noop;
+  }
+  const q = query(
+    collection(db, 'support_threads'),
+    orderBy('lastAt', 'desc'),
+    limit(100)
+  );
+  return onSnapshot(
+    q,
+    (snap) => callback(snap.docs.map((d) => ({ ...d.data(), id: d.id } as SupportThread))),
+    (error) => {
+      console.warn('Support threads subscription error:', error.code);
       callback([]);
     }
   );

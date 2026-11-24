@@ -3,6 +3,7 @@ import { adminDb } from '../firebase-admin';
 import { AppError } from '../api/withErrorHandler';
 import { GuestStay, Bed } from '@/types';
 import { BED_STATUS } from '@/lib/constants/status';
+import { recordEvent } from './systemLogs.service';
 import { Timestamp } from 'firebase-admin/firestore';
 
 function nightsBetween(checkIn: string, checkOut: string): number {
@@ -34,6 +35,11 @@ export class GuestsService {
    */
   async checkIn(ownerId: string, recordedBy: string, input: CheckInGuestInput): Promise<GuestStay> {
     if (!input.name || input.name.trim().length < 2) throw new AppError(400, 'Guest name is required');
+    // Dates must be valid and check-out strictly after check-in.
+    const ci = Date.parse(`${input.checkInDate}T00:00:00Z`);
+    const co = Date.parse(`${input.checkOutDate}T00:00:00Z`);
+    if (isNaN(ci) || isNaN(co)) throw new AppError(400, 'Valid check-in and check-out dates are required');
+    if (co <= ci) throw new AppError(400, 'Check-out date must be after check-in date');
     const nights = nightsBetween(input.checkInDate, input.checkOutDate);
 
     let totalAmountPaise: number;
@@ -76,7 +82,8 @@ export class GuestsService {
         billingMode: input.billingMode,
         nightlyRatePaise,
         totalAmountPaise,
-        amountPaidPaise: Math.round(input.amountPaidPaise ?? totalAmountPaise),
+        // Clamp recorded payment to the total so the client can't overstate it.
+        amountPaidPaise: Math.min(totalAmountPaise, Math.max(0, Math.round(input.amountPaidPaise ?? totalAmountPaise))),
         idProofType: input.idProofType,
         notes: input.notes?.trim().slice(0, 300) || undefined,
         status: 'active',
@@ -93,6 +100,17 @@ export class GuestsService {
         tenantPhone: stay.phone || null,
         updatedAt: now,
       });
+    });
+
+    await recordEvent({
+      category: 'guest',
+      message: `Guest "${stay!.name}" checked in to Bed ${stay!.bedLabel} · ${stay!.nights}n · ₹${Math.round(
+        stay!.totalAmountPaise / 100
+      )}`,
+      ownerId,
+      actorUid: recordedBy,
+      targetId: stay!.id,
+      amountPaise: stay!.totalAmountPaise,
     });
 
     return stay!;
@@ -133,6 +151,13 @@ export class GuestsService {
       }
 
       tx.update(stayRef, { status: 'completed', checkedOutAt: now });
+    });
+
+    await recordEvent({
+      category: 'guest',
+      message: `Guest checked out · stay ${stayId} · bed freed`,
+      ownerId,
+      targetId: stayId,
     });
   }
 }

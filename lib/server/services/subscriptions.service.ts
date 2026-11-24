@@ -11,14 +11,28 @@ export interface SubmitUpgradeParams {
   ownerId: string;
   requestedPlan: PlanTier;
   billingCycle: 'monthly' | 'yearly';
-  amountPaise: number;
   utrReference: string;
 }
+
+/**
+ * Canonical plan pricing in paise — the server source of truth. The amount is
+ * NEVER taken from the client; it is looked up here so an owner can't submit an
+ * upgrade for ₹1. (Yearly = 2 months free.)
+ */
+const PLAN_PRICES_PAISE: Record<string, { monthly: number; yearly: number }> = {
+  [PLAN_TIER.GROWTH]: { monthly: 99900, yearly: 999000 },
+  [PLAN_TIER.PRO]: { monthly: 199900, yearly: 1999000 },
+};
 
 export class SubscriptionsService {
   async submitUpgrade(params: SubmitUpgradeParams): Promise<SubscriptionRequest> {
     const ownerDoc = await adminDb.collection('owners').doc(params.ownerId).get();
     if (!ownerDoc.exists) throw new AppError(404, 'Owner profile not found');
+
+    // Compute the price server-side; reject plans with no defined price.
+    const pricing = PLAN_PRICES_PAISE[params.requestedPlan];
+    if (!pricing) throw new AppError(400, 'This plan cannot be purchased.');
+    const amountPaise = pricing[params.billingCycle];
 
     const reqRef = adminDb.collection('subscription_requests').doc();
     const now = Timestamp.now();
@@ -28,7 +42,7 @@ export class SubscriptionsService {
       ownerId: params.ownerId,
       requestedPlan: params.requestedPlan,
       billingCycle: params.billingCycle,
-      amountPaise: params.amountPaise,
+      amountPaise, // server-computed, not client-supplied
       utrReference: params.utrReference.trim().toUpperCase(),
       status: SUBSCRIPTION_REQUEST_STATUS.PENDING,
       createdAt: now,

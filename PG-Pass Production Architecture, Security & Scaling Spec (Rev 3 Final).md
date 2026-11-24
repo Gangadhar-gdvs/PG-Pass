@@ -302,7 +302,13 @@ system log viewer.
   X-Frame-Options DENY, nosniff.
 - **Rate limiting:** Firestore-backed for sensitive/public endpoints.
 - **Admin:** custom-claim only (`scripts/bootstrapAdmin.ts`); no client secret.
-- **Logging:** PII-redacted; errors persisted to `system_logs` for the admin viewer.
+- **Logging:** PII-redacted. Both technical errors AND business/security **events**
+  go to one `system_logs` stream the admin reads (via `recordEvent`, category-tagged:
+  payment / refund / security / account / tenant / guest / discovery / quota / comms /
+  cron). So the admin sees rent confirmations, reversals, deposit refunds, portal
+  lockouts, account suspensions, guest check-in/out, join decisions, reminder
+  delivery, and nightly-backup results in one filterable place — not scattered or
+  hidden. Query: `GET /api/admin/logs?level=&category=&limit=`.
 - **Backups:** nightly AES-256-GCM encrypted export to B2 (verified on upload).
 
 ---

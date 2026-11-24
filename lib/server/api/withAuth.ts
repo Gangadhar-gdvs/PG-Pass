@@ -2,7 +2,8 @@ import 'server-only';
 import { NextRequest, NextResponse } from 'next/server';
 import { adminAuth, adminDb } from '../firebase-admin';
 import { AppError, RouteHandler } from './withErrorHandler';
-import { SESSION_COOKIE_NAME } from '@/lib/constants/limits';
+import { SESSION_COOKIE_NAME, SESSION_ID_COOKIE_NAME } from '@/lib/constants/limits';
+import { isSessionCurrent } from '../auth/sessionRegistry';
 
 export interface AuthContext {
   uid: string;
@@ -106,6 +107,17 @@ export function withAuth(
             throw new AppError(403, 'Associated PG account is not active');
           }
         }
+      }
+    }
+
+    // 6. Single-active-session check (one login per account; admins exempt).
+    // A newer login elsewhere supersedes this device's session id, so its API
+    // calls are rejected with SESSION_SUPERSEDED and the client logs out.
+    if (!isAdmin) {
+      const sid = req.cookies.get(SESSION_ID_COOKIE_NAME)?.value;
+      const current = await isSessionCurrent(role, uid, sid);
+      if (!current) {
+        throw new AppError(401, 'This session was signed out on another device', 'SESSION_SUPERSEDED');
       }
     }
 

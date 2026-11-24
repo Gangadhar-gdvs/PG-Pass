@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Building2, ChevronRight, Search } from 'lucide-react';
+import { SupportLink } from '@/components/ui/support-link';
 
 interface Tenancy {
   tenantId: string;
@@ -91,6 +92,10 @@ export default function ResidentHome() {
           ))}
         </div>
       )}
+
+      <div className="pt-2 flex justify-center">
+        <SupportLink subject="Resident support request" />
+      </div>
     </div>
   );
 }

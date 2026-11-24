@@ -31,6 +31,7 @@ export class StaffService {
     const snap = await adminDb
       .collection('staff')
       .where('ownerId', '==', ownerId)
+      .limit(100)
       .get();
 
     return snap.docs.map((d) => ({ id: d.id, ...d.data() } as StaffMember));
@@ -44,18 +45,18 @@ export class StaffService {
     input: InviteStaffInput,
     actorUid: string
   ): Promise<StaffMember & { setupLink?: string }> {
-    const ownerDoc = await adminDb.collection('owners').doc(ownerId).get();
+    const [ownerDoc, currentStaffSnap] = await Promise.all([
+      adminDb.collection('owners').doc(ownerId).get(),
+      adminDb
+        .collection('staff')
+        .where('ownerId', '==', ownerId)
+        .where('accountStatus', '==', ACCOUNT_STATUS.ACTIVE)
+        .count()
+        .get(),
+    ]);
     if (!ownerDoc.exists) throw new AppError(404, 'Owner profile not found');
 
     const maxStaff = ownerDoc.data()?.maxStaff ?? 0;
-
-    // Check plan staff quota
-    const currentStaffSnap = await adminDb
-      .collection('staff')
-      .where('ownerId', '==', ownerId)
-      .where('accountStatus', '==', ACCOUNT_STATUS.ACTIVE)
-      .count()
-      .get();
 
     if (currentStaffSnap.data().count >= maxStaff) {
       throw new AppError(
@@ -164,10 +165,8 @@ export class StaffService {
     }
 
     const now = Timestamp.now();
-    await staffRef.update({
-      accountStatus: status,
-      updatedAt: now,
-    });
+    const patch = { accountStatus: status, updatedAt: now };
+    await staffRef.update(patch);
 
     // Write audit log
     await adminDb.collection('audit_logs').add({
@@ -180,8 +179,8 @@ export class StaffService {
       createdAt: now,
     });
 
-    const updated = await staffRef.get();
-    return updated.data() as StaffMember;
+    // Return the locally-merged result — no extra read round-trip.
+    return { ...data, ...patch };
   }
 
   /**

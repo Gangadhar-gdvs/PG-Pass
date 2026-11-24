@@ -95,6 +95,20 @@ service cloud.firestore {
       allow write: if false; // managed via /api/properties (Admin SDK)
     }
 
+    // Owner↔admin support chat. Owner reads ONLY their own thread + messages
+    // (enables live onSnapshot); admin reads all. Writes are server-only.
+    match /support_threads/{ownerId} {
+      allow get:   if isOwnerUid(ownerId) || isAdmin();
+      allow list:  if isAdmin() && boundedList();
+      allow write: if false;
+
+      match /messages/{msgId} {
+        allow get:   if isOwnerUid(ownerId) || isAdmin();
+        allow list:  if (isOwnerUid(ownerId) || isAdmin()) && boundedList();
+        allow write: if false;
+      }
+    }
+
     // Resident self-service accounts. A resident reads only their own profile;
     // all discovery/join data is served via the Admin SDK through /api/**.
     match /residents/{uid} {

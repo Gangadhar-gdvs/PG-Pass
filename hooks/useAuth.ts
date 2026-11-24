@@ -25,14 +25,29 @@ export function useAuth() {
             email: firebaseUser.email,
           });
 
-          // Proactively ensure server session cookie is active for authenticated API routes
+          // Proactively keep the server session cookie fresh for API routes.
+          // This is a BACKGROUND refresh (mode: 'refresh') — it must never take
+          // over an account logged in on another device. If the server says
+          // this device was superseded, sign out locally.
           try {
             const idToken = await firebaseUser.getIdToken();
-            fetch('/api/auth/session', {
+            const res = await fetch('/api/auth/session', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ idToken }),
-            }).catch(() => {});
+              body: JSON.stringify({ idToken, mode: 'refresh' }),
+            });
+            if (res.status === 409) {
+              const data = await res.json().catch(() => ({}));
+              if (data.code === 'SESSION_SUPERSEDED') {
+                await signOut(auth).catch(() => {});
+                setUser(null);
+                setLoading(false);
+                if (typeof window !== 'undefined') {
+                  window.location.href = '/login?kicked=1';
+                }
+                return;
+              }
+            }
           } catch {
             // Ignore background sync errors
           }

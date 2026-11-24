@@ -3,6 +3,7 @@ import { withErrorHandler } from '@/lib/server/api/withErrorHandler';
 import { withCronAuth } from '@/lib/server/api/withCronAuth';
 import { adminDb } from '@/lib/server/firebase-admin';
 import { storageProvider } from '@/lib/server/storage/provider';
+import { recordEvent } from '@/lib/server/services/systemLogs.service';
 import { env } from '@/lib/env';
 import zlib from 'zlib';
 import crypto from 'crypto';
@@ -82,14 +83,22 @@ export const POST = withErrorHandler(
       }
     }
 
+    const uploaded = backupConfigured && Object.keys(uploadedBytes).length > 0;
+    await recordEvent({
+      category: 'cron',
+      level: uploaded || !backupConfigured ? 'info' : 'warn',
+      message: `Nightly backup ${todayStr}: ${Object.values(results).reduce((a, b) => a + b, 0)} docs${
+        uploaded ? ' · uploaded+verified to B2' : backupConfigured ? ' · NOT uploaded' : ' · B2 not configured'
+      }`,
+      details: { collectionCounts: results, uploadedBytes },
+    });
+
     return NextResponse.json({
       success: true,
       backupDate: todayStr,
       collectionCounts: results,
       uploadedBytes,
-      // True only when backup is configured AND at least one object was
-      // uploaded and verified on this run.
-      encryptedToB2: backupConfigured && Object.keys(uploadedBytes).length > 0,
+      encryptedToB2: uploaded,
       backupConfigured,
     });
   })

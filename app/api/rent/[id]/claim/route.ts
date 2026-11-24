@@ -108,6 +108,8 @@ export const POST = withErrorHandler(
         status: 'verify',
       });
     },
-    { tier: 'sensitive', key: 'ip', maxRequests: 10, windowSeconds: 60 }
+    // Raised so many residents behind one shared IP can submit payment claims
+    // concurrently; UTR dedup (utr_claims) + portal auth prevent abuse per tenant.
+    { tier: 'sensitive', key: 'ip', maxRequests: 40, windowSeconds: 60 }
   )
 );
