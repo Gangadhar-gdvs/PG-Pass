@@ -32,7 +32,7 @@
     "react-dom": "19.3.0",
     "react-hot-toast": "^2.6.1",
     "server-only": "^0.0.1",
-    "tailwind-merge": "^3.7.0",
+    "tailwind-merge": "^3.7.1",
     "zod": "^4.6.7"
   },
   "overridesComment": "uuid -> GHSA-w5hq-g745-h8pq (buffer-bounds fix in 11.1.1); firebase-admin's transitive chain pins ^9 but only calls uuid.v4() with no buffer arg, so the bump is safe. @grpc/grpc-js -> GHSA-m9gg-hp2v-232j / GHSA-f596-whhp-79r4 (server-side gRPC); only the browser firebase SDK pulled the vulnerable 1.9.x and it never runs the Node gRPC transport, so exposure is nil.",
