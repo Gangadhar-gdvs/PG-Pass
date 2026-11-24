@@ -15,6 +15,7 @@ import { BedGrid } from '@/components/owner/BedGrid';
 import { AddTenantModal } from '@/components/owner/AddTenantModal';
 import { WhatsAppReminderModal } from '@/components/owner/WhatsAppReminderModal';
 import { BankCsvReconciler } from '@/components/owner/BankCsvReconciler';
+import { PropertySetupWizard } from '@/components/owner/PropertySetupWizard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Drawer } from '@/components/ui/drawer';
@@ -34,27 +35,17 @@ import {
   UserPlus,
   ShieldAlert,
   FileSpreadsheet,
+  ArrowLeft,
+  Layers,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function OwnerDashboardPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const ownerId = user?.uid || '';
 
   const [owner, setOwner] = useState<Owner | null>(null);
   const [loadingOwner, setLoadingOwner] = useState(true);
-
-  // Setup Wizard State
-  const [pgName, setPgName] = useState('');
-  const [ownerName, setOwnerName] = useState('');
-  const [pgAddress, setPgAddress] = useState('');
-  const [totalFloors, setTotalFloors] = useState('2');
-  const [roomsPerFloor, setRoomsPerFloor] = useState('3');
-  const [bedsPerRoom, setBedsPerRoom] = useState('2');
-  const [monthlyRent, setMonthlyRent] = useState('8500');
-  const [upiId, setUpiId] = useState('');
-  const [panNumber, setPanNumber] = useState('');
-  const [submittingSetup, setSubmittingSetup] = useState(false);
 
   // Active Hooks for Beds, Tenants, Records
   const { beds } = useBeds(ownerId);
@@ -62,6 +53,7 @@ export default function OwnerDashboardPage() {
   const [rentRecords, setRentRecords] = useState<RentRecord[]>([]);
 
   // Modals & Drawer State
+  const [showSetupWizard, setShowSetupWizard] = useState(false);
   const [selectedBedForAdd, setSelectedBedForAdd] = useState<Bed | null>(null);
   const [showReminderModal, setShowReminderModal] = useState(false);
   const [showBankReconciler, setShowBankReconciler] = useState(false);
@@ -71,6 +63,12 @@ export default function OwnerDashboardPage() {
 
   // Load Owner Profile
   useEffect(() => {
+    if (authLoading) return;
+    if (!ownerId) {
+      setLoadingOwner(false);
+      return;
+    }
+
     async function loadOwner() {
       try {
         const res = await fetch('/api/owners');
@@ -85,8 +83,8 @@ export default function OwnerDashboardPage() {
       }
     }
 
-    if (ownerId) loadOwner();
-  }, [ownerId]);
+    loadOwner();
+  }, [ownerId, authLoading]);
 
   // Subscribe to real-time Rent Records for the current month
   useEffect(() => {
@@ -97,94 +95,6 @@ export default function OwnerDashboardPage() {
     });
     return unsub;
   }, [ownerId]);
-
-  // Setup Wizard Submission via Server APIs
-  const handleCompleteSetup = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    const sanitizedPgName = sanitizeText(pgName, 80);
-    const sanitizedOwnerName = sanitizeText(ownerName, 60);
-    const sanitizedPgAddress = sanitizeText(pgAddress, 200);
-
-    if (!sanitizedPgName || !sanitizedOwnerName) {
-      toast.error('Please enter your PG Name and Owner Name');
-      return;
-    }
-
-    const upiValidation = validateUpi(upiId);
-    if (!upiValidation.valid) {
-      toast.error(upiValidation.error || 'Please enter a valid UPI ID (e.g., name@okicici)');
-      return;
-    }
-
-    const panValidation = validatePan(panNumber);
-    if (!panValidation.valid) {
-      toast.error(panValidation.error || 'Please enter a valid 10-character PAN');
-      return;
-    }
-
-    setSubmittingSetup(true);
-
-    try {
-      const floors = Math.min(Math.max(Number(totalFloors) || 1, 1), 30);
-      const rooms = Math.min(Math.max(Number(roomsPerFloor) || 1, 1), 30);
-      const bedsCount = Math.min(Math.max(Number(bedsPerRoom) || 1, 1), 10);
-      const rent = Math.max(Number(monthlyRent) || 1000, 500);
-
-      // 1. Create Owner Profile via PUT /api/owners
-      const ownerRes = await fetch('/api/owners', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: sanitizedOwnerName,
-          phone: (user?.phoneNumber || '9876543210').replace(/\D/g, '').slice(-10),
-          pgName: sanitizedPgName,
-          address: sanitizedPgAddress || 'PG Address',
-          upiId: upiValidation.formatted,
-          panNumber: panValidation.formatted,
-        }),
-      });
-
-      if (!ownerRes.ok) {
-        const err = await ownerRes.json().catch(() => ({}));
-        throw new Error(err.message || 'Failed to save owner profile');
-      }
-
-      const updatedOwner = await ownerRes.json();
-      setOwner(updatedOwner);
-
-      // 2. Batch generate beds via POST /api/beds
-      const bedPromises = [];
-      for (let f = 1; f <= floors; f++) {
-        for (let r = 1; r <= rooms; r++) {
-          const roomNumber = `${f}${String(r).padStart(2, '0')}`;
-          for (let b = 1; b <= bedsCount; b++) {
-            const bedLabel = `${roomNumber}-${String.fromCharCode(64 + b)}`;
-            bedPromises.push(
-              fetch('/api/beds', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  floor: f,
-                  roomNumber,
-                  bedLabel,
-                  rentAmountPaise: Math.round(rent * 100),
-                }),
-              })
-            );
-          }
-        }
-      }
-      await Promise.all(bedPromises);
-
-      toast.success(`Setup complete! Generated ${floors * rooms * bedsCount} beds.`);
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err.message || 'Setup failed');
-    } finally {
-      setSubmittingSetup(false);
-    }
-  };
 
   // Mark Paid via POST /api/rent/[id]/confirm
   const handleMarkPaid = async (bed: Bed, record?: RentRecord) => {
@@ -294,125 +204,46 @@ export default function OwnerDashboardPage() {
   // ---------------- SETUP WIZARD (FIRST TIME PG ONBOARDING) ----------------
   if (!owner) {
     return (
-      <div className="max-w-2xl mx-auto py-8">
-        <div className="bg-white border border-[#E2E8F0] rounded-[12px] p-6 sm:p-8 shadow-xs">
-          <div className="mb-6 pb-4 border-b border-[#E2E8F0]">
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-[#D97706] bg-[#FEF3C7] px-2.5 py-0.5 rounded-[6px] inline-block mb-2">
-              PG Setup Wizard
-            </span>
+      <PropertySetupWizard
+        initialOwnerPhone={user?.phoneNumber || '9876543210'}
+        onComplete={(newOwner) => setOwner(newOwner)}
+      />
+    );
+  }
+
+  // ---------------- MANUAL RE-CONFIGURATION / ADD ROOMS ----------------
+  if (showSetupWizard) {
+    return (
+      <div className="space-y-4 text-left">
+        <div className="flex items-center justify-between pb-3 border-b border-[#E2E8F0]">
+          <div>
             <h1 className="text-xl font-bold text-[#09090B] tracking-tight">
-              Configure Your PG Property
+              Property & Room Inventory Setup
             </h1>
-            <p className="text-xs text-[#64748B] mt-1">
-              Enter building specs to automatically generate your visual bed inventory and rent links.
+            <p className="text-xs text-[#64748B] mt-0.5">
+              Configure room sharing formats (Single, 2-share to 6-share), rents, and floor layout matrix for {owner.pgName}
             </p>
           </div>
-
-          <form onSubmit={handleCompleteSetup} className="space-y-4">
-            <div className="space-y-3">
-              <Input
-                label="PG Property Name"
-                placeholder="e.g. Sri Krishna Luxury PG"
-                value={pgName}
-                onChange={(e) => setPgName(e.target.value)}
-                required
-              />
-
-              <Input
-                label="Owner / Landlord Name"
-                placeholder="e.g. Suresh Reddy"
-                value={ownerName}
-                onChange={(e) => setOwnerName(e.target.value)}
-                required
-              />
-
-              <Input
-                label="Property Address"
-                placeholder="e.g. Plot 42, Ayyappa Society, Madhapur, Hyderabad"
-                value={pgAddress}
-                onChange={(e) => setPgAddress(e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="pt-3 border-t border-[#E2E8F0]">
-              <span className="text-xs font-semibold uppercase tracking-wider text-[#475569] block mb-2">
-                Room & Bed Layout
-              </span>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <Input
-                  label="Floors"
-                  type="number"
-                  min={1}
-                  max={20}
-                  value={totalFloors}
-                  onChange={(e) => setTotalFloors(e.target.value)}
-                  required
-                />
-                <Input
-                  label="Rooms / Floor"
-                  type="number"
-                  min={1}
-                  max={20}
-                  value={roomsPerFloor}
-                  onChange={(e) => setRoomsPerFloor(e.target.value)}
-                  required
-                />
-                <Input
-                  label="Beds / Room"
-                  type="number"
-                  min={1}
-                  max={6}
-                  value={bedsPerRoom}
-                  onChange={(e) => setBedsPerRoom(e.target.value)}
-                  required
-                />
-                <Input
-                  label="Monthly Rent (₹)"
-                  type="number"
-                  value={monthlyRent}
-                  onChange={(e) => setMonthlyRent(e.target.value)}
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="pt-3 border-t border-[#E2E8F0]">
-              <span className="text-xs font-semibold uppercase tracking-wider text-[#475569] block mb-2">
-                Settlement & HRA Compliance
-              </span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <Input
-                  label="Owner UPI ID (for tenant rent transfers)"
-                  placeholder="name@okicici"
-                  value={upiId}
-                  onChange={(e) => setUpiId(e.target.value)}
-                  required
-                />
-
-                <Input
-                  label="Landlord PAN (for tenant HRA receipts)"
-                  placeholder="ABCDE1234F"
-                  value={panNumber}
-                  onChange={(e) => setPanNumber(e.target.value.toUpperCase())}
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="pt-4 flex justify-end">
-              <Button
-                type="submit"
-                size="lg"
-                loading={submittingSetup}
-                variant="solid"
-                className="w-full sm:w-auto"
-              >
-                Save PG & Generate Bed Inventory
-              </Button>
-            </div>
-          </form>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowSetupWizard(false)}
+            className="text-xs"
+          >
+            <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
+            <span>Back to Dashboard</span>
+          </Button>
         </div>
+        <PropertySetupWizard
+          initialOwnerPhone={user?.phoneNumber || owner.phone || '9876543210'}
+          existingOwner={owner}
+          onCancel={() => setShowSetupWizard(false)}
+          onComplete={(newOwner) => {
+            setOwner(newOwner);
+            setShowSetupWizard(false);
+            toast.success('Bed inventory successfully generated!');
+          }}
+        />
       </div>
     );
   }
@@ -441,6 +272,15 @@ export default function OwnerDashboardPage() {
           <Button
             size="sm"
             variant="outline"
+            onClick={() => setShowSetupWizard(true)}
+            className="text-xs border-[#CBD5E1] text-[#334155] hover:bg-[#F8FAFC]"
+          >
+            <Building className="w-3.5 h-3.5 mr-1.5 text-[#D97706]" />
+            <span>Room Setup</span>
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
             onClick={() => setShowBankReconciler(true)}
             className="text-xs border-[#CBD5E1] text-[#334155] hover:bg-[#F8FAFC]"
           >
@@ -451,9 +291,17 @@ export default function OwnerDashboardPage() {
             size="sm"
             variant="solid"
             onClick={() => {
+              if (beds.length === 0) {
+                toast.error('No beds configured yet. Please generate your room inventory first.');
+                setShowSetupWizard(true);
+                return;
+              }
               const firstVacant = beds.find((b) => b.status === 'vacant');
-              if (firstVacant) setSelectedBedForAdd(firstVacant);
-              else toast.error('No vacant beds available');
+              if (firstVacant) {
+                setSelectedBedForAdd(firstVacant);
+              } else {
+                toast.error('All beds are currently occupied. Vacate a bed to add a new resident.');
+              }
             }}
             className="text-xs"
           >
@@ -462,6 +310,34 @@ export default function OwnerDashboardPage() {
           </Button>
         </div>
       </div>
+
+      {/* Empty Inventory Onboarding Banner */}
+      {beds.length === 0 && (
+        <div className="bg-[#FEF3C7] border border-[#FDE68A] rounded-[12px] p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="p-2.5 bg-[#D97706] text-white rounded-[10px] mt-0.5 shadow-xs">
+              <Building className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-[#92400E]">
+                No Rooms or Beds Configured Yet (0 Units)
+              </h3>
+              <p className="text-xs text-[#B45309] mt-0.5">
+                Your PG has 0 beds ready for lease. Configure your floor-by-floor sharing formats (Single, 2-share to 6-share) and pricing to generate your bed units.
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="solid"
+            size="sm"
+            className="bg-[#D97706] hover:bg-[#B45309] text-white whitespace-nowrap shadow-sm font-medium"
+            onClick={() => setShowSetupWizard(true)}
+          >
+            <Layers className="w-4 h-4 mr-1.5" />
+            <span>Configure Rooms & Generate Beds</span>
+          </Button>
+        </div>
+      )}
 
       {/* Bento Live HUD Telemetry Strip */}
       <StatsBar
@@ -482,6 +358,7 @@ export default function OwnerDashboardPage() {
         onVerifyProof={(bed, rec) => setProofModalRecord({ bed, record: rec })}
         onVacate={(bed) => setConfirmVacateBed(bed)}
         onSelectBed={(bed) => setActiveBedDrawer(bed)}
+        onConfigureRooms={() => setShowSetupWizard(true)}
       />
 
       {/* RIGHT-SIDE BED DETAILS COMMAND DRAWER */}

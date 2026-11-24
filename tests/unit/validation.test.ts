@@ -12,7 +12,7 @@ describe('Validation Schemas', () => {
       const valid = {
         name: 'Ramesh Kumar',
         phone: '9876543210',
-        pgName: 'Sri Krishna PG',
+        pgName: 'Skyline Coliving',
         address: '123 Koramangala, Bangalore',
         upiId: 'ramesh@icici',
         panNumber: 'ABCDE1234F',
@@ -25,7 +25,7 @@ describe('Validation Schemas', () => {
       const invalid = {
         name: 'Ramesh Kumar',
         phone: '9876543210',
-        pgName: 'Sri Krishna PG',
+        pgName: 'Skyline Coliving',
         address: '123 Koramangala, Bangalore',
         upiId: 'not-a-valid-upi',
       };
@@ -37,7 +37,7 @@ describe('Validation Schemas', () => {
       const invalid = {
         name: 'Ramesh Kumar',
         phone: '1234567890', // Must start with 6-9
-        pgName: 'Sri Krishna PG',
+        pgName: 'Skyline Coliving',
         address: '123 Koramangala, Bangalore',
         upiId: 'ramesh@upi',
       };

@@ -5,14 +5,14 @@ describe('Client UPI & WhatsApp Helpers', () => {
   it('should build a valid direct UPI deeplink', () => {
     const payload = buildUpiPayload({
       upiId: 'landlord@okaxis',
-      merchantName: 'Sri Krishna PG',
+      merchantName: 'Skyline Luxury Coliving',
       amountPaise: 850000,
       transactionNote: 'Rent Apr 2026 Bed 101-A',
     });
 
     expect(payload).toContain('upi://pay?');
     expect(payload).toContain('pa=landlord%40okaxis');
-    expect(payload).toContain('pn=Sri+Krishna+PG');
+    expect(payload).toContain('pn=Skyline+Luxury+Coliving');
     expect(payload).toContain('am=8500.00');
     expect(payload).toContain('cu=INR');
   });

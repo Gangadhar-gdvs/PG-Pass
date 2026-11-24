@@ -16,6 +16,10 @@ import {
   Phone,
   ArrowRight,
   ShieldCheck,
+  AlertCircle,
+  Terminal,
+  Bug,
+  RefreshCw,
 } from 'lucide-react';
 import {
   signInWithEmailAndPassword,
@@ -26,6 +30,7 @@ import {
 import { auth } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Drawer } from '@/components/ui/drawer';
 import { formatCurrency } from '@/lib/utils';
 import {
   getSuperAdminPlatformOverview,
@@ -63,9 +68,31 @@ export default function SuperAdminPortalPage() {
   const [selectedPgId, setSelectedPgId] = useState<string | null>(null);
 
   // Tab State
-  const [activeTab, setActiveTab] = useState<'telemetry' | 'upgrades'>('telemetry');
+  const [activeTab, setActiveTab] = useState<'telemetry' | 'upgrades' | 'logs'>('telemetry');
   const [upgradeRequests, setUpgradeRequests] = useState<any[]>([]);
   const [loadingUpgrades, setLoadingUpgrades] = useState(false);
+
+  // System & Error Logs State
+  const [systemLogs, setSystemLogs] = useState<any[]>([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+  const [logFilter, setLogFilter] = useState<string>('all');
+  const [selectedLogForDetails, setSelectedLogForDetails] = useState<any | null>(null);
+
+  const loadLogs = async (level = logFilter) => {
+    setLoadingLogs(true);
+    try {
+      const res = await fetch(`/api/admin/logs?level=${level}&limit=100`);
+      if (res.ok) {
+        const data = await res.json();
+        setSystemLogs(data.logs || []);
+      }
+    } catch (e) {
+      console.error('Error fetching logs:', e);
+      toast.error('Failed to load system error logs');
+    } finally {
+      setLoadingLogs(false);
+    }
+  };
 
   const loadUpgrades = async () => {
     setLoadingUpgrades(true);
@@ -457,6 +484,26 @@ export default function SuperAdminPortalPage() {
             </span>
           )}
         </button>
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab('logs');
+            loadLogs();
+          }}
+          className={`py-3 border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${
+            activeTab === 'logs'
+              ? 'border-[#D97706] text-[#D97706]'
+              : 'border-transparent text-[#64748B] hover:text-[#09090B]'
+          }`}
+        >
+          <Bug className="w-3.5 h-3.5" />
+          <span>System & Error Logs</span>
+          {systemLogs.filter((l) => l.level === 'error').length > 0 && (
+            <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-[#FEE2E2] text-[#DC2626] font-bold">
+              {systemLogs.filter((l) => l.level === 'error').length}
+            </span>
+          )}
+        </button>
       </div>
 
       {/* Main Content Area */}
@@ -530,6 +577,117 @@ export default function SuperAdminPortalPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+      ) : activeTab === 'logs' ? (
+        <div className="flex-1 p-6 overflow-y-auto max-w-6xl mx-auto w-full space-y-4 text-left">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="text-base font-bold text-[#09090B] flex items-center gap-2">
+                <Bug className="w-4 h-4 text-[#DC2626]" />
+                <span>System Error Logs & Diagnostics</span>
+              </h2>
+              <p className="text-xs text-[#64748B]">
+                Real-time technical errors, Firebase auth exceptions, and server diagnostics.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <select
+                value={logFilter}
+                onChange={(e) => {
+                  setLogFilter(e.target.value);
+                  loadLogs(e.target.value);
+                }}
+                className="h-8 px-2.5 bg-white border border-[#CBD5E1] rounded-[6px] text-xs text-[#09090B] font-medium focus:outline-none focus:border-[#D97706]"
+              >
+                <option value="all">All Levels</option>
+                <option value="error">Errors Only</option>
+                <option value="warn">Warnings Only</option>
+                <option value="info">Info Only</option>
+              </select>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => loadLogs(logFilter)}
+                loading={loadingLogs}
+              >
+                <RefreshCw className="w-3.5 h-3.5 mr-1" />
+                <span>Refresh</span>
+              </Button>
+            </div>
+          </div>
+
+          {systemLogs.length === 0 ? (
+            <div className="bg-white border border-[#E2E8F0] rounded-[12px] p-10 text-center space-y-2">
+              <CheckCircle2 className="w-8 h-8 text-[#10B981] mx-auto" />
+              <p className="text-xs font-semibold text-[#09090B]">No System Errors Detected</p>
+              <p className="text-[11px] text-[#64748B]">All cloud services, authentications, and APIs are operating normally.</p>
+            </div>
+          ) : (
+            <div className="bg-white border border-[#E2E8F0] rounded-[12px] overflow-hidden shadow-xs">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-[#F8FAFC] border-b border-[#E2E8F0] text-[#64748B] font-semibold text-[11px]">
+                    <tr>
+                      <th className="py-2.5 px-3.5">Level</th>
+                      <th className="py-2.5 px-3.5">Source</th>
+                      <th className="py-2.5 px-3.5">Code / Route</th>
+                      <th className="py-2.5 px-3.5">Message</th>
+                      <th className="py-2.5 px-3.5">Timestamp</th>
+                      <th className="py-2.5 px-3.5 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#E2E8F0]">
+                    {systemLogs.map((log) => (
+                      <tr key={log.id} className="hover:bg-[#F8FAFC] transition-colors">
+                        <td className="py-2.5 px-3.5">
+                          <span
+                            className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-[4px] ${
+                              log.level === 'error'
+                                ? 'bg-[#FEE2E2] text-[#DC2626] border border-[#FECACA]'
+                                : log.level === 'warn'
+                                ? 'bg-[#FEF3C7] text-[#D97706] border border-[#FDE68A]'
+                                : 'bg-[#E0F2FE] text-[#0284C7] border border-[#BAE6FD]'
+                            }`}
+                          >
+                            {log.level}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3.5 font-mono text-[11px] text-[#475569]">
+                          {log.source === 'client' ? '🌐 Client' : '⚡ Server'}
+                        </td>
+                        <td className="py-2.5 px-3.5">
+                          <span className="font-mono font-bold text-[#09090B] block text-[11px]">
+                            {log.code || 'UNKNOWN'}
+                          </span>
+                          <span className="font-mono text-[10px] text-[#64748B]">
+                            {log.route || '-'}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3.5 max-w-xs truncate text-[#09090B] font-medium" title={log.message}>
+                          {log.message}
+                        </td>
+                        <td className="py-2.5 px-3.5 text-[11px] text-[#64748B] whitespace-nowrap">
+                          {new Date(log.createdAt).toLocaleString('en-IN', {
+                            dateStyle: 'short',
+                            timeStyle: 'medium',
+                          })}
+                        </td>
+                        <td className="py-2.5 px-3.5 text-right">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedLogForDetails(log)}
+                            className="text-[#D97706] hover:text-[#B45309] font-bold text-xs hover:underline cursor-pointer"
+                          >
+                            Inspect
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>
@@ -694,6 +852,92 @@ export default function SuperAdminPortalPage() {
             )}
           </main>
         </div>
+      )}
+
+      {/* ERROR LOG INSPECT DRAWER */}
+      {selectedLogForDetails && (
+        <Drawer
+          isOpen={!!selectedLogForDetails}
+          onClose={() => setSelectedLogForDetails(null)}
+          title={`Error Diagnostics: ${selectedLogForDetails.code || selectedLogForDetails.level.toUpperCase()}`}
+          description={`Captured at ${new Date(selectedLogForDetails.createdAt).toLocaleString('en-IN')}`}
+          width="lg"
+          footer={
+            <Button variant="outline" size="sm" onClick={() => setSelectedLogForDetails(null)}>
+              Close
+            </Button>
+          }
+        >
+          <div className="space-y-4 text-xs text-left">
+            <div>
+              <span className="text-[11px] font-bold text-[#64748B] uppercase block mb-1">
+                Error Message
+              </span>
+              <div className="p-3 bg-[#FEF2F2] border border-[#FECACA] text-[#991B1B] rounded-[6px] font-mono leading-relaxed break-words">
+                {selectedLogForDetails.message}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 text-[11px]">
+              <div className="p-2.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-[6px]">
+                <span className="text-[#64748B] block font-semibold">Source & Level</span>
+                <span className="font-bold text-[#09090B] uppercase">
+                  {selectedLogForDetails.source} · {selectedLogForDetails.level}
+                </span>
+              </div>
+              <div className="p-2.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-[6px]">
+                <span className="text-[#64748B] block font-semibold">Route / Endpoint</span>
+                <span className="font-mono text-[#09090B] truncate block">
+                  {selectedLogForDetails.route || 'N/A'}
+                </span>
+              </div>
+            </div>
+
+            {selectedLogForDetails.requestId && (
+              <div className="p-2.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-[6px] text-[11px]">
+                <span className="text-[#64748B] block font-semibold">Request ID</span>
+                <span className="font-mono text-[#09090B]">
+                  {selectedLogForDetails.requestId}
+                </span>
+              </div>
+            )}
+
+            {selectedLogForDetails.details && (
+              <div>
+                <span className="text-[11px] font-bold text-[#64748B] uppercase block mb-1">
+                  Context / Details Payload
+                </span>
+                <pre className="p-3 bg-[#0F172A] text-[#E2E8F0] rounded-[6px] font-mono text-[11px] overflow-x-auto max-h-48 whitespace-pre-wrap">
+                  {typeof selectedLogForDetails.details === 'object'
+                    ? JSON.stringify(selectedLogForDetails.details, null, 2)
+                    : String(selectedLogForDetails.details)}
+                </pre>
+              </div>
+            )}
+
+            {selectedLogForDetails.stack && (
+              <div>
+                <span className="text-[11px] font-bold text-[#64748B] uppercase block mb-1">
+                  Stack Trace
+                </span>
+                <pre className="p-3 bg-[#0F172A] text-[#94A3B8] rounded-[6px] font-mono text-[10px] overflow-x-auto max-h-56 whitespace-pre-wrap">
+                  {selectedLogForDetails.stack}
+                </pre>
+              </div>
+            )}
+
+            {selectedLogForDetails.userAgent && (
+              <div>
+                <span className="text-[11px] font-bold text-[#64748B] uppercase block mb-1">
+                  User Agent
+                </span>
+                <p className="font-mono text-[10px] text-[#64748B] break-all">
+                  {selectedLogForDetails.userAgent}
+                </p>
+              </div>
+            )}
+          </div>
+        </Drawer>
       )}
     </div>
   );

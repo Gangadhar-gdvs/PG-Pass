@@ -45,6 +45,11 @@ export interface Owner {
   roomsPerFloor?: number;
   bedsPerRoom?: number;
   monthlyRent?: number;
+  pgCategory?: 'gents' | 'ladies' | 'coliving';
+  foodPlan?: '3_meals' | '2_meals' | 'no_food';
+  foodCuisine?: 'both' | 'south' | 'north';
+  noticePeriodDays?: number;
+  pgAmenities?: string[];
   createdAt?: any;
   updatedAt?: any;
 }
@@ -58,6 +63,9 @@ export interface Bed {
   rentAmountPaise?: number;
   monthlyRent: number; // required number for formatCurrency(bed.monthlyRent)
   status: BedStatus;
+  sharingType?: '1' | '2' | '3' | '4' | '5' | '6';
+  acType?: 'ac' | 'non-ac';
+  roomAmenities?: string[];
   tenantId?: string;
   tenantName?: string;
   tenantPhone?: string;

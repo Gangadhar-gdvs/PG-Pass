@@ -121,7 +121,7 @@ export default function LandingPage() {
               <div className="flex items-center justify-between pb-3 border-b border-[#E2E8F0]">
                 <div>
                   <span className="text-xs font-bold text-[#09090B] block">
-                    Sri Krishna Luxury PG
+                    Skyline Luxury Coliving
                   </span>
                   <span className="text-[10px] text-[#64748B]">Madhapur, Hyderabad</span>
                 </div>

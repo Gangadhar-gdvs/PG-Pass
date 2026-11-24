@@ -11,6 +11,7 @@ import {
   deleteDoc,
   onSnapshot,
   orderBy,
+  limit,
   Timestamp,
 } from 'firebase/firestore';
 import { Owner, Bed, Tenant, RentRecord, MoveInPhoto } from '@/types';
@@ -75,8 +76,11 @@ export async function createOwnerProfile(uid: string, data: Omit<Owner, 'id' | '
 export async function getOwnerProfile(uid: string): Promise<Owner | null> {
   if (isFirebaseConfigured()) {
     try {
-      const snap = await getDoc(doc(db, 'owners', uid));
-      if (snap.exists()) return snap.data() as Owner;
+      // 2.5s maximum wait for client Firestore read to prevent freezing/hanging
+      const snapPromise = getDoc(doc(db, 'owners', uid));
+      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500));
+      const snap = await Promise.race([snapPromise, timeoutPromise]);
+      if (snap && 'exists' in snap && snap.exists()) return snap.data() as Owner;
     } catch (e) {
       console.warn('Firebase read error, checking local store:', e);
     }
@@ -150,22 +154,33 @@ export async function createBeds(
 }
 
 export function subscribeToOwnerBeds(ownerId: string, callback: (beds: Bed[]) => void): () => void {
-  if (isFirebaseConfigured()) {
-    try {
-      const q = query(collection(db, 'beds'), where('ownerId', '==', ownerId));
-      return onSnapshot(q, (snap) => {
-        callback(snap.docs.map((d) => d.data() as Bed));
-      });
-    } catch (e) {
-      console.warn('Firestore subscription failed, falling back to local events:', e);
-    }
-  }
-
   const notify = () => {
     const allBeds = getLocal<Bed[]>(LOCAL_STORAGE_KEYS.BEDS, []);
     // Strict isolation: return ONLY beds where bed.ownerId strictly matches
     callback(allBeds.filter((b) => b.ownerId === ownerId));
   };
+
+  if (isFirebaseConfigured()) {
+    try {
+      const q = query(
+        collection(db, 'beds'),
+        where('ownerId', '==', ownerId),
+        limit(100) // Strictly conforms to firestore.rules boundedList (<=100)
+      );
+      return onSnapshot(
+        q,
+        (snap) => {
+          callback(snap.docs.map((d) => d.data() as Bed));
+        },
+        (error) => {
+          console.warn('Firestore beds subscription error, immediately using local store:', error);
+          notify();
+        }
+      );
+    } catch (e) {
+      console.warn('Firestore subscription failed, falling back to local events:', e);
+    }
+  }
 
   notify();
   if (typeof window !== 'undefined') {
@@ -273,26 +288,34 @@ export async function createTenant(
 }
 
 export function subscribeToOwnerTenants(ownerId: string, callback: (tenants: Tenant[]) => void): () => void {
-  if (isFirebaseConfigured()) {
-    try {
-      const q = query(
-        collection(db, 'tenants'),
-        where('ownerId', '==', ownerId),
-        where('active', '==', true)
-      );
-      return onSnapshot(q, (snap) => {
-        callback(snap.docs.map((d) => d.data() as Tenant));
-      });
-    } catch (e) {
-      console.warn('Firestore tenant subscription failed, using local store:', e);
-    }
-  }
-
   const notify = () => {
     const list = getLocal<Tenant[]>(LOCAL_STORAGE_KEYS.TENANTS, []);
     // Strict isolation: return ONLY active residents belonging to this owner
     callback(list.filter((t) => t.ownerId === ownerId && t.active));
   };
+
+  if (isFirebaseConfigured()) {
+    try {
+      const q = query(
+        collection(db, 'tenants'),
+        where('ownerId', '==', ownerId),
+        where('active', '==', true),
+        limit(100) // Strictly conforms to firestore.rules boundedList (<=100)
+      );
+      return onSnapshot(
+        q,
+        (snap) => {
+          callback(snap.docs.map((d) => d.data() as Tenant));
+        },
+        (error) => {
+          console.warn('Firestore tenant subscription error, immediately using local store:', error);
+          notify();
+        }
+      );
+    } catch (e) {
+      console.warn('Firestore tenant subscription failed, using local store:', e);
+    }
+  }
 
   notify();
   if (typeof window !== 'undefined') {
@@ -412,26 +435,34 @@ export function subscribeToOwnerRentRecords(
   monthYear: string,
   callback: (records: RentRecord[]) => void
 ): () => void {
-  if (isFirebaseConfigured()) {
-    try {
-      const q = query(
-        collection(db, 'rent_records'),
-        where('ownerId', '==', ownerId),
-        where('monthYear', '==', monthYear)
-      );
-      return onSnapshot(q, (snap) => {
-        callback(snap.docs.map((d) => d.data() as RentRecord));
-      });
-    } catch (e) {
-      console.warn('Firestore records subscription failed, using local store:', e);
-    }
-  }
-
   const notify = () => {
     const list = getLocal<RentRecord[]>(LOCAL_STORAGE_KEYS.RENT_RECORDS, []);
     // Strict isolation: return ONLY records where record.ownerId strictly matches
     callback(list.filter((r) => r.ownerId === ownerId && r.monthYear === monthYear));
   };
+
+  if (isFirebaseConfigured()) {
+    try {
+      const q = query(
+        collection(db, 'rent_records'),
+        where('ownerId', '==', ownerId),
+        where('monthYear', '==', monthYear),
+        limit(100) // Strictly conforms to firestore.rules boundedList (<=100)
+      );
+      return onSnapshot(
+        q,
+        (snap) => {
+          callback(snap.docs.map((d) => d.data() as RentRecord));
+        },
+        (error) => {
+          console.warn('Firestore records subscription error, immediately using local store:', error);
+          notify();
+        }
+      );
+    } catch (e) {
+      console.warn('Firestore records subscription failed, using local store:', e);
+    }
+  }
 
   notify();
   if (typeof window !== 'undefined') {

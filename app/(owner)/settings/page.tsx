@@ -135,7 +135,7 @@ export default function SettingsPage() {
 
             <Input
               label="PG Business Name"
-              placeholder="e.g. Sri Krishna Luxury Coliving"
+              placeholder="e.g. Skyline Luxury Coliving"
               value={pgName}
               onChange={(e) => setPgName(e.target.value)}
               required
@@ -144,7 +144,7 @@ export default function SettingsPage() {
 
             <Input
               label="Proprietor / Landlord Full Name"
-              placeholder="e.g. Ramesh Kumar"
+              placeholder="e.g. Property Manager Name"
               value={ownerName}
               onChange={(e) => setOwnerName(e.target.value)}
               required

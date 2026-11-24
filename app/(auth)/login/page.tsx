@@ -11,6 +11,7 @@ import {
   createUserWithEmailAndPassword,
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
+import { reportClientError } from '@/lib/client/logger';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import toast from 'react-hot-toast';
@@ -55,12 +56,25 @@ function LoginFormContent() {
       await establishSession(userCredential.user);
     } catch (err: any) {
       console.error('Google sign-in error:', err);
+
+      // Report full technical diagnostics to system logs for admin portal
+      reportClientError({
+        message: err.message || 'Google sign-in failed',
+        code: err.code || 'GOOGLE_SIGNIN_ERROR',
+        route: '/login',
+        error: err,
+        details: { provider: 'google', action: 'signInWithPopup' },
+      });
+
+      // Clear, polite, non-technical message for residents and owners
       if (err.code === 'auth/operation-not-allowed') {
-        setError('Google Sign-In is not enabled yet in your Firebase Console. Please enable it under Authentication > Sign-in method.');
+        setError('Google sign-in is temporarily unavailable. Please sign in with your email or contact support.');
       } else if (err.code === 'auth/popup-closed-by-user') {
-        setError('Sign-in cancelled');
+        setError('Sign-in was cancelled.');
+      } else if (err.code === 'auth/network-request-failed') {
+        setError('Network error. Please check your internet connection.');
       } else {
-        setError(err.message || 'Failed to sign in with Google');
+        setError('Unable to sign in with Google. Please try again or use your email.');
       }
     } finally {
       setGoogleLoading(false);
@@ -91,13 +105,27 @@ function LoginFormContent() {
       await establishSession(userCredential.user);
     } catch (err: any) {
       console.error('Email auth error:', err);
-      let msg = err.message || 'Authentication failed';
+
+      // Report technical diagnostics to system logs
+      if (err.code !== 'auth/wrong-password' && err.code !== 'auth/user-not-found' && err.code !== 'auth/invalid-credential') {
+        reportClientError({
+          message: err.message || 'Email authentication failed',
+          code: err.code || 'EMAIL_AUTH_ERROR',
+          route: '/login',
+          error: err,
+          details: { mode: authMode },
+        });
+      }
+
+      let msg = 'Unable to sign in. Please try again.';
       if (err.code === 'auth/operation-not-allowed') {
-        msg = 'Email/Password sign-in is not enabled in Firebase Console. Please enable it under Authentication > Sign-in method.';
+        msg = 'Email sign-in is temporarily unavailable. Please contact support.';
       } else if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-        msg = 'Invalid email or password';
+        msg = 'Invalid email or password. Please try again.';
       } else if (err.code === 'auth/email-already-in-use') {
-        msg = 'An account with this email already exists. Please sign in.';
+        msg = 'An account with this email already exists. Please sign in instead.';
+      } else if (err.code === 'auth/network-request-failed') {
+        msg = 'Network connection error. Please check your internet connection.';
       }
       setError(msg);
     } finally {

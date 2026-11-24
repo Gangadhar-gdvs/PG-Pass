@@ -7,6 +7,10 @@ import { MAX_LIST_LIMIT } from '@/lib/constants/limits';
 import { Timestamp } from 'firebase-admin/firestore';
 
 export class BedsService {
+  constructor() {
+    this.createBedsBatch = this.createBedsBatch.bind(this);
+  }
+
   async listBeds(ownerId: string, limitCount = 50, startAfterId?: string): Promise<Bed[]> {
     const safeLimit = Math.min(limitCount, MAX_LIST_LIMIT);
     let q = adminDb
@@ -45,6 +49,9 @@ export class BedsService {
       bedLabel: string;
       rentAmountPaise: number;
       floor?: number;
+      sharingType?: '1' | '2' | '3' | '4' | '5' | '6';
+      acType?: 'ac' | 'non-ac';
+      roomAmenities?: string[];
     }
   ): Promise<Bed> {
     // 1. Quota check
@@ -83,16 +90,90 @@ export class BedsService {
       rentAmountPaise: data.rentAmountPaise,
       monthlyRent: Math.round(data.rentAmountPaise / 100),
       floor: data.floor ?? 1,
+      sharingType: data.sharingType,
+      acType: data.acType,
+      roomAmenities: data.roomAmenities,
       status: BED_STATUS.VACANT,
-      tenantId: undefined,
-      tenantName: undefined,
-      tenantPhone: undefined,
+      tenantId: null as any,
+      tenantName: null as any,
+      tenantPhone: null as any,
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
     };
 
     await bedRef.set(newBed);
     return newBed;
+  }
+
+  async createBedsBatch(
+    ownerId: string,
+    bedsList: Array<{
+      roomNumber: string;
+      bedLabel: string;
+      rentAmountPaise: number;
+      floor?: number;
+      sharingType?: '1' | '2' | '3' | '4' | '5' | '6';
+      acType?: 'ac' | 'non-ac';
+      roomAmenities?: string[];
+    }>
+  ): Promise<{ count: number }> {
+    const ownerDoc = await adminDb.collection('owners').doc(ownerId).get();
+    if (!ownerDoc.exists) {
+      throw new AppError(404, 'Owner profile not found. Please complete setup.');
+    }
+    const planLimit = ownerDoc.data()?.maxBeds ?? 20;
+
+    const countSnap = await adminDb
+      .collection('beds')
+      .where('ownerId', '==', ownerId)
+      .count()
+      .get();
+
+    const currentCount = countSnap.data().count;
+    const maxBeds = currentCount === 0 ? Math.max(planLimit, bedsList.length) : planLimit;
+
+    if (currentCount + bedsList.length > maxBeds) {
+      throw new AppError(
+        403,
+        `Adding ${bedsList.length} beds exceeds your plan limit (${maxBeds} beds). You currently have ${currentCount} beds. Please upgrade your plan in Billing.`
+      );
+    }
+
+    if (currentCount === 0 && bedsList.length > planLimit) {
+      await ownerDoc.ref.update({ maxBeds, maxTenants: maxBeds });
+    }
+
+    const batch = adminDb.batch();
+    const now = Timestamp.now();
+    let addedCount = 0;
+
+    for (const data of bedsList) {
+      const bedId = `${ownerId}_${data.roomNumber}_${data.bedLabel}`.replace(/[\s/]/g, '-');
+      const bedRef = adminDb.collection('beds').doc(bedId);
+      const newBed: Bed = {
+        id: bedId,
+        ownerId,
+        roomNumber: data.roomNumber.trim(),
+        bedLabel: data.bedLabel.trim(),
+        rentAmountPaise: data.rentAmountPaise,
+        monthlyRent: Math.round(data.rentAmountPaise / 100),
+        floor: data.floor ?? 1,
+        sharingType: data.sharingType,
+        acType: data.acType,
+        roomAmenities: data.roomAmenities,
+        status: BED_STATUS.VACANT,
+        tenantId: null as any,
+        tenantName: null as any,
+        tenantPhone: null as any,
+        createdAt: now,
+        updatedAt: now,
+      };
+      batch.set(bedRef, newBed, { merge: true });
+      addedCount++;
+    }
+
+    await batch.commit();
+    return { count: addedCount };
   }
 
   async updateBed(
@@ -125,3 +206,18 @@ export class BedsService {
 }
 
 export const bedsService = new BedsService();
+
+export async function createBedsBatch(
+  ownerId: string,
+  bedsList: Array<{
+    roomNumber: string;
+    bedLabel: string;
+    rentAmountPaise: number;
+    floor?: number;
+    sharingType?: '1' | '2' | '3' | '4' | '5' | '6';
+    acType?: 'ac' | 'non-ac';
+    roomAmenities?: string[];
+  }>
+): Promise<{ count: number }> {
+  return bedsService.createBedsBatch(ownerId, bedsList);
+}

@@ -10,6 +10,12 @@ export const ownerProfileSchema = z.object({
   upiId: z.string().regex(/^[\w.-]+@[\w.-]+$/, 'Invalid UPI ID format (e.g. name@bank)'),
   upiMerchantName: z.string().optional(),
   panNumber: z.string().regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, 'Invalid PAN format').optional().or(z.literal('')),
+  pgCategory: z.enum(['gents', 'ladies', 'coliving']).optional(),
+  foodPlan: z.enum(['3_meals', '2_meals', 'no_food']).optional(),
+  foodCuisine: z.enum(['both', 'south', 'north']).optional(),
+  noticePeriodDays: z.number().int().optional(),
+  pgAmenities: z.array(z.string()).optional(),
+  totalFloors: z.number().int().optional(),
 });
 
 // Bed creation and update schema
@@ -18,6 +24,13 @@ export const createBedSchema = z.object({
   bedLabel: z.string().min(1, 'Bed label required'),
   rentAmountPaise: z.number().int().positive('Rent must be a positive integer in paise'),
   floor: z.number().int().min(0).default(1),
+  sharingType: z.enum(['1', '2', '3', '4', '5', '6']).optional(),
+  acType: z.enum(['ac', 'non-ac']).optional(),
+  roomAmenities: z.array(z.string()).optional(),
+});
+
+export const createBedsBatchSchema = z.object({
+  beds: z.array(createBedSchema).min(1).max(200),
 });
 
 export const updateBedSchema = z.object({

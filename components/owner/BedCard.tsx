@@ -74,9 +74,21 @@ export function BedCard({
       {/* Top Details */}
       <div>
         <div className="flex items-center justify-between pl-1">
-          <span className="font-mono-numbers font-bold text-xs text-[#09090B] tracking-tight">
-            {bed.bedLabel}
-          </span>
+          <div className="flex items-center gap-1.5">
+            <span className="font-mono-numbers font-bold text-xs text-[#09090B] tracking-tight">
+              {bed.bedLabel}
+            </span>
+            {bed.sharingType && (
+              <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded-[4px] bg-[#F1F5F9] text-[#475569] border border-[#E2E8F0]">
+                {bed.sharingType === '1' ? 'Single' : `${bed.sharingType}-Share`}
+              </span>
+            )}
+            {bed.acType === 'ac' && (
+              <span className="text-[9px] font-extrabold uppercase px-1 py-0.5 rounded-[3px] bg-[#E0F2FE] text-[#0369A1]">
+                AC
+              </span>
+            )}
+          </div>
           {isVacant ? (
             <Badge variant="vacant">Vacant</Badge>
           ) : isPaid ? (

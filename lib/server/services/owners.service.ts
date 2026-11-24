@@ -23,6 +23,12 @@ export class OwnersService {
       upiId: string;
       upiMerchantName?: string;
       panNumber?: string;
+      pgCategory?: 'gents' | 'ladies' | 'coliving';
+      foodPlan?: '3_meals' | '2_meals' | 'no_food';
+      foodCuisine?: 'both' | 'south' | 'north';
+      noticePeriodDays?: number;
+      pgAmenities?: string[];
+      totalFloors?: number;
     }
   ): Promise<Owner> {
     const docRef = adminDb.collection('owners').doc(ownerId);
@@ -40,6 +46,12 @@ export class OwnersService {
         upiId: data.upiId.trim().toLowerCase(),
         upiMerchantName: data.upiMerchantName?.trim() || data.name.trim(),
         panNumber: data.panNumber?.trim() || '',
+        pgCategory: data.pgCategory,
+        foodPlan: data.foodPlan,
+        foodCuisine: data.foodCuisine,
+        noticePeriodDays: data.noticePeriodDays,
+        pgAmenities: data.pgAmenities,
+        totalFloors: data.totalFloors,
         accountStatus: ACCOUNT_STATUS.ACTIVE,
         plan: PLAN_TIER.FREE,
         maxBeds: FREE_MAX_BEDS,
@@ -65,12 +77,20 @@ export class OwnersService {
       upiId: data.upiId.trim().toLowerCase(),
       upiMerchantName: data.upiMerchantName?.trim() || data.name.trim(),
       panNumber: data.panNumber?.trim() || '',
+      ...(data.pgCategory ? { pgCategory: data.pgCategory } : {}),
+      ...(data.foodPlan ? { foodPlan: data.foodPlan } : {}),
+      ...(data.foodCuisine ? { foodCuisine: data.foodCuisine } : {}),
+      ...(data.noticePeriodDays ? { noticePeriodDays: data.noticePeriodDays } : {}),
+      ...(data.pgAmenities ? { pgAmenities: data.pgAmenities } : {}),
+      ...(data.totalFloors ? { totalFloors: data.totalFloors } : {}),
       updatedAt: Timestamp.now(),
     };
 
     await docRef.update(updateData as any);
-    const updated = await docRef.get();
-    return updated.data() as Owner;
+    return {
+      ...(existing.data() as Owner),
+      ...updateData,
+    } as Owner;
   }
 }
 

@@ -1,8 +1,16 @@
 import 'server-only';
+import dns from 'dns';
 import { initializeApp, getApps, getApp, cert, App } from 'firebase-admin/app';
 import { getAuth, Auth } from 'firebase-admin/auth';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
 import { env } from '@/lib/env';
+
+// Enforce IPv4 lookup order to eliminate Windows/ISP IPv6 hanging and 120s connection timeouts
+try {
+  dns.setDefaultResultOrder('ipv4first');
+} catch {
+  // Gracefully ignore if runtime does not support
+}
 
 function initFirebaseAdmin(): App {
   if (getApps().length > 0) {
@@ -45,3 +53,8 @@ function initFirebaseAdmin(): App {
 export const adminApp: App = initFirebaseAdmin();
 export const adminAuth: Auth = getAuth(adminApp);
 export const adminDb: Firestore = getFirestore(adminApp);
+try {
+  adminDb.settings({ ignoreUndefinedProperties: true });
+} catch {
+  // Settings already frozen or initialized
+}

@@ -1,6 +1,7 @@
 import 'server-only';
 import { NextRequest, NextResponse } from 'next/server';
 import { createLogger } from '../monitoring/logger';
+import { recordSystemLog } from '../services/systemLogs.service';
 import crypto from 'crypto';
 
 export class AppError extends Error {
@@ -71,6 +72,17 @@ export function withErrorHandler(handler: RouteHandler): RouteHandler {
         durationMs,
         stack,
       });
+
+      // Persist unhandled error to system_logs for admin dashboard
+      recordSystemLog({
+        level: 'error',
+        source: 'server',
+        message: errorMessage,
+        code: 'INTERNAL_SERVER_ERROR',
+        route,
+        stack,
+        requestId,
+      }).catch(() => {});
 
       return NextResponse.json(
         {
