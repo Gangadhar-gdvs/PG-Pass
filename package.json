@@ -28,7 +28,7 @@
     "next": "16.4.6",
     "postcss": "^8.5.33",
     "qrcode": "^1.5.4",
-    "react": "19.3.0",
+    "react": "19.3.1",
     "react-dom": "19.3.0",
     "react-hot-toast": "^2.6.1",
     "server-only": "^0.0.1",
