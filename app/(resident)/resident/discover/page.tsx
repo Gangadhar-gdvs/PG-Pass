@@ -1,11 +1,10 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Search, MapPin } from 'lucide-react';
+import { Search, MapPin, Building2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface Listing {
@@ -14,7 +13,6 @@ interface Listing {
   city?: string;
   area?: string;
   pgCategory?: string;
-  monthlyRent?: number;
 }
 
 export default function DiscoverPage() {
@@ -62,61 +60,77 @@ export default function DiscoverPage() {
   };
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-lg font-bold">Find a PG</h1>
+    <div className="space-y-4 pt-4">
+      <h1 className="text-xl font-extrabold text-slate-900 px-1">Find a PG</h1>
 
+      {/* Search card */}
       <form
         onSubmit={(e) => {
           e.preventDefault();
           search();
         }}
-        className="space-y-2"
+        className="app-card p-3.5 space-y-2.5"
       >
-        <Input label="Search by name or area" value={q} onChange={(e) => setQ(e.target.value)} placeholder="e.g. Koramangala, Sunrise PG" />
-        <div className="flex gap-2 items-end">
-          <div className="flex-1">
-            <Input label="City" value={city} onChange={(e) => setCity(e.target.value)} placeholder="e.g. Bengaluru" />
-          </div>
-          <Button type="submit" variant="solid" className="bg-[#0D9488] hover:bg-[#0F766E] h-11">
-            <Search className="w-4 h-4" />
+        <div className="relative">
+          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search name or area…"
+            className="w-full h-12 pl-10 pr-3 rounded-[14px] border-2 border-slate-200 text-sm focus:border-[color:var(--accent)] focus:outline-none"
+          />
+        </div>
+        <div className="flex gap-2">
+          <input
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+            placeholder="City (e.g. Bengaluru)"
+            className="flex-1 h-12 px-4 rounded-[14px] border-2 border-slate-200 text-sm focus:border-[color:var(--accent)] focus:outline-none"
+          />
+          <Button type="submit" variant="solid" size="md">
+            <Search className="w-4 h-4" /> Search
           </Button>
         </div>
       </form>
 
       {loading ? (
         <div className="space-y-2">
-          {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-20" />)}
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 rounded-2xl" />
+          ))}
         </div>
       ) : listings.length === 0 ? (
-        <EmptyState
-          icon={<Search className="w-6 h-6 text-[#0D9488]" />}
-          title="No PGs found"
-          description="Try a different city or search term. Only PGs that opted into public listing appear here."
-        />
+        <div className="app-card p-6">
+          <EmptyState
+            icon={<Search className="w-6 h-6 accent-text" />}
+            title="No PGs found"
+            description="Try a different city or term. Only PGs that opted into public listing appear here."
+          />
+        </div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-2.5 stagger">
           {listings.map((l) => (
-            <div key={l.propertyId} className="bg-white border border-[#CCFBF1] rounded-[12px] p-4 shadow-xs">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="font-bold text-sm">{l.pgName}</div>
-                  <div className="text-xs text-[#64748B] flex items-center gap-1">
-                    <MapPin className="w-3 h-3" />
-                    {[l.area, l.city].filter(Boolean).join(', ') || 'Location n/a'}
-                  </div>
-                  <div className="text-[11px] text-[#94A3B8] mt-0.5 capitalize">
-                    {l.pgCategory || 'coliving'}
-                  </div>
-                </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={joiningId === l.propertyId}
-                  onClick={() => join(l.propertyId)}
-                >
-                  Request Join
-                </Button>
+            <div key={l.propertyId} className="app-card p-4 flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-[16px] accent-soft-bg flex items-center justify-center shrink-0">
+                <Building2 className="w-6 h-6" />
               </div>
+              <div className="min-w-0 flex-1">
+                <div className="font-extrabold text-[15px] text-slate-900 truncate">{l.pgName}</div>
+                <div className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
+                  <MapPin className="w-3 h-3" />
+                  {[l.area, l.city].filter(Boolean).join(', ') || 'Location n/a'}
+                </div>
+                <div className="text-[11px] text-slate-400 mt-0.5 capitalize">{l.pgCategory || 'coliving'}</div>
+              </div>
+              <Button
+                size="sm"
+                variant="solid"
+                disabled={joiningId === l.propertyId}
+                loading={joiningId === l.propertyId}
+                onClick={() => join(l.propertyId)}
+              >
+                Join
+              </Button>
             </div>
           ))}
         </div>

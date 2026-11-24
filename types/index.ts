@@ -14,7 +14,33 @@ import {
 export * from '@/lib/constants/status';
 
 // Expanded BedStatus to support both Rev 3 spec and legacy UI prototype indicators
-export type BedStatus = 'vacant' | 'occupied' | 'maintenance' | 'paid' | 'pending' | 'verify';
+export type BedStatus = 'vacant' | 'occupied' | 'maintenance' | 'guest' | 'paid' | 'pending' | 'verify';
+
+/** Short-stay guest (comes and goes within days) — a lightweight alternative to
+ *  a full-time tenant: no monthly rent cycle, no deposit ledger, no portal. */
+export interface GuestStay {
+  id: string;
+  ownerId: string;
+  propertyId?: string;
+  bedId: string;
+  bedLabel?: string;
+  roomNumber?: string;
+  name: string;
+  phone?: string;
+  checkInDate: string; // YYYY-MM-DD
+  checkOutDate: string; // YYYY-MM-DD (planned)
+  nights: number;
+  billingMode: 'per_night' | 'flat';
+  nightlyRatePaise?: number;
+  totalAmountPaise: number;
+  amountPaidPaise: number;
+  idProofType?: string;
+  notes?: string;
+  status: 'active' | 'completed';
+  checkedOutAt?: any;
+  recordedBy: string;
+  createdAt?: any;
+}
 export type RentStatus = 'pending' | 'verify' | 'paid';
 
 export interface LineItem {

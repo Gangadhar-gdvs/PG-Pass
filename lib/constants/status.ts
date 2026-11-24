@@ -18,6 +18,7 @@ export const BED_STATUS = {
   VACANT: 'vacant',
   OCCUPIED: 'occupied',
   MAINTENANCE: 'maintenance',
+  GUEST: 'guest', // short-stay guest occupies the bed until checkout
 } as const;
 
 export type BedStatus = (typeof BED_STATUS)[keyof typeof BED_STATUS];

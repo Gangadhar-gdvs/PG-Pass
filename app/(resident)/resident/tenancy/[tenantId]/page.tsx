@@ -2,16 +2,17 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
+import Link from 'next/link';
 import { formatCurrency, formatDateIN } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { StatusDot } from '@/components/ui/status-dot';
+import { ArrowLeft, ShieldCheck, Wrench } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-const STATUS_MAP: Record<string, 'paid' | 'pending' | 'verify'> = {
-  paid: 'paid',
-  verify: 'verify',
-  pending: 'pending',
+const STATUS_STYLE: Record<string, string> = {
+  paid: 'bg-[#D1FAE5] text-[#065F46]',
+  verify: 'bg-[#E0E7FF] text-[#4338CA]',
+  pending: 'bg-[#FEF3C7] text-[#92400E]',
 };
 
 export default function TenancyDetail() {
@@ -61,49 +62,61 @@ export default function TenancyDetail() {
 
   if (loading) {
     return (
-      <div className="space-y-3">
-        <Skeleton className="h-7 w-40" />
-        <Skeleton className="h-24" />
-        <Skeleton className="h-40" />
+      <div className="space-y-3 pt-4">
+        <Skeleton className="h-7 w-40 rounded-xl" />
+        <Skeleton className="h-20 rounded-2xl" />
+        <Skeleton className="h-40 rounded-2xl" />
       </div>
     );
   }
-  if (!data) return <p className="text-sm text-[#64748B]">Could not load this tenancy.</p>;
+  if (!data) return <p className="text-sm text-slate-500 pt-6">Could not load this tenancy.</p>;
 
-  const { tenant, rentHistory, deposits, tickets } = data;
+  const { tenant, rentHistory, tickets } = data;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 pt-4">
+      <Link href="/resident/home" className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 press">
+        <ArrowLeft className="w-4 h-4" /> My PGs
+      </Link>
+
       <div>
-        <h1 className="text-lg font-bold">Your Tenancy</h1>
-        <p className="text-xs text-[#64748B]">
-          {tenant.roomNumber ? `Room ${tenant.roomNumber} · ` : ''}Bed {tenant.bedLabel || '—'} · since {formatDateIN(tenant.moveInDate)}
+        <h1 className="text-xl font-extrabold text-slate-900">Your Tenancy</h1>
+        <p className="text-xs text-slate-500 mt-0.5">
+          {tenant.roomNumber ? `Room ${tenant.roomNumber} · ` : ''}Bed {tenant.bedLabel || '—'} · since{' '}
+          {formatDateIN(tenant.moveInDate)}
         </p>
       </div>
 
-      {/* Deposit */}
-      <div className="bg-white border border-[#CCFBF1] rounded-[12px] p-4 shadow-xs flex items-center justify-between">
-        <span className="text-xs font-semibold text-[#64748B]">Security Deposit Paid</span>
-        <span className="font-bold font-mono-numbers">
-          {formatCurrency((tenant.depositPaidPaise || 0) / 100)}
-        </span>
+      {/* Deposit card */}
+      <div className="app-card p-4 flex items-center gap-3">
+        <div className="w-11 h-11 rounded-[14px] accent-soft-bg flex items-center justify-center">
+          <ShieldCheck className="w-5 h-5" />
+        </div>
+        <div className="flex-1">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Security Deposit</div>
+          <div className="font-extrabold font-mono-numbers text-lg text-slate-900">
+            {formatCurrency((tenant.depositPaidPaise || 0) / 100)}
+          </div>
+        </div>
       </div>
 
       {/* Rent history */}
       <section>
-        <h2 className="text-sm font-bold mb-2">Payment History</h2>
-        <div className="space-y-2">
-          {rentHistory.length === 0 && <p className="text-xs text-[#94A3B8]">No rent records yet.</p>}
+        <h2 className="text-sm font-extrabold text-slate-900 mb-2 px-1">Payment History</h2>
+        <div className="space-y-2 stagger">
+          {rentHistory.length === 0 && <p className="text-xs text-slate-400 px-1">No rent records yet.</p>}
           {rentHistory.map((r: any) => (
-            <div key={r.id} className="bg-white border border-[#E2E8F0] rounded-[10px] p-3 flex items-center justify-between">
+            <div key={r.id} className="app-card p-3.5 flex items-center justify-between">
               <div>
-                <div className="text-sm font-semibold">{r.period}</div>
-                <div className="text-xs text-[#64748B] font-mono-numbers">
+                <div className="text-sm font-bold text-slate-900">{r.period}</div>
+                <div className="text-xs text-slate-500 font-mono-numbers mt-0.5">
                   {formatCurrency((r.amountPaidPaise || 0) / 100)} / {formatCurrency((r.amountDuePaise || 0) / 100)}
                   {r.receiptNumber ? ` · REC-${String(r.receiptNumber).padStart(5, '0')}` : ''}
                 </div>
               </div>
-              <StatusDot status={STATUS_MAP[r.status] || 'pending'} label={r.status} />
+              <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full capitalize ${STATUS_STYLE[r.status] || STATUS_STYLE.pending}`}>
+                {r.status}
+              </span>
             </div>
           ))}
         </div>
@@ -111,46 +124,49 @@ export default function TenancyDetail() {
 
       {/* Issues */}
       <section>
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-sm font-bold">My Issues</h2>
+        <div className="flex items-center justify-between mb-2 px-1">
+          <h2 className="text-sm font-extrabold text-slate-900">My Issues</h2>
           {!issueOpen && (
-            <Button size="sm" variant="outline" onClick={() => setIssueOpen(true)}>
-              Raise Issue
-            </Button>
+            <button onClick={() => setIssueOpen(true)} className="text-xs font-bold accent-text press">
+              + Raise
+            </button>
           )}
         </div>
 
         {issueOpen && (
-          <form onSubmit={raiseIssue} className="bg-white border border-[#E2E8F0] rounded-[10px] p-3 space-y-2 mb-2">
+          <form onSubmit={raiseIssue} className="app-card p-3.5 space-y-2 mb-2 animate-pop">
             <textarea
               value={desc}
               onChange={(e) => setDesc(e.target.value)}
               rows={3}
               placeholder="Describe the problem (e.g. leaking tap in bathroom)"
-              className="w-full px-3 py-2 rounded-[8px] border border-[#CBD5E1] text-sm focus:border-[#0D9488] focus:outline-none resize-none"
+              className="w-full px-3 py-2.5 rounded-[12px] border-2 border-slate-200 text-sm focus:border-[color:var(--accent)] focus:outline-none resize-none"
             />
             <div className="flex gap-2">
-              <Button type="submit" size="sm" variant="solid" loading={sending} className="flex-1 bg-[#0D9488] hover:bg-[#0F766E]">
-                Submit
+              <Button type="submit" size="md" variant="solid" loading={sending} className="flex-1">
+                Submit Issue
               </Button>
-              <Button type="button" size="sm" variant="outline" onClick={() => setIssueOpen(false)}>
+              <Button type="button" size="md" variant="outline" onClick={() => setIssueOpen(false)}>
                 Cancel
               </Button>
             </div>
           </form>
         )}
 
-        <div className="space-y-2">
-          {tickets.length === 0 && <p className="text-xs text-[#94A3B8]">No issues raised.</p>}
+        <div className="space-y-2 stagger">
+          {tickets.length === 0 && <p className="text-xs text-slate-400 px-1">No issues raised.</p>}
           {tickets.map((t: any) => (
-            <div key={t.id} className="bg-white border border-[#E2E8F0] rounded-[10px] p-3">
+            <div key={t.id} className="app-card p-3.5">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold capitalize">{t.category}</span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#F1F5F9] text-[#475569] capitalize">
+                <span className="text-sm font-bold capitalize flex items-center gap-1.5 text-slate-900">
+                  <Wrench className="w-3.5 h-3.5 text-slate-400" />
+                  {t.category}
+                </span>
+                <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 capitalize">
                   {String(t.status).replace('_', ' ')}
                 </span>
               </div>
-              <p className="text-xs text-[#64748B] mt-1 break-words">{t.description}</p>
+              <p className="text-xs text-slate-500 mt-1.5 break-words">{t.description}</p>
             </div>
           ))}
         </div>

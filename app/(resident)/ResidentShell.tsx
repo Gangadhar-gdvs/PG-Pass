@@ -1,20 +1,14 @@
 'use client';
 
 import React from 'react';
-import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
+import { BottomTabBar } from '@/components/ui/bottom-tab-bar';
 import { Home, Search, LogOut, UserCircle } from 'lucide-react';
-
-const nav = [
-  { href: '/resident/home', label: 'My PGs', icon: Home },
-  { href: '/resident/discover', label: 'Find a PG', icon: Search },
-];
 
 export function ResidentShell({ children }: { children: React.ReactNode }) {
   const { logout } = useAuth();
   const router = useRouter();
-  const pathname = usePathname();
 
   const signOut = () => {
     logout();
@@ -22,51 +16,42 @@ export function ResidentShell({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="min-h-screen bg-[#F0FDFA] text-[#09090B] flex flex-col pb-16">
-      {/* Header */}
-      <header className="sticky top-0 z-40 bg-white border-b border-[#CCFBF1] px-4 py-3 flex items-center justify-between shadow-xs">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-[6px] bg-[#0D9488] text-white flex items-center justify-center">
-            <UserCircle className="w-4 h-4" />
+    <div className="theme-resident min-h-screen app-gradient-tint flex flex-col pb-24">
+      {/* Gradient header band */}
+      <header className="app-gradient px-5 pt-5 pb-6 rounded-b-[28px] shadow-[0_8px_24px_-12px_rgba(13,148,136,0.5)]">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-[12px] bg-white/20 backdrop-blur flex items-center justify-center">
+              <UserCircle className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <div className="font-extrabold text-white text-[15px] leading-none">PGPass</div>
+              <div className="text-white/70 text-[11px] font-semibold mt-0.5">Resident</div>
+            </div>
           </div>
-          <span className="font-bold text-sm tracking-tight">PGPass · Resident</span>
+          <button
+            type="button"
+            onClick={signOut}
+            className="w-9 h-9 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center press"
+            title="Sign out"
+          >
+            <LogOut className="w-4 h-4 text-white" />
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={signOut}
-          className="p-1.5 rounded-[6px] text-[#64748B] hover:text-[#DC2626] hover:bg-[#F8FAFC] transition-colors"
-          title="Sign out"
-        >
-          <LogOut className="w-4 h-4" />
-        </button>
       </header>
 
-      <main className="flex-1 overflow-x-hidden p-4 max-w-2xl mx-auto w-full pb-[calc(5rem+env(safe-area-inset-bottom))]">
-        {children}
+      <main className="flex-1 overflow-x-hidden px-4 -mt-3 max-w-2xl mx-auto w-full">
+        <div className="animate-fade-up">{children}</div>
       </main>
 
-      {/* Bottom nav */}
-      <nav
-        className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-[#CCFBF1] px-4 py-2 flex justify-around items-center shadow-lg"
-        style={{ paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom))' }}
-      >
-        {nav.map((item) => {
-          const active = pathname.startsWith(item.href);
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex flex-col items-center justify-center gap-1 min-h-[44px] px-6 rounded-[8px] transition-colors ${
-                active ? 'text-[#0D9488] font-bold' : 'text-[#64748B]'
-              }`}
-            >
-              <Icon className="w-5 h-5" />
-              <span className="text-[10px]">{item.label}</span>
-            </Link>
-          );
-        })}
-      </nav>
+      {/* Desktop nav is minimal for residents; primary nav is the floating bar */}
+      <BottomTabBar
+        primary={[
+          { href: '/resident/home', label: 'My PGs', icon: Home },
+          { href: '/resident/discover', label: 'Discover', icon: Search },
+        ]}
+        center={{ label: 'Find a PG', icon: Search, onClick: () => router.push('/resident/discover') }}
+      />
     </div>
   );
 }

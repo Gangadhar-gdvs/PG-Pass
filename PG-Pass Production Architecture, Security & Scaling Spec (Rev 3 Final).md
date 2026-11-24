@@ -24,6 +24,16 @@ understand the whole system quickly. It describes **what exists today**.
 | Client libs | `qrcode`, `jspdf`, `canvas-confetti`, `react-hot-toast`, `lucide-react` (all lazy-loaded where heavy) |
 | Email (optional) | **Resend HTTP API** | No-op unless `RESEND_API_KEY` is set |
 | Hosting | Host-agnostic (any Next.js host) | Decision deferred |
+| SMS (optional) | Generic HTTP provider | No-op unless keyed; auto-sends rent reminders |
+
+**UI design system ("bold & vibrant mobile-app"):** per-panel theming via CSS
+vars in `globals.css` (resident **teal** / owner **amber** / admin **indigo**) —
+each panel layout sets a `theme-*` class and all primitives read `var(--accent)`.
+Shared bold utilities: gradient headers (`app-gradient`), floating card stacks
+(`app-card`), pill buttons, and motion (`animate-pop`, `stagger`, `press`).
+Navigation on mobile/tablet is a **floating bottom tab bar** (`components/ui/bottom-tab-bar.tsx`):
+2–4 essential tabs + a prominent center action + a **"More"** button that opens a
+full-menu sheet with every destination; desktop keeps the sidebar.
 
 ---
 
@@ -234,6 +244,24 @@ contact.
 **Rent & money** — 0%-fee direct UPI (QR + copy), proration & line items,
 partial/advance payments, configurable due-day, **late-fee + defaulter aging**,
 sequential HRA PDF receipts (per property), deposit ledger with refund workflow.
+
+**Reminders** — tapping "remind" **auto-sends via SMS (tenant) + email (linked
+resident)** when a provider is configured (`SMS_API_URL`/`RESEND_API_KEY`);
+otherwise falls back to the free "open WhatsApp with prefilled message" flow.
+Both channels are no-op/best-effort by default, so the app stays ₹0 out of the box.
+
+**Guests (short stay)** — a lightweight flow separate from full-time tenants, for
+people staying a day to a few days: **"Check in Guest"** picks a vacant bed, sets
+dates, and charges **per-night (rate × nights) or a flat total** up front. The bed
+is held as `guest` and **auto-frees on checkout**. A **Guests page** lists
+"staying now" (with checkout) + history. No monthly rent cycle, deposit ledger, or
+portal — it's deliberately quick. (`guest_stays` collection, `guests.service`,
+`/api/guests` + `/api/guests/[id]/checkout`.)
+
+**Join requests** — residents who discover a PG publicly request to join; the owner
+sees a dashboard banner and **Accept** pre-fills the Add-Tenant form with the
+resident's name + phone (phone auto-links the resident account) — then taps a
+vacant bed to finish. (`/api/owners/join-requests`.)
 
 **Residents** — searchable + paginated directory, CSV export, portal links,
 soft-delete with 7-day undo, atomic move-out settlement (deductions/refund,

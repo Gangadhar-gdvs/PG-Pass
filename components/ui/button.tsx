@@ -21,41 +21,43 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     },
     ref
   ) => {
+    // Bold mobile-app: rounded-full pills, generous tap targets, springy press.
     const base =
-      "inline-flex items-center justify-center font-semibold transition-all duration-150 rounded-[8px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-[0.98] select-none";
+      "inline-flex items-center justify-center font-bold tracking-tight transition-all duration-150 rounded-full accent-ring disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-[0.96] select-none";
 
     const sizes = {
-      sm: "h-8 px-3 text-xs gap-1.5",
-      md: "h-9.5 px-4 text-[13px] gap-2",
-      lg: "h-11 px-5 text-sm gap-2.5",
-      full: "h-10 w-full px-4 text-sm gap-2",
+      sm: "h-9 px-4 text-xs gap-1.5",
+      md: "h-11 px-5 text-sm gap-2",
+      lg: "h-12 px-6 text-[15px] gap-2.5",
+      full: "h-12 w-full px-5 text-sm gap-2",
     };
 
-    const variants = {
-      solid:
-        "bg-[#D97706] text-white hover:bg-[#B45309] focus-visible:ring-[#F59E0B] shadow-[0_1px_2px_0_rgba(217,119,6,0.25)]",
-      default:
-        "bg-[#D97706] text-white hover:bg-[#B45309] focus-visible:ring-[#F59E0B] shadow-[0_1px_2px_0_rgba(217,119,6,0.25)]",
-      amber:
-        "bg-[#D97706] text-white hover:bg-[#B45309] focus-visible:ring-[#F59E0B] shadow-[0_1px_2px_0_rgba(217,119,6,0.25)]",
+    // `accent` variants pull the panel theme color (var(--accent)) so buttons
+    // match whichever panel (resident/owner/admin) they render in.
+    const accentSolid =
+      "text-white shadow-[0_6px_18px_-6px_color-mix(in_srgb,var(--accent)_55%,transparent)] hover:brightness-105";
+    const variants: Record<string, string> = {
+      solid: accentSolid,
+      default: accentSolid,
+      amber: accentSolid,
       outline:
-        "bg-white border border-[#E2E8F0] text-[#09090B] hover:bg-[#F8FAFC] hover:border-[#CBD5E1] focus-visible:ring-[#D97706] shadow-xs",
-      ghost:
-        "bg-transparent text-[#475569] hover:bg-[#F1F5F9] hover:text-[#09090B] focus-visible:ring-[#D97706]",
-      destructive:
-        "bg-[#EF4444] text-white hover:bg-[#DC2626] focus-visible:ring-[#EF4444] shadow-xs",
-      success:
-        "bg-[#10B981] text-white hover:bg-[#059669] focus-visible:ring-[#10B981] shadow-xs",
+        "bg-white border-2 border-slate-200 text-slate-900 hover:border-slate-300 hover:bg-slate-50",
+      ghost: "bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900",
+      destructive: "bg-[#EF4444] text-white hover:bg-[#DC2626] shadow-[0_6px_18px_-6px_rgba(239,68,68,0.5)]",
+      success: "bg-[#10B981] text-white hover:bg-[#059669] shadow-[0_6px_18px_-6px_rgba(16,185,129,0.5)]",
     };
+
+    const useAccent = variant === "solid" || variant === "default" || variant === "amber";
 
     return (
       <button
         ref={ref}
         disabled={disabled || loading}
+        style={useAccent ? { background: "var(--accent)" } : undefined}
         className={`${base} ${sizes[size]} ${variants[variant]} ${className}`}
         {...props}
       >
-        {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+        {loading && <Loader2 className="w-4 h-4 animate-spin" />}
         {children}
       </button>
     );

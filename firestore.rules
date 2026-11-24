@@ -83,6 +83,12 @@ service cloud.firestore {
       allow write: if false; // created/deleted via /api/expenses (Admin SDK)
     }
 
+    match /guest_stays/{stayId} {
+      allow get:   if canReadOwnerScope(resource.data.ownerId);
+      allow list:  if canReadOwnerScope(resource.data.ownerId) && boundedList();
+      allow write: if false; // check-in/checkout via /api/guests (Admin SDK)
+    }
+
     match /properties/{propertyId} {
       allow get:   if canReadOwnerScope(resource.data.ownerId);
       allow list:  if canReadOwnerScope(resource.data.ownerId) && boundedList();

@@ -15,6 +15,8 @@ interface AddTenantModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: (tenantId: string, rawPortalToken?: string) => void;
+  prefillName?: string;
+  prefillPhone?: string;
 }
 
 export function AddTenantModal({
@@ -22,9 +24,20 @@ export function AddTenantModal({
   isOpen,
   onClose,
   onSuccess,
+  prefillName,
+  prefillPhone,
 }: AddTenantModalProps) {
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
+  const [name, setName] = useState(prefillName || '');
+  const [phone, setPhone] = useState(prefillPhone || '');
+
+  // Seed from a join-request when the modal opens.
+  React.useEffect(() => {
+    if (isOpen) {
+      if (prefillName) setName(prefillName);
+      if (prefillPhone) setPhone(prefillPhone);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, prefillName, prefillPhone]);
   const [moveInDate, setMoveInDate] = useState(
     new Date().toISOString().split('T')[0]
   );

@@ -200,6 +200,7 @@ export function RoomCard({
         {room.beds.map((bed) => {
           const record = recordMap.get(bed.id);
           const isVacant = bed.status === 'vacant';
+          const isGuest = bed.status === 'guest';
           const isPaid = bed.status === 'paid' || record?.status === 'paid';
           const isVerify = bed.status === 'verify' || record?.status === 'verify';
 
@@ -210,6 +211,8 @@ export function RoomCard({
               className={`group/bed relative rounded-[10px] p-2.5 border transition-all duration-150 cursor-pointer flex items-center justify-between gap-2 ${
                 isVacant
                   ? 'bg-[#F8FAFC] border-dashed border-[#CBD5E1] hover:border-[#D97706] hover:bg-amber-50/30'
+                  : isGuest
+                  ? 'bg-violet-50/40 border-[#DDD6FE] hover:border-[#8B5CF6]'
                   : isPaid
                   ? 'bg-emerald-50/30 border-[#A7F3D0] hover:border-[#059669]'
                   : isVerify

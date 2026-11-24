@@ -51,9 +51,9 @@ export function StatsBar({ beds, rentRecords, onRemindAll }: StatsBarProps) {
   const totalProjected = totalCollected + totalPending;
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 text-left">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 text-left stagger">
       {/* Bento Widget 1: Occupancy HUD */}
-      <div className="bg-white border border-[#E2E8F0] rounded-[12px] p-4.5 shadow-xs flex flex-col justify-between space-y-3">
+      <div className="app-card p-4.5 flex flex-col justify-between space-y-3 press">
         <div className="flex items-center justify-between">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-[#64748B]">
             Occupancy Rate
@@ -81,7 +81,7 @@ export function StatsBar({ beds, rentRecords, onRemindAll }: StatsBarProps) {
       </div>
 
       {/* Bento Widget 2: Collected Rent Revenue */}
-      <div className="bg-white border border-[#E2E8F0] rounded-[12px] p-4.5 shadow-xs flex flex-col justify-between space-y-3">
+      <div className="app-card p-4.5 flex flex-col justify-between space-y-3 press">
         <div className="flex items-center justify-between">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-[#64748B]">
             Collected MTD
@@ -109,7 +109,7 @@ export function StatsBar({ beds, rentRecords, onRemindAll }: StatsBarProps) {
       </div>
 
       {/* Bento Widget 3: Pending Dues */}
-      <div className="bg-white border border-[#E2E8F0] rounded-[12px] p-4.5 shadow-xs flex flex-col justify-between space-y-3">
+      <div className="app-card p-4.5 flex flex-col justify-between space-y-3 press">
         <div className="flex items-center justify-between">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-[#64748B]">
             Pending Collection
@@ -145,7 +145,7 @@ export function StatsBar({ beds, rentRecords, onRemindAll }: StatsBarProps) {
       </div>
 
       {/* Bento Widget 4: Proof Queue / Live System Status */}
-      <div className="bg-white border border-[#E2E8F0] rounded-[12px] p-4.5 shadow-xs flex flex-col justify-between space-y-3">
+      <div className="app-card p-4.5 flex flex-col justify-between space-y-3 press">
         <div className="flex items-center justify-between">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-[#64748B]">
             Live Proof Queue

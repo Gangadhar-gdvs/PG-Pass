@@ -256,14 +256,14 @@ export default function SuperAdminPortalPage() {
   // ---------------- AUTHENTICATION GATE (STRICT LOGIN ONLY - NO PUBLIC REGISTRATION) ----------------
   if (!currentUser) {
     return (
-      <div className="min-h-screen bg-[#F8FAFC] text-[#09090B] flex flex-col items-center justify-center p-4">
-        <div className="w-full max-w-sm bg-white border border-[#E2E8F0] rounded-[14px] p-8 shadow-[0_20px_50px_rgba(0,0,0,0.06)] text-center text-left">
-          <div className="w-12 h-12 rounded-[10px] bg-[#FEF3C7] border border-[#FDE68A] text-[#D97706] flex items-center justify-center mx-auto mb-4">
+      <div className="theme-admin min-h-screen app-gradient-tint text-slate-900 flex flex-col items-center justify-center p-4">
+        <div className="w-full max-w-sm app-card p-8 text-center text-left animate-pop">
+          <div className="w-12 h-12 rounded-[14px] accent-soft-bg flex items-center justify-center mx-auto mb-4">
             <Lock className="w-5 h-5" />
           </div>
 
           <div className="text-center mb-6">
-            <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-[#D97706] bg-[#FEF3C7] px-2.5 py-0.5 rounded-[4px] inline-block mb-1.5">
+            <span className="text-[10px] font-mono font-bold uppercase tracking-widest accent-text accent-soft-bg px-2.5 py-0.5 rounded-[6px] inline-block mb-1.5">
               Restricted Area
             </span>
             <h1 className="text-xl font-bold text-[#09090B] tracking-tight">
@@ -395,19 +395,19 @@ export default function SuperAdminPortalPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-[#09090B] flex flex-col font-sans">
-      {/* Top Header */}
-      <header className="border-b border-[#E2E8F0] bg-white px-6 py-3.5 flex items-center justify-between shadow-xs">
+    <div className="theme-admin min-h-screen app-gradient-tint text-slate-900 flex flex-col font-sans">
+      {/* Gradient header */}
+      <header className="app-gradient px-5 sm:px-6 py-4 flex items-center justify-between shadow-[0_8px_24px_-12px_rgba(79,70,229,0.5)]">
         <div className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded-[8px] bg-[#D97706] text-white flex items-center justify-center font-bold text-xs">
+          <div className="h-9 w-9 rounded-[12px] bg-white/20 backdrop-blur text-white flex items-center justify-center font-extrabold text-xs">
             PG
           </div>
           <div>
-            <span className="font-bold text-sm tracking-tight text-[#09090B] block leading-none">
-              PGPass Platform Telemetry
+            <span className="font-extrabold text-sm tracking-tight text-white block leading-none">
+              PGPass Platform
             </span>
-            <span className="text-[10px] text-[#64748B] font-mono mt-0.5 block">
-              Signed in as: <strong className="text-[#09090B]">{currentUser.email}</strong>
+            <span className="text-[10px] text-white/70 font-mono mt-0.5 block">
+              {currentUser.email}
             </span>
           </div>
         </div>
@@ -415,10 +415,10 @@ export default function SuperAdminPortalPage() {
         <button
           type="button"
           onClick={handleAdminLogout}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] border border-[#E2E8F0] text-xs font-semibold text-[#64748B] hover:text-[#EF4444] hover:bg-[#FEF2F2] hover:border-[#FECACA] transition-colors cursor-pointer"
+          className="flex items-center gap-1.5 px-3.5 h-9 rounded-full bg-white/15 hover:bg-white/25 text-xs font-bold text-white transition-colors press"
         >
           <LogOut className="w-3.5 h-3.5" />
-          <span>Exit Session</span>
+          <span>Exit</span>
         </button>
       </header>
 

@@ -39,12 +39,15 @@ export function BedCard({
   onSelectBed,
 }: BedCardProps) {
   const isVacant = bed.status === 'vacant';
+  const isGuest = bed.status === 'guest';
   const isPaid = bed.status === 'paid' || rentRecord?.status === 'paid';
   const isVerify = bed.status === 'verify' || rentRecord?.status === 'verify';
 
-  // Left status bar color
+  // Left status bar color (guest = violet, distinct from monthly tenants)
   const statusColor = isVacant
     ? 'bg-[#CBD5E1]'
+    : isGuest
+    ? 'bg-[#8B5CF6]'
     : isPaid
     ? 'bg-[#10B981]'
     : isVerify
@@ -91,6 +94,11 @@ export function BedCard({
           </div>
           {isVacant ? (
             <Badge variant="vacant">Vacant</Badge>
+          ) : isGuest ? (
+            <span className="inline-flex items-center gap-1 text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-[#F5F3FF] text-[#6D28D9] border border-[#DDD6FE]">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#8B5CF6]" />
+              Guest
+            </span>
           ) : isPaid ? (
             <Badge variant="paid" dot>Paid</Badge>
           ) : isVerify ? (

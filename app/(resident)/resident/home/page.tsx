@@ -36,49 +36,57 @@ export default function ResidentHome() {
 
   if (loading) {
     return (
-      <div className="space-y-3">
-        <Skeleton className="h-7 w-40" />
-        {Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-20" />)}
+      <div className="space-y-3 pt-4">
+        <Skeleton className="h-7 w-40 rounded-xl" />
+        {Array.from({ length: 2 }).map((_, i) => (
+          <Skeleton key={i} className="h-24 rounded-2xl" />
+        ))}
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-lg font-bold">Hi {resident?.name || 'there'} 👋</h1>
+    <div className="space-y-4 pt-4">
+      <h1 className="text-xl font-extrabold text-slate-900 px-1">
+        Hi {resident?.name?.split(' ')[0] || 'there'} 👋
+      </h1>
 
       {tenancies.length === 0 ? (
-        <EmptyState
-          icon={<Building2 className="w-6 h-6 text-[#0D9488]" />}
-          title="No PG linked yet"
-          description="If your PG owner added you with this phone number, it'll appear here. Or find a PG to join."
-          action={
-            <Link
-              href="/resident/discover"
-              className="inline-flex items-center gap-1.5 h-11 px-4 rounded-[8px] bg-[#0D9488] text-white text-sm font-semibold"
-            >
-              <Search className="w-4 h-4" /> Find a PG
-            </Link>
-          }
-        />
+        <div className="app-card p-6">
+          <EmptyState
+            icon={<Building2 className="w-6 h-6 accent-text" />}
+            title="No PG linked yet"
+            description="If your PG owner added you with this phone number, it'll appear here — or find a PG to join."
+            action={
+              <Link href="/resident/discover" className="btn-pill">
+                <Search className="w-4 h-4" /> Find a PG
+              </Link>
+            }
+          />
+        </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-3 stagger">
           {tenancies.map((t) => (
             <Link
               key={t.tenantId}
               href={`/resident/tenancy/${t.tenantId}`}
-              className="block bg-white border border-[#CCFBF1] rounded-[12px] p-4 shadow-xs active:bg-[#F0FDFA]"
+              className="app-card press flex items-center gap-4 p-4"
             >
-              <div className="flex items-center justify-between">
-                <div className="min-w-0">
-                  <div className="font-bold text-sm truncate">{t.pgName}</div>
-                  <div className="text-xs text-[#64748B]">
-                    {t.roomNumber ? `Room ${t.roomNumber} · ` : ''}Bed {t.bedLabel || '—'}
-                    {!t.active && <span className="ml-2 text-[#94A3B8]">(past)</span>}
-                  </div>
-                </div>
-                <ChevronRight className="w-5 h-5 text-[#94A3B8] shrink-0" />
+              <div className="w-12 h-12 rounded-[16px] accent-soft-bg flex items-center justify-center shrink-0">
+                <Building2 className="w-6 h-6" />
               </div>
+              <div className="min-w-0 flex-1">
+                <div className="font-extrabold text-[15px] text-slate-900 truncate">{t.pgName}</div>
+                <div className="text-xs text-slate-500 mt-0.5">
+                  {t.roomNumber ? `Room ${t.roomNumber} · ` : ''}Bed {t.bedLabel || '—'}
+                  {!t.active && (
+                    <span className="ml-2 inline-block px-2 py-0.5 rounded-full bg-slate-100 text-slate-400 text-[10px] font-bold">
+                      PAST
+                    </span>
+                  )}
+                </div>
+              </div>
+              <ChevronRight className="w-5 h-5 text-slate-300 shrink-0" />
             </Link>
           ))}
         </div>

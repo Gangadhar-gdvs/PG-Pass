@@ -13,6 +13,7 @@ import { Bed, Owner, RentRecord, Tenant } from '@/types';
 import { StatsBar } from '@/components/owner/StatsBar';
 import { BedGrid } from '@/components/owner/BedGrid';
 import { AddTenantModal } from '@/components/owner/AddTenantModal';
+import { CheckInGuestModal } from '@/components/owner/CheckInGuestModal';
 import { WhatsAppReminderModal } from '@/components/owner/WhatsAppReminderModal';
 import { BankCsvReconciler } from '@/components/owner/BankCsvReconciler';
 import { PropertySetupWizard } from '@/components/owner/PropertySetupWizard';
@@ -41,6 +42,7 @@ import {
   ArrowLeft,
   Layers,
   IndianRupee,
+  BedDouble,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -73,6 +75,11 @@ export default function OwnerDashboardPage() {
   // Modals & Drawer State
   const [showSetupWizard, setShowSetupWizard] = useState(false);
   const [selectedBedForAdd, setSelectedBedForAdd] = useState<Bed | null>(null);
+  const [joinRequests, setJoinRequests] = useState<
+    Array<{ id: string; residentName: string; residentPhone: string }>
+  >([]);
+  const [prefillTenant, setPrefillTenant] = useState<{ name: string; phone: string } | null>(null);
+  const [guestBed, setGuestBed] = useState<Bed | null>(null);
   const [showReminderModal, setShowReminderModal] = useState(false);
   const [showBankReconciler, setShowBankReconciler] = useState(false);
   const [proofModalRecord, setProofModalRecord] = useState<{ bed: Bed; record: RentRecord } | null>(null);
@@ -160,6 +167,56 @@ export default function OwnerDashboardPage() {
       cancelled = true;
     };
   }, [ownerId, refundsRefreshKey]);
+
+  // Pending resident join-requests (from public PG discovery).
+  useEffect(() => {
+    if (!ownerId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/owners/join-requests');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled) setJoinRequests(data.requests || []);
+      } catch {
+        /* non-fatal */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [ownerId]);
+
+  // Owner accepts a join request: prefill the Add-Tenant flow with the
+  // resident's name + phone (phone auto-links the resident account) and mark the
+  // request approved. The owner then taps a vacant bed to finish.
+  const acceptJoinRequest = async (req: { id: string; residentName: string; residentPhone: string }) => {
+    setPrefillTenant({ name: req.residentName, phone: req.residentPhone });
+    try {
+      await fetch('/api/owners/join-requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId: req.id, action: 'approved' }),
+      });
+      setJoinRequests((list) => list.filter((r) => r.id !== req.id));
+      toast.success('Approved — now tap a vacant bed to add this resident');
+    } catch {
+      toast.error('Could not approve request');
+    }
+  };
+
+  const declineJoinRequest = async (id: string) => {
+    try {
+      await fetch('/api/owners/join-requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId: id, action: 'declined' }),
+      });
+      setJoinRequests((list) => list.filter((r) => r.id !== id));
+    } catch {
+      toast.error('Could not decline');
+    }
+  };
 
   const markRefundIssued = async (depositId: string) => {
     if (refundBusyId) return;
@@ -518,9 +575,44 @@ export default function OwnerDashboardPage() {
         </div>
       )}
 
+      {/* Resident join requests (from public PG discovery) */}
+      {joinRequests.length > 0 && (
+        <div className="app-card overflow-hidden animate-pop">
+          <div className="accent-soft-bg px-4 py-2.5 flex items-center gap-2">
+            <UserPlus className="w-4 h-4" />
+            <span className="text-sm font-extrabold">
+              {joinRequests.length} resident {joinRequests.length === 1 ? 'wants' : 'want'} to join
+            </span>
+          </div>
+          <div className="divide-y divide-slate-100">
+            {joinRequests.slice(0, 6).map((r) => (
+              <div key={r.id} className="flex items-center justify-between px-4 py-3">
+                <div className="min-w-0">
+                  <div className="text-sm font-bold text-slate-900 truncate">{r.residentName}</div>
+                  <div className="text-[11px] font-mono-numbers text-slate-500">{r.residentPhone}</div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Button size="sm" variant="outline" onClick={() => declineJoinRequest(r.id)}>
+                    Decline
+                  </Button>
+                  <Button size="sm" variant="solid" onClick={() => acceptJoinRequest(r)}>
+                    Accept
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+          {prefillTenant && (
+            <div className="px-4 py-2.5 text-[11px] accent-text accent-soft-bg font-semibold">
+              Approved “{prefillTenant.name}” — now tap a vacant bed to finish adding them.
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Defaulter / aging report — overdue unpaid rent across all months */}
       {defaulters.length > 0 && (
-        <div className="bg-[#FEF2F2] border border-[#FECACA] rounded-[10px] overflow-hidden">
+        <div className="bg-[#FEF2F2] border border-[#FECACA] rounded-[14px] overflow-hidden shadow-[0_2px_8px_-2px_rgba(239,68,68,0.15)] animate-pop">
           <button
             type="button"
             onClick={() => setShowDefaulters((s) => !s)}
@@ -570,7 +662,7 @@ export default function OwnerDashboardPage() {
 
       {/* Pending deposit refunds owed to tenants */}
       {pendingRefunds.length > 0 && (
-        <div className="bg-[#EFF6FF] border border-[#BFDBFE] rounded-[10px] p-3 space-y-2">
+        <div className="bg-[#EFF6FF] border border-[#BFDBFE] rounded-[14px] p-3 space-y-2 shadow-[0_2px_8px_-2px_rgba(29,78,216,0.15)] animate-pop">
           <div className="flex items-center gap-2">
             <IndianRupee className="w-4 h-4 text-[#1D4ED8]" />
             <span className="text-sm font-bold text-[#1E3A8A]">
@@ -603,7 +695,7 @@ export default function OwnerDashboardPage() {
       )}
 
       {/* Billing period navigator — view/collect rent for any month */}
-      <div className="flex items-center justify-between bg-white border border-[#E2E8F0] rounded-[10px] px-3 py-2 shadow-xs">
+      <div className="flex items-center justify-between app-card px-3 py-2">
         <button
           type="button"
           onClick={() => setSelectedPeriod((p) => shiftPeriod(p, -1))}
@@ -641,8 +733,8 @@ export default function OwnerDashboardPage() {
         ).length;
         if (pendingCount < 2) return null;
         return (
-          <div className="flex items-center justify-between bg-[#ECFDF5] border border-[#A7F3D0] rounded-[10px] px-3 py-2">
-            <span className="text-xs font-semibold text-[#065F46]">
+          <div className="flex items-center justify-between bg-[#ECFDF5] border border-[#A7F3D0] rounded-[14px] px-3.5 py-2.5 shadow-[0_2px_8px_-2px_rgba(16,185,129,0.15)] animate-pop">
+            <span className="text-xs font-bold text-[#065F46]">
               {pendingCount} payments pending this month
             </span>
             <Button
@@ -689,7 +781,14 @@ export default function OwnerDashboardPage() {
         description={activeBedDrawer ? `Room ${activeBedDrawer.roomNumber} · Floor ${activeBedDrawer.floor}` : ''}
         width="md"
         footer={
-          activeBedDrawer?.status !== 'vacant' ? (
+          activeBedDrawer?.status === 'guest' ? (
+            <a href="/guests" className="w-full">
+              <Button variant="solid" size="sm" className="w-full">
+                <BedDouble className="w-3.5 h-3.5 mr-1" />
+                <span>Manage Guest · Check out</span>
+              </Button>
+            </a>
+          ) : activeBedDrawer?.status !== 'vacant' ? (
             <div className="flex items-center justify-between w-full">
               <Button
                 variant="destructive"
@@ -742,18 +841,32 @@ export default function OwnerDashboardPage() {
               </div>
             </div>
           ) : (
-            <Button
-              size="sm"
-              variant="solid"
-              className="w-full bg-[#D97706]"
-              onClick={() => {
-                setSelectedBedForAdd(activeBedDrawer);
-                setActiveBedDrawer(null);
-              }}
-            >
-              <UserPlus className="w-3.5 h-3.5 mr-1.5" />
-              <span>Assign Resident to this Bed</span>
-            </Button>
+            <div className="flex items-center gap-2 w-full">
+              <Button
+                size="sm"
+                variant="solid"
+                className="flex-1"
+                onClick={() => {
+                  setSelectedBedForAdd(activeBedDrawer);
+                  setActiveBedDrawer(null);
+                }}
+              >
+                <UserPlus className="w-3.5 h-3.5 mr-1" />
+                <span>Add Resident</span>
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  setGuestBed(activeBedDrawer);
+                  setActiveBedDrawer(null);
+                }}
+              >
+                <BedDouble className="w-3.5 h-3.5 mr-1" />
+                <span>Check in Guest</span>
+              </Button>
+            </div>
           )
         }
       >
@@ -981,8 +1094,26 @@ export default function OwnerDashboardPage() {
           bed={selectedBedForAdd}
           ownerId={ownerId}
           isOpen={!!selectedBedForAdd}
-          onClose={() => setSelectedBedForAdd(null)}
-          onSuccess={() => setSelectedBedForAdd(null)}
+          prefillName={prefillTenant?.name}
+          prefillPhone={prefillTenant?.phone}
+          onClose={() => {
+            setSelectedBedForAdd(null);
+            setPrefillTenant(null);
+          }}
+          onSuccess={() => {
+            setSelectedBedForAdd(null);
+            setPrefillTenant(null);
+          }}
+        />
+      )}
+
+      {/* CHECK IN GUEST (short stay) */}
+      {guestBed && (
+        <CheckInGuestModal
+          bed={guestBed}
+          isOpen={!!guestBed}
+          onClose={() => setGuestBed(null)}
+          onSuccess={() => setGuestBed(null)}
         />
       )}
 
