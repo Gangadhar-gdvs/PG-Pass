@@ -55,7 +55,13 @@ function LoginFormContent() {
       await establishSession(userCredential.user);
     } catch (err: any) {
       console.error('Google sign-in error:', err);
-      setError(err.message || 'Failed to sign in with Google');
+      if (err.code === 'auth/operation-not-allowed') {
+        setError('Google Sign-In is not enabled yet in your Firebase Console. Please enable it under Authentication > Sign-in method.');
+      } else if (err.code === 'auth/popup-closed-by-user') {
+        setError('Sign-in cancelled');
+      } else {
+        setError(err.message || 'Failed to sign in with Google');
+      }
     } finally {
       setGoogleLoading(false);
     }
@@ -86,7 +92,9 @@ function LoginFormContent() {
     } catch (err: any) {
       console.error('Email auth error:', err);
       let msg = err.message || 'Authentication failed';
-      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+      if (err.code === 'auth/operation-not-allowed') {
+        msg = 'Email/Password sign-in is not enabled in Firebase Console. Please enable it under Authentication > Sign-in method.';
+      } else if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
         msg = 'Invalid email or password';
       } else if (err.code === 'auth/email-already-in-use') {
         msg = 'An account with this email already exists. Please sign in.';

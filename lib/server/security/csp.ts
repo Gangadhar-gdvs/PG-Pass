@@ -9,9 +9,15 @@ export function buildCsp(nonce: string): string {
   const b2Origins = `https://${b2Host} http://${b2Host}`;
   const authOrigins = `https://${authDomain} http://${authDomain}`;
 
+  // Allow 'unsafe-eval' in dev mode for Turbopack & React Fast Refresh
+  const isDev = process.env.NODE_ENV !== 'production';
+  const scriptSrc = isDev
+    ? `script-src 'self' 'unsafe-eval' 'nonce-${nonce}' 'strict-dynamic' https://apis.google.com`
+    : `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://apis.google.com`;
+
   const directives = [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://apis.google.com`,
+    scriptSrc,
     "style-src 'self' 'unsafe-inline'",
     `img-src 'self' data: blob: ${b2Origins}`,
     `connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com ${b2Origins}`,
