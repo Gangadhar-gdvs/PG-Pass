@@ -40,10 +40,14 @@ export function proxy(request: NextRequest) {
 
   // Enforce CSP in production; keep Report-Only in dev/staging so new sources
   // can be surfaced via violation reports before they start getting blocked.
-  const cspHeaderName =
-    process.env.NODE_ENV === 'production'
-      ? 'Content-Security-Policy'
-      : 'Content-Security-Policy-Report-Only';
+  const isStagingOrDev =
+    process.env.NODE_ENV !== 'production' ||
+    process.env.NEXT_PUBLIC_APP_NAME?.toLowerCase().includes('staging') ||
+    process.env.CSP_REPORT_ONLY === 'true';
+
+  const cspHeaderName = isStagingOrDev
+    ? 'Content-Security-Policy-Report-Only'
+    : 'Content-Security-Policy';
 
   // 3. Inject nonce + the active CSP into request headers for downstream RSC
   const requestHeaders = new Headers(request.headers);
