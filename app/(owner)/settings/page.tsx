@@ -7,7 +7,7 @@ import { OwnerOnlyGuard } from '@/components/owner/OwnerOnlyGuard';
 import { PgPhotoGallery } from '@/components/owner/PgPhotoGallery';
 import { SupportLink } from '@/components/ui/support-link';
 import { Input } from '@/components/ui/input';
-import { Skeleton } from '@/components/ui/skeleton';
+import { HeaderSkeleton, FormSkeleton } from '@/components/ui/skeletons';
 import { Button } from '@/components/ui/button';
 import { validateUpi, sanitizeText } from '@/lib/security';
 import {
@@ -109,11 +109,8 @@ function SettingsPageInner() {
   if (loading) {
     return (
       <div className="max-w-2xl mx-auto py-8 space-y-4">
-        <Skeleton className="h-24" />
-        <Skeleton className="h-8 w-56" />
-        {Array.from({ length: 5 }).map((_, i) => (
-          <Skeleton key={i} className="h-11" />
-        ))}
+        <HeaderSkeleton action={false} />
+        <FormSkeleton fields={5} />
       </div>
     );
   }

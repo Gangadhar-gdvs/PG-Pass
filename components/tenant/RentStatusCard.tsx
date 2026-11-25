@@ -68,12 +68,12 @@ export function RentStatusCard({
   const isPaid = status === 'paid';
   const isVerify = status === 'verify';
 
-  // Amount in rupees
-  const amountRupees = rentRecord?.amountDuePaise
-    ? Math.round(rentRecord.amountDuePaise / 100)
-    : rentRecord?.amountPaidPaise
-    ? Math.round(rentRecord.amountPaidPaise / 100)
-    : 8500;
+  // Amount in rupees. No fabricated default — if there is no rent record we
+  // don't know the amount, so we show nothing and disable payment rather than
+  // invent a figure (a wrong amount here would drive a wrong UPI payment).
+  const amountPaise: number | null =
+    rentRecord?.amountDuePaise ?? rentRecord?.amountPaidPaise ?? null;
+  const amountRupees = amountPaise != null ? Math.round(amountPaise / 100) : null;
 
   const period =
     rentRecord?.period ||
@@ -117,15 +117,17 @@ export function RentStatusCard({
     }
   };
 
-  // Build UPI deep-link URL
-  const upiPayUrl = pg.upiId
-    ? buildUpiPayload({
-        upiId: pg.upiId,
-        merchantName: pg.upiMerchantName || pg.name,
-        amountPaise: rentRecord?.amountDuePaise || 850000,
-        transactionNote: `Rent ${period} Bed ${tenant.bedLabel || ''}`,
-      })
-    : '';
+  // Build UPI deep-link URL only when we have both a UPI id AND a known amount —
+  // never generate a payment request for a fabricated figure.
+  const upiPayUrl =
+    pg.upiId && amountPaise != null
+      ? buildUpiPayload({
+          upiId: pg.upiId,
+          merchantName: pg.upiMerchantName || pg.name,
+          amountPaise,
+          transactionNote: `Rent ${period} Bed ${tenant.bedLabel || ''}`,
+        })
+      : '';
 
   useEffect(() => {
     if (showQr && upiPayUrl && !qrDataUrl) {
@@ -206,7 +208,7 @@ export function RentStatusCard({
           </span>
           <div className="mt-1 flex items-baseline justify-between">
             <span className="text-3xl font-extrabold font-mono-numbers text-[#09090B] tracking-tight">
-              {formatCurrency(amountRupees)}
+              {amountRupees != null ? formatCurrency(amountRupees) : '—'}
             </span>
             {isPaid && rentRecord?.receiptNumber && (
               <span className="text-xs font-mono font-bold text-[#10B981] bg-[#ECFDF5] px-2 py-0.5 rounded-[4px]">
@@ -346,7 +348,7 @@ export function RentStatusCard({
                     </div>
                   )}
                   <span className="text-xs font-bold text-[#09090B] mt-2">
-                    Scan to pay {formatCurrency(amountRupees)}
+                    Scan to pay {amountRupees != null ? formatCurrency(amountRupees) : '—'}
                   </span>
                   <span className="text-[11px] text-[#64748B]">{pg.upiId}</span>
                 </div>

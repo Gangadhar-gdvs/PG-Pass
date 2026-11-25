@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { CardListSkeleton } from '@/components/ui/skeletons';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Search, MapPin, Building2, Star } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -99,11 +99,7 @@ export default function DiscoverPage() {
       </form>
 
       {loading ? (
-        <div className="space-y-2">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-24 rounded-2xl" />
-          ))}
-        </div>
+        <CardListSkeleton rows={3} height="h-24" />
       ) : listings.length === 0 ? (
         <div className="app-card p-6">
           <EmptyState

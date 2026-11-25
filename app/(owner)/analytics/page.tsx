@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useOwnerSession } from '@/hooks/useOwner';
 import { formatCurrency } from '@/lib/utils';
-import { Skeleton } from '@/components/ui/skeleton';
+import { HeaderSkeleton, StatGridSkeleton, PanelSkeleton } from '@/components/ui/skeletons';
 import { EmptyState } from '@/components/ui/empty-state';
 import { BarChart3, TrendingUp, Building2, IndianRupee, AlertTriangle } from 'lucide-react';
 
@@ -112,13 +112,9 @@ export default function AnalyticsPage() {
   if (loading) {
     return (
       <div className="max-w-5xl mx-auto space-y-4">
-        <Skeleton className="h-8 w-48" />
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-24" />
-          ))}
-        </div>
-        <Skeleton className="h-64" />
+        <HeaderSkeleton action={false} />
+        <StatGridSkeleton count={4} />
+        <PanelSkeleton height="h-64" />
       </div>
     );
   }

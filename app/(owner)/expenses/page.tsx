@@ -6,7 +6,7 @@ import { formatCurrency, formatDateIN } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dropdown } from '@/components/ui/dropdown';
-import { Skeleton } from '@/components/ui/skeleton';
+import { CardListSkeleton } from '@/components/ui/skeletons';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Wallet, Trash2, Plus } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -141,9 +141,7 @@ export default function ExpensesPage() {
 
       {/* List */}
       {loading ? (
-        <div className="space-y-2">
-          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-16" />)}
-        </div>
+        <CardListSkeleton rows={4} height="h-16" />
       ) : expenses.length === 0 ? (
         <EmptyState
           icon={<Wallet className="w-6 h-6 text-[#64748B]" />}

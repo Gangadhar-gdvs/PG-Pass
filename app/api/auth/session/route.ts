@@ -46,10 +46,14 @@ export const POST = withErrorHandler(
       }
       const mode = body.mode === 'login' ? 'login' : 'refresh';
 
-      // 1. Verify Firebase ID token
+      // 1. Verify Firebase ID token. `checkRevoked = false` avoids an extra
+      // network round-trip to the Firebase Auth backend: at login the client SDK
+      // minted this token seconds ago, so a revocation check adds latency with no
+      // real benefit. Revocation is still enforced at logout (we revoke refresh
+      // tokens) and on every protected request via the session cookie.
       let decodedToken;
       try {
-        decodedToken = await adminAuth.verifyIdToken(idToken, true);
+        decodedToken = await adminAuth.verifyIdToken(idToken, false);
       } catch {
         throw new AppError(401, 'Invalid or expired ID token');
       }
@@ -59,23 +63,30 @@ export const POST = withErrorHandler(
         throw new AppError(403, 'Account is suspended');
       }
 
-      // 3. Verify accountStatus in Firestore if owner
       const uid = decodedToken.uid;
       const role: Role = decodedToken.admin ? 'admin' : ((decodedToken.role as Role) || 'owner');
+      const existingSid = req.cookies.get(SESSION_ID_COOKIE_NAME)?.value;
+      const expiresInMs = SESSION_MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
 
-      if (role === 'owner') {
-        const ownerDoc = await adminDb.collection('owners').doc(uid).get();
-        if (ownerDoc.exists) {
-          const ownerData = ownerDoc.data();
-          if (ownerData?.accountStatus && ownerData.accountStatus !== 'active') {
-            throw new AppError(403, 'Account is not active');
-          }
+      // 3 + 4 + 6. The owner account-status read, the active-session lookup, and
+      // minting the session cookie are all independent — run them CONCURRENTLY so
+      // we pay one cross-region round-trip instead of three in series. Each result
+      // is validated below in its original order.
+      const [ownerDoc, activeSid, sessionCookie] = await Promise.all([
+        role === 'owner'
+          ? adminDb.collection('owners').doc(uid).get()
+          : Promise.resolve(null),
+        getActiveSessionId(role, uid),
+        adminAuth.createSessionCookie(idToken, { expiresIn: expiresInMs }).catch(() => null),
+      ]);
+
+      // 3. Verify accountStatus in Firestore if owner.
+      if (ownerDoc && ownerDoc.exists) {
+        const ownerData = ownerDoc.data();
+        if (ownerData?.accountStatus && ownerData.accountStatus !== 'active') {
+          throw new AppError(403, 'Account is not active');
         }
       }
-
-      // 4. Single-active-session arbitration (admins exempt).
-      const existingSid = req.cookies.get(SESSION_ID_COOKIE_NAME)?.value;
-      const activeSid = await getActiveSessionId(role, uid);
 
       if (mode === 'refresh') {
         // Background re-sync must not reclaim a session taken over elsewhere, and
@@ -108,12 +119,8 @@ export const POST = withErrorHandler(
       // - login:   mint a fresh id (so the previous device is superseded).
       const sessionId = mode === 'refresh' ? (existingSid as string) : randomUUID();
 
-      // 6. Create the Firebase session cookie
-      const expiresInMs = SESSION_MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
-      let sessionCookie: string;
-      try {
-        sessionCookie = await adminAuth.createSessionCookie(idToken, { expiresIn: expiresInMs });
-      } catch {
+      // 6. The session cookie was minted in the parallel batch above.
+      if (!sessionCookie) {
         throw new AppError(500, 'Failed to create session cookie');
       }
 

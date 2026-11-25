@@ -28,14 +28,45 @@ export function SupportChat({
   const [messages, setMessages] = useState<SupportMessage[]>([]);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Live subscription (push). Re-subscribes if the thread changes.
+  // Live subscription (push). Re-subscribes if the thread changes. A 12s timeout
+  // guards against a silent hang (unreachable Firestore / missing index).
   useEffect(() => {
     if (!threadOwnerId) return;
     onOpen?.();
-    const unsub = subscribeToSupportMessages(threadOwnerId, setMessages);
-    return unsub;
+    setLoading(true);
+    setError(false);
+    let settled = false;
+    const timeout = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        setLoading(false);
+        setError(true);
+      }
+    }, 12_000);
+    const unsub = subscribeToSupportMessages(
+      threadOwnerId,
+      (msgs) => {
+        settled = true;
+        clearTimeout(timeout);
+        setMessages(msgs);
+        setError(false);
+        setLoading(false);
+      },
+      () => {
+        settled = true;
+        clearTimeout(timeout);
+        setError(true);
+        setLoading(false);
+      }
+    );
+    return () => {
+      clearTimeout(timeout);
+      unsub();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [threadOwnerId]);
 
@@ -60,12 +91,27 @@ export function SupportChat({
   return (
     <div className="flex flex-col h-full">
       <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-2.5 p-3">
-        {messages.length === 0 && (
+        {loading && (
+          <div className="space-y-2.5">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className={`flex ${i % 2 ? 'justify-end' : 'justify-start'}`}>
+                <div className={`h-9 rounded-[16px] animate-shimmer bg-[#F5F3EF] ${i % 2 ? 'w-40' : 'w-52'}`} />
+              </div>
+            ))}
+          </div>
+        )}
+        {!loading && error && (
+          <div className="h-full flex flex-col items-center justify-center text-center text-xs text-[#DC2626] px-6 gap-1">
+            <span className="font-semibold">Couldn&apos;t load messages</span>
+            <span className="text-slate-400">Check your connection — new messages will appear once reconnected.</span>
+          </div>
+        )}
+        {!loading && !error && messages.length === 0 && (
           <div className="h-full flex items-center justify-center text-center text-xs text-slate-400 px-6">
             {emptyHint || 'No messages yet. Start the conversation below.'}
           </div>
         )}
-        {messages.map((m) => {
+        {!loading && messages.map((m) => {
           const mine = m.sender === viewerSide;
           return (
             <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'} animate-fade-up`}>

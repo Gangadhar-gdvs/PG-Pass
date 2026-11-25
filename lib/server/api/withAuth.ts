@@ -94,38 +94,36 @@ export function withAuth(
       }
     }
 
-    // 5. High-speed cached Firestore accountStatus verification
+    // 5 + 6. Account-status and single-active-session checks. These are
+    // independent Firestore reads, so run them CONCURRENTLY rather than in a
+    // serial chain — on a cross-region serverless deploy each round-trip is
+    // costly, and this roughly halves the per-request auth latency.
+    // (Admins are exempt from both.)
     if (!isAdmin) {
-      if (role === 'owner') {
-        const ownerStatus = await getCachedAccountStatus('owners', uid);
-        if (ownerStatus !== 'active') {
-          throw new AppError(403, 'Owner account is not active');
-        }
-      } else if (role === 'staff') {
-        const staffStatus = await getCachedAccountStatus('staff', uid);
-        if (staffStatus !== 'active') {
-          throw new AppError(403, 'Staff account is not active');
-        }
+      const sid = req.cookies.get(SESSION_ID_COOKIE_NAME)?.value;
 
-        // Check owning PG accountStatus
-        if (ownerId) {
-          const parentStatus = await getCachedAccountStatus('owners', ownerId);
-          if (parentStatus !== 'active') {
+      const statusCheck = (async () => {
+        if (role === 'owner') {
+          if ((await getCachedAccountStatus('owners', uid)) !== 'active') {
+            throw new AppError(403, 'Owner account is not active');
+          }
+        } else if (role === 'staff') {
+          if ((await getCachedAccountStatus('staff', uid)) !== 'active') {
+            throw new AppError(403, 'Staff account is not active');
+          }
+          if (ownerId && (await getCachedAccountStatus('owners', ownerId)) !== 'active') {
             throw new AppError(403, 'Associated PG account is not active');
           }
         }
-      }
-    }
+      })();
 
-    // 6. Single-active-session check (one login per account; admins exempt).
-    // A newer login elsewhere supersedes this device's session id, so its API
-    // calls are rejected with SESSION_SUPERSEDED and the client logs out.
-    if (!isAdmin) {
-      const sid = req.cookies.get(SESSION_ID_COOKIE_NAME)?.value;
-      const current = await isSessionCurrent(role, uid, sid);
-      if (!current) {
-        throw new AppError(401, 'This session was signed out on another device', 'SESSION_SUPERSEDED');
-      }
+      const sessionCheck = (async () => {
+        if (!(await isSessionCurrent(role, uid, sid))) {
+          throw new AppError(401, 'This session was signed out on another device', 'SESSION_SUPERSEDED');
+        }
+      })();
+
+      await Promise.all([statusCheck, sessionCheck]);
     }
 
     // 7. Per-staff permission check (owner/admin bypass). Enforced server-side

@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useOwnerSession } from '@/hooks/useOwner';
 import { formatDateIN } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { CardListSkeleton } from '@/components/ui/skeletons';
 import { EmptyState } from '@/components/ui/empty-state';
 import { TabBar } from '@/components/ui/tab-bar';
 import { Wrench } from 'lucide-react';
@@ -105,11 +105,7 @@ export default function MaintenancePage() {
       />
 
       {loading ? (
-        <div className="space-y-3">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-24" />
-          ))}
-        </div>
+        <CardListSkeleton rows={4} height="h-24" />
       ) : tickets.length === 0 ? (
         <EmptyState
           icon={<Wrench className="w-6 h-6 text-[#64748B]" />}

@@ -7,17 +7,33 @@ import { Send, CheckCircle2, AlertCircle, Building2, TrendingUp } from 'lucide-r
 import { Button } from '@/components/ui/button';
 import { ProgressBar } from '@/components/ui/progress-bar';
 
+export interface DashboardSummary {
+  totalBeds: number;
+  occupiedBeds: number;
+  vacantBeds: number;
+  occupancyRate: number;
+  monthlyPotential: number;
+  occupiedPotential: number;
+}
+
 interface StatsBarProps {
   beds: Bed[];
   rentRecords: RentRecord[];
   onRemindAll: () => void;
+  // Accurate server-computed totals (via Firestore aggregations). When present,
+  // the occupancy/potential figures come from here instead of the live bed
+  // window, so they're correct for PGs larger than the 100-row cap.
+  summary?: DashboardSummary | null;
 }
 
-export function StatsBar({ beds, rentRecords, onRemindAll }: StatsBarProps) {
-  const totalBeds = beds.length;
-  const occupiedBeds = beds.filter((b) => b.status !== 'vacant').length;
-  const vacantBeds = totalBeds - occupiedBeds;
-  const occupancyRate = totalBeds > 0 ? Math.round((occupiedBeds / totalBeds) * 100) : 0;
+export function StatsBar({ beds, rentRecords, onRemindAll, summary }: StatsBarProps) {
+  // Prefer the server summary for whole-PG totals; fall back to the live window
+  // (correct for PGs ≤100 beds, and used while the summary is still loading).
+  const totalBeds = summary?.totalBeds ?? beds.length;
+  const occupiedBeds = summary?.occupiedBeds ?? beds.filter((b) => b.status !== 'vacant').length;
+  const vacantBeds = summary?.vacantBeds ?? totalBeds - occupiedBeds;
+  const occupancyRate =
+    summary?.occupancyRate ?? (totalBeds > 0 ? Math.round((occupiedBeds / totalBeds) * 100) : 0);
 
   const recordMap = new Map<string, RentRecord>();
   rentRecords.forEach((r) => {

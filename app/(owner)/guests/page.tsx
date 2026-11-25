@@ -5,7 +5,7 @@ import { useOwnerSession } from '@/hooks/useOwner';
 import { useBeds } from '@/hooks/useBeds';
 import { formatCurrency, formatDateIN } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { CardListSkeleton } from '@/components/ui/skeletons';
 import { EmptyState } from '@/components/ui/empty-state';
 import { TabBar } from '@/components/ui/tab-bar';
 import { CheckInGuestModal } from '@/components/owner/CheckInGuestModal';
@@ -84,11 +84,7 @@ export default function GuestsPage() {
       />
 
       {loading ? (
-        <div className="space-y-3">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-24 rounded-2xl" />
-          ))}
-        </div>
+        <CardListSkeleton rows={3} height="h-24" />
       ) : guests.length === 0 ? (
         <div className="app-card p-6">
           <EmptyState

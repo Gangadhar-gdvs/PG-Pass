@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Skeleton } from '@/components/ui/skeleton';
+import { CardListSkeleton } from '@/components/ui/skeletons';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Building2, ChevronRight, Search } from 'lucide-react';
 import { SupportLink } from '@/components/ui/support-link';
@@ -38,10 +38,7 @@ export default function ResidentHome() {
   if (loading) {
     return (
       <div className="space-y-3 pt-4">
-        <Skeleton className="h-7 w-40 rounded-xl" />
-        {Array.from({ length: 2 }).map((_, i) => (
-          <Skeleton key={i} className="h-24 rounded-2xl" />
-        ))}
+        <CardListSkeleton rows={2} height="h-24" />
       </div>
     );
   }

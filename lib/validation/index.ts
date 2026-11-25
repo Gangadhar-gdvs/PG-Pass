@@ -73,6 +73,9 @@ export const depositEntrySchema = z.object({
   amountPaise: z.number().int().positive('Amount must be positive paise'),
   reason: z.string().min(2, 'Reason is required'),
   reference: z.string().optional(),
+  // Optional client-generated key; a retried submission with the same key is a
+  // no-op (prevents double-counting a deposit).
+  idempotencyKey: z.string().min(8).max(100).optional(),
 });
 
 // Line item schema

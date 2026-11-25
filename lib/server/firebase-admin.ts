@@ -54,7 +54,15 @@ export const adminApp: App = initFirebaseAdmin();
 export const adminAuth: Auth = getAuth(adminApp);
 export const adminDb: Firestore = getFirestore(adminApp);
 try {
-  adminDb.settings({ ignoreUndefinedProperties: true });
+  adminDb.settings({
+    ignoreUndefinedProperties: true,
+    // `preferRest` makes Firestore use HTTP/1.1 REST instead of gRPC. On
+    // serverless (Vercel), the default gRPC transport must open an HTTP/2
+    // channel on every cold start — a slow, cross-region handshake that
+    // dominated login/first-load latency. This app does a handful of short
+    // reads per request, which REST serves far faster with no channel warm-up.
+    preferRest: true,
+  });
 } catch {
   // Settings already frozen or initialized
 }

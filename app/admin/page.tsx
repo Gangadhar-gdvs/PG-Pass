@@ -72,7 +72,9 @@ export default function SuperAdminPortalPage() {
     platformTotalBeds: number;
     platformTotalResidents: number;
     platformTotalVolume: number;
+    nextCursor?: string | null;
   } | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPgId, setSelectedPgId] = useState<string | null>(null);
@@ -202,6 +204,26 @@ export default function SuperAdminPortalPage() {
       toast.error(e.message || 'Failed to load platform telemetry');
     } finally {
       setLoadingStats(false);
+    }
+  };
+
+  // Load the next page of PGs (cursor pagination) and append to the directory.
+  const loadMorePgs = async () => {
+    if (!stats?.nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const res = await fetch(`/api/admin/overview?cursor=${encodeURIComponent(stats.nextCursor)}`);
+      if (!res.ok) throw new Error('Failed to load more PGs');
+      const data = await res.json();
+      setStats((prev) =>
+        prev
+          ? { ...data, allPgs: [...prev.allPgs, ...data.allPgs] }
+          : data
+      );
+    } catch (e: any) {
+      toast.error(e.message || 'Could not load more PGs');
+    } finally {
+      setLoadingMore(false);
     }
   };
 
@@ -524,7 +546,9 @@ export default function SuperAdminPortalPage() {
         </div>
 
         <div className="flex items-baseline gap-2">
-          <span className="text-[#64748B] uppercase text-[10px] font-bold">Gross Monthly Volume:</span>
+          <span className="text-[#64748B] uppercase text-[10px] font-bold">
+            Volume (loaded PGs):
+          </span>
           <span className="font-mono text-base font-bold text-[#D97706]">
             {formatCurrency(stats?.platformTotalVolume || 0)}
           </span>
@@ -845,6 +869,18 @@ export default function SuperAdminPortalPage() {
                   );
                 })
               )}
+
+              {/* Cursor pagination — only when not filtering a search locally. */}
+              {stats?.nextCursor && !searchQuery.trim() && (
+                <button
+                  type="button"
+                  onClick={loadMorePgs}
+                  disabled={loadingMore}
+                  className="w-full py-3 text-xs font-semibold text-[#D97706] hover:bg-[#FEF3C7] transition-colors disabled:opacity-60"
+                >
+                  {loadingMore ? 'Loading…' : 'Load more PGs'}
+                </button>
+              )}
             </div>
           </aside>
 
@@ -908,6 +944,11 @@ export default function SuperAdminPortalPage() {
                   <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#64748B]">
                     Unit Occupancy Matrix ({selectedPg.beds.length} Total Beds)
                   </span>
+                  {selectedPg.beds.length >= 500 && (
+                    <span className="block text-[10px] text-[#2563EB] font-semibold">
+                      Showing the first 500 beds for this PG (admin detail is windowed).
+                    </span>
+                  )}
                   <div className="flex flex-wrap gap-1.5 pt-1">
                     {selectedPg.beds.map((bed) => {
                       const isOcc = bed.status !== 'vacant';

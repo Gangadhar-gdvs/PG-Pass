@@ -11,6 +11,9 @@ export interface RecordDepositInput {
   reason: string;
   reference?: string;
   recordedBy: string;
+  // Optional client-supplied key to make a retried call a no-op instead of
+  // double-counting the deposit ledger + tenant balance.
+  idempotencyKey?: string;
 }
 
 export class DepositsService {
@@ -29,11 +32,27 @@ export class DepositsService {
   async recordEntry(ownerId: string, tenantId: string, input: RecordDepositInput): Promise<DepositRecord> {
     const tenantRef = adminDb.collection('tenants').doc(tenantId);
     const depositRef = adminDb.collection('deposits').doc();
+    // Scope the idempotency key to this owner+tenant so keys can't collide or be
+    // replayed across accounts.
+    const idemRef = input.idempotencyKey
+      ? adminDb.collection('idempotency_keys').doc(`deposit_${ownerId}_${tenantId}_${input.idempotencyKey}`)
+      : null;
     const now = Timestamp.now();
 
     let newEntry: DepositRecord;
 
     await adminDb.runTransaction(async (transaction) => {
+      // Idempotency guard (reads first, per Firestore txn rules). A retried call
+      // with the same key finds the marker and returns the stored result instead
+      // of applying the ledger + balance change twice.
+      if (idemRef) {
+        const idemDoc = await transaction.get(idemRef);
+        if (idemDoc.exists) {
+          newEntry = idemDoc.data()!.result as DepositRecord;
+          return;
+        }
+      }
+
       const tenantDoc = await transaction.get(tenantRef);
       if (!tenantDoc.exists) {
         throw new AppError(404, 'Tenant not found');
@@ -73,6 +92,16 @@ export class DepositsService {
         depositPaidPaise: currentDepositPaid,
         updatedAt: now,
       });
+
+      // Persist the idempotency marker (with the result) in the SAME transaction,
+      // and an expiry so TTL can reap it. A retry now short-circuits above.
+      if (idemRef) {
+        transaction.set(idemRef, {
+          result: newEntry,
+          createdAt: now,
+          expiresAt: Timestamp.fromMillis(now.toMillis() + 7 * 24 * 60 * 60 * 1000),
+        });
+      }
     });
 
     return newEntry!;

@@ -353,6 +353,15 @@ export class TenantsService {
     const bedRef = adminDb.collection('beds').doc(tenant.bedId);
     const now = Timestamp.now();
 
+    // Read active portal tokens BEFORE the transaction (Firestore txns can't run
+    // queries). They're revoked INSIDE the transaction below so freeing the bed,
+    // suspending the tenant, and killing portal access all commit atomically —
+    // a crash can no longer leave a moved-out resident with a live portal link.
+    const tokensSnap = await adminDb
+      .collection('portal_tokens')
+      .where('tenantId', '==', tenantId)
+      .get();
+
     await adminDb.runTransaction(async (transaction) => {
       // 1. Free bed
       transaction.update(bedRef, {
@@ -404,19 +413,12 @@ export class TenantsService {
           createdAt: now,
         });
       }
-    });
 
-    // 5. Revoke all active portal tokens for this tenant
-    const tokensSnap = await adminDb
-      .collection('portal_tokens')
-      .where('tenantId', '==', tenantId)
-      .get();
-
-    const batch = adminDb.batch();
-    tokensSnap.docs.forEach((doc) => {
-      batch.update(doc.ref, { revokedAt: now });
+      // 5. Revoke all active portal tokens — atomically with the move-out.
+      tokensSnap.docs.forEach((doc) => {
+        transaction.update(doc.ref, { revokedAt: now });
+      });
     });
-    await batch.commit();
 
     // 6. Owner-facing notification with the settlement summary, so the owner
     //    has a record (and can share a refund/deduction breakdown with the

@@ -23,7 +23,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Drawer } from '@/components/ui/drawer';
 import { ProgressBar } from '@/components/ui/progress-bar';
-import { Skeleton } from '@/components/ui/skeleton';
+import { HeaderSkeleton, CardListSkeleton, PanelSkeleton } from '@/components/ui/skeletons';
 import { OwnerOnlyGuard } from '@/components/owner/OwnerOnlyGuard';
 import toast from 'react-hot-toast';
 
@@ -138,13 +138,9 @@ function BillingPageInner() {
   if (loading) {
     return (
       <div className="max-w-3xl mx-auto space-y-4">
-        <Skeleton className="h-8 w-56" />
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-28" />
-          ))}
-        </div>
-        <Skeleton className="h-40" />
+        <HeaderSkeleton action={false} />
+        <CardListSkeleton rows={3} height="h-28" cols={3} />
+        <PanelSkeleton height="h-40" />
       </div>
     );
   }

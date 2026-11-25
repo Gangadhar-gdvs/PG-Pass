@@ -30,7 +30,21 @@ export function useAuth() {
           // This is a BACKGROUND refresh (mode: 'refresh') — it must never take
           // over an account logged in on another device. If the server says
           // this device was superseded, sign out locally.
+          //
+          // THROTTLED: the session cookie is valid for days and the shell is
+          // already server-gated, so there's no need to hit the server on every
+          // navigation. We refresh at most once every few minutes — enough to
+          // detect a "signed out on another device" takeover promptly without
+          // firing redundant Firebase round-trips that slow each page load.
           try {
+            const REFRESH_INTERVAL_MS = 5 * 60_000;
+            const lastKey = 'pgp_last_session_refresh';
+            const last = Number(sessionStorage.getItem(lastKey) || 0);
+            if (Date.now() - last < REFRESH_INTERVAL_MS) {
+              setLoading(false);
+              return;
+            }
+
             const idToken = await firebaseUser.getIdToken();
             const res = await fetch('/api/auth/session', {
               method: 'POST',
@@ -49,8 +63,13 @@ export function useAuth() {
                 return;
               }
             }
+            // Record the throttle timestamp ONLY after a completed refresh — if the
+            // request failed/offline we must retry on the next mount, not suppress
+            // takeover detection for 5 minutes on a request that never succeeded.
+            sessionStorage.setItem(lastKey, String(Date.now()));
           } catch {
-            // Ignore background sync errors
+            // Ignore background sync errors (timestamp intentionally NOT written,
+            // so the next navigation retries the refresh).
           }
         } else {
           setUser(null);

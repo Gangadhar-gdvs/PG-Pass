@@ -113,7 +113,8 @@ export function subscribeToOwnerRentRecords(
   ownerId: string,
   period: string,
   callback: (records: RentRecord[]) => void,
-  propertyId?: string
+  propertyId?: string,
+  onError?: (error: { code: string }) => void
 ): () => void {
   if (!ownerId || !period || !isFirebaseConfigured()) {
     callback([]);
@@ -133,7 +134,7 @@ export function subscribeToOwnerRentRecords(
     (snap) => callback(snap.docs.map((d) => ({ ...d.data(), id: d.id } as RentRecord))),
     (error) => {
       console.warn('Firestore rent-records subscription error:', error.code);
-      callback([]);
+      onError?.({ code: error.code });
     }
   );
 }
@@ -141,7 +142,8 @@ export function subscribeToOwnerRentRecords(
 // ---------------- SUPPORT CHAT (live, push via onSnapshot — not polling) ----------------
 export function subscribeToSupportMessages(
   ownerId: string,
-  callback: (messages: SupportMessage[]) => void
+  callback: (messages: SupportMessage[]) => void,
+  onError?: (error: { code: string }) => void
 ): () => void {
   if (!ownerId || !isFirebaseConfigured()) {
     callback([]);
@@ -157,14 +159,15 @@ export function subscribeToSupportMessages(
     (snap) => callback(snap.docs.map((d) => ({ ...d.data(), id: d.id } as SupportMessage))),
     (error) => {
       console.warn('Support messages subscription error:', error.code);
-      callback([]);
+      onError?.({ code: error.code });
     }
   );
 }
 
 // Admin: live list of all support threads, most recently active first.
 export function subscribeToSupportThreads(
-  callback: (threads: SupportThread[]) => void
+  callback: (threads: SupportThread[]) => void,
+  onError?: (error: { code: string }) => void
 ): () => void {
   if (!isFirebaseConfigured()) {
     callback([]);
@@ -180,7 +183,7 @@ export function subscribeToSupportThreads(
     (snap) => callback(snap.docs.map((d) => ({ ...d.data(), id: d.id } as SupportThread))),
     (error) => {
       console.warn('Support threads subscription error:', error.code);
-      callback([]);
+      onError?.({ code: error.code });
     }
   );
 }

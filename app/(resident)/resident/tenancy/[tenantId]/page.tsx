@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { formatCurrency, formatDateIN } from '@/lib/utils';
-import { Skeleton } from '@/components/ui/skeleton';
+import { HeaderSkeleton, PanelSkeleton } from '@/components/ui/skeletons';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, ShieldCheck, Wrench, Star } from 'lucide-react';
 import { RateStaffSection } from '@/components/resident/RateStaffSection';
@@ -68,9 +68,9 @@ export default function TenancyDetail() {
   if (loading) {
     return (
       <div className="space-y-3 pt-4">
-        <Skeleton className="h-7 w-40 rounded-xl" />
-        <Skeleton className="h-20 rounded-2xl" />
-        <Skeleton className="h-40 rounded-2xl" />
+        <HeaderSkeleton action={false} />
+        <PanelSkeleton height="h-20" />
+        <PanelSkeleton height="h-40" />
       </div>
     );
   }

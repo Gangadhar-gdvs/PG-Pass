@@ -22,7 +22,7 @@ import { Input } from '@/components/ui/input';
 import { PhoneInput } from '@/components/ui/phone-input';
 import { Drawer } from '@/components/ui/drawer';
 import { Avatar } from '@/components/ui/avatar';
-import { Skeleton } from '@/components/ui/skeleton';
+import { HeaderSkeleton, CardListSkeleton } from '@/components/ui/skeletons';
 import { validatePhone, sanitizeText } from '@/lib/security';
 import { OwnerOnlyGuard } from '@/components/owner/OwnerOnlyGuard';
 import { StaffPermissionsEditor } from '@/components/owner/StaffPermissionsEditor';
@@ -194,12 +194,8 @@ function StaffPageInner() {
   if (loading) {
     return (
       <div className="max-w-3xl mx-auto space-y-4">
-        <Skeleton className="h-8 w-48" />
-        <div className="space-y-3">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-20" />
-          ))}
-        </div>
+        <HeaderSkeleton />
+        <CardListSkeleton rows={3} height="h-20" />
       </div>
     );
   }

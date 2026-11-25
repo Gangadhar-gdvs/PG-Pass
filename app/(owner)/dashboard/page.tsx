@@ -22,6 +22,7 @@ import { TenantPhotoGallery } from '@/components/owner/TenantPhotoGallery';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Drawer } from '@/components/ui/drawer';
+import { DashboardSkeleton } from '@/components/ui/skeletons';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { StatusDot } from '@/components/ui/status-dot';
 import { Avatar } from '@/components/ui/avatar';
@@ -57,11 +58,35 @@ export default function OwnerDashboardPage() {
   const [owner, setOwner] = useState<Owner | null>(null);
   const [loadingOwner, setLoadingOwner] = useState(true);
   const [ownerError, setOwnerError] = useState(false);
+  // Gate for NON-CRITICAL background loads (defaulter badge, pending refunds,
+  // join-request banner). These only render notification banners below the fold,
+  // so we hold them until the critical content (profile) is in and the browser
+  // is idle — they must never contend with first paint.
+  const [secondaryReady, setSecondaryReady] = useState(false);
 
   // Active Hooks for Beds, Tenants, Records
   const { beds, error: bedsError } = useBeds(ownerId, propertyFilter);
   const { tenants, error: tenantsError } = useTenants(ownerId, propertyFilter);
+
+  // Once the owner profile has loaded, defer secondary loads to browser idle
+  // time so the main dashboard paints and becomes interactive first.
+  useEffect(() => {
+    if (!owner) return;
+    const w = window as any;
+    const schedule: (cb: () => void) => number =
+      typeof w.requestIdleCallback === 'function'
+        ? (cb) => w.requestIdleCallback(cb, { timeout: 2000 })
+        : (cb) => window.setTimeout(cb, 300);
+    const cancel: (id: number) => void =
+      typeof w.cancelIdleCallback === 'function' ? w.cancelIdleCallback : window.clearTimeout;
+    const id = schedule(() => setSecondaryReady(true));
+    return () => cancel(id);
+  }, [owner]);
   const [rentRecords, setRentRecords] = useState<RentRecord[]>([]);
+  const [rentError, setRentError] = useState(false);
+  // Accurate whole-PG totals (server aggregation) — correct even when the live
+  // bed window is capped at 100. Refreshed when beds/payments change.
+  const [summary, setSummary] = useState<import('@/components/owner/StatsBar').DashboardSummary | null>(null);
   const [selectedPeriod, setSelectedPeriod] = useState(getCurrentPeriod());
   const [defaulters, setDefaulters] = useState<
     Array<RentRecord & { daysOverdue: number; lateFeePaise: number; outstandingPaise: number }>
@@ -140,20 +165,62 @@ export default function OwnerDashboardPage() {
   // future months can be viewed and collected, not just the current month.
   useEffect(() => {
     if (!ownerId) return;
+    setRentError(false);
     const unsub = subscribeToOwnerRentRecords(
       ownerId,
       selectedPeriod,
       (records) => {
         setRentRecords(records);
+        setRentError(false);
       },
-      propertyFilter
+      propertyFilter,
+      () => setRentError(true)
     );
     return unsub;
   }, [ownerId, selectedPeriod, propertyFilter]);
 
-  // Load the defaulter / aging report (overdue unpaid rent across all months).
+  // A stable signature of rent PAID-state. It only changes when a record's
+  // paid/unpaid status actually flips (mark paid, reverse, bulk, partial) — not
+  // on every live stream tick — so the deferred defaulters banner re-fetches
+  // after money changes without hammering the API on each snapshot.
+  const paidSignature = React.useMemo(
+    () =>
+      rentRecords
+        .map((r) => `${r.id}:${r.status === 'paid' ? 1 : 0}`)
+        .sort()
+        .join('|'),
+    [rentRecords]
+  );
+
+  // Fetch accurate whole-PG totals via server aggregation (correct even when the
+  // live bed window is capped at 100). Refreshes when the bed set or paid-state
+  // changes — not on every stream tick.
+  const bedCount = beds.length;
   useEffect(() => {
     if (!ownerId) return;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 12_000);
+    (async () => {
+      try {
+        const qs = propertyFilter ? `?propertyId=${encodeURIComponent(propertyFilter)}` : '';
+        const res = await fetch(`/api/owners/summary${qs}`, { signal: controller.signal });
+        if (res.ok) setSummary(await res.json());
+      } catch {
+        /* non-fatal — StatsBar falls back to the live window */
+      } finally {
+        clearTimeout(timeout);
+      }
+    })();
+    return () => {
+      clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [ownerId, propertyFilter, bedCount, paidSignature]);
+
+  // Load the defaulter / aging report (overdue unpaid rent across all months).
+  // Deferred (secondaryReady); re-fetches only when paid-state changes.
+  useEffect(() => {
+    if (!ownerId || !secondaryReady) return;
     let cancelled = false;
     (async () => {
       try {
@@ -168,12 +235,11 @@ export default function OwnerDashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [ownerId, rentRecords.length]);
+  }, [ownerId, propertyFilter, secondaryReady, paidSignature]);
 
   // Load pending security-deposit refunds (owed to departed/departing tenants).
-  const refundsRefreshKey = beds.length; // refresh when bed/tenant set changes
   useEffect(() => {
-    if (!ownerId) return;
+    if (!ownerId || !secondaryReady) return;
     let cancelled = false;
     (async () => {
       try {
@@ -188,11 +254,11 @@ export default function OwnerDashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [ownerId, refundsRefreshKey]);
+  }, [ownerId, propertyFilter, secondaryReady]);
 
   // Pending resident join-requests (from public PG discovery).
   useEffect(() => {
-    if (!ownerId) return;
+    if (!ownerId || !secondaryReady) return;
     let cancelled = false;
     (async () => {
       try {
@@ -207,7 +273,7 @@ export default function OwnerDashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [ownerId]);
+  }, [ownerId, secondaryReady]);
 
   // Owner accepts a join request: prefill the Add-Tenant flow with the
   // resident's name + phone (phone auto-links the resident account) and mark the
@@ -438,16 +504,11 @@ export default function OwnerDashboardPage() {
   };
 
   if (loadingOwner) {
-    return (
-      <div className="py-20 flex flex-col items-center justify-center">
-        <div className="w-8 h-8 border-2 border-[#D97706] border-t-transparent rounded-full animate-spin mb-3" />
-        <span className="text-xs text-[#64748B] font-medium">Loading PG data...</span>
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   // ---------------- LOAD FAILURE (never spin forever) ----------------
-  if (ownerError || bedsError || tenantsError) {
+  if (ownerError || bedsError || tenantsError || rentError) {
     return (
       <div className="py-20 flex flex-col items-center justify-center text-center px-6">
         <div className="w-12 h-12 rounded-2xl bg-[#FEF2F2] border border-[#FECACA] flex items-center justify-center mb-4">
@@ -824,7 +885,22 @@ export default function OwnerDashboardPage() {
         beds={beds}
         rentRecords={rentRecords}
         onRemindAll={() => setShowReminderModal(true)}
+        summary={summary}
       />
+
+      {/* Large-PG notice: the live grid is a bounded window; the HUD totals above
+          are the accurate whole-PG figures (server-computed). */}
+      {summary && summary.totalBeds > beds.length && (
+        <div className="flex items-start gap-2.5 rounded-[10px] bg-[#EFF6FF] border border-[#BFDBFE] px-4 py-3 text-xs text-[#1E40AF]">
+          <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5 text-[#2563EB]" />
+          <span>
+            Showing the most recent <strong>{beds.length}</strong> of{' '}
+            <strong>{summary.totalBeds}</strong> beds in the live grid. Occupancy above
+            reflects your <strong>entire</strong> PG; rent totals cover the beds currently
+            loaded. Use search and the filters to find a specific bed.
+          </span>
+        </div>
+      )}
 
       {/* Bed Bento Grid Section */}
       <BedGrid

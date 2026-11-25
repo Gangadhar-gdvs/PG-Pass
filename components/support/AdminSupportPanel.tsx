@@ -16,9 +16,41 @@ import toast from 'react-hot-toast';
 export function AdminSupportPanel() {
   const [threads, setThreads] = useState<SupportThread[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   // Live thread list (admin rule allows listing all threads).
-  useEffect(() => subscribeToSupportThreads(setThreads), []);
+  useEffect(() => {
+    setLoading(true);
+    setError(false);
+    let settled = false;
+    const timeout = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        setLoading(false);
+        setError(true);
+      }
+    }, 12_000);
+    const unsub = subscribeToSupportThreads(
+      (t) => {
+        settled = true;
+        clearTimeout(timeout);
+        setThreads(t);
+        setError(false);
+        setLoading(false);
+      },
+      () => {
+        settled = true;
+        clearTimeout(timeout);
+        setError(true);
+        setLoading(false);
+      }
+    );
+    return () => {
+      clearTimeout(timeout);
+      unsub();
+    };
+  }, []);
 
   const current = threads.find((t) => t.id === selected) || null;
 
@@ -57,12 +89,30 @@ export function AdminSupportPanel() {
             Owner Conversations
           </div>
           <div className="flex-1 overflow-y-auto divide-y divide-[#F1F5F9]">
-            {threads.length === 0 && (
+            {loading && (
+              <div className="p-3 space-y-2.5">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-full animate-shimmer bg-[#F5F3EF] shrink-0" />
+                    <div className="flex-1 space-y-1.5">
+                      <div className="h-3 w-1/2 rounded animate-shimmer bg-[#F5F3EF]" />
+                      <div className="h-2.5 w-2/3 rounded animate-shimmer bg-[#F5F3EF]" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {!loading && error && (
+              <div className="p-6 text-center text-xs text-[#DC2626]">
+                Couldn&apos;t load conversations. Check your connection and try again.
+              </div>
+            )}
+            {!loading && !error && threads.length === 0 && (
               <div className="p-6 text-center text-xs text-[#94A3B8]">
                 No owner has started a conversation yet.
               </div>
             )}
-            {threads.map((t) => (
+            {!loading && threads.map((t) => (
               <button
                 key={t.id}
                 type="button"

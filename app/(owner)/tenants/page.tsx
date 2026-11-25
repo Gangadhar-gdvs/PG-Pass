@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button';
 import { DataTable, Column } from '@/components/ui/data-table';
 import { Avatar } from '@/components/ui/avatar';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Skeleton } from '@/components/ui/skeleton';
+import { ListSkeleton } from '@/components/ui/skeletons';
 import toast from 'react-hot-toast';
 
 export default function TenantsPage() {
@@ -243,15 +243,7 @@ export default function TenantsPage() {
 
       {/* Data Table */}
       {loading ? (
-        <div className="rounded-[10px] border border-[#E2E8F0] bg-white p-4 space-y-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="flex items-center gap-3">
-              <Skeleton className="h-9 w-9 rounded-full" />
-              <Skeleton className="h-4 flex-1" />
-              <Skeleton className="h-4 w-20" />
-            </div>
-          ))}
-        </div>
+        <ListSkeleton rows={6} />
       ) : error ? (
         <EmptyState
           icon={<Users className="w-6 h-6 text-[#DC2626]" />}

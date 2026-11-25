@@ -195,9 +195,11 @@ export function TenantPortalView({ token }: TenantPortalViewProps) {
     );
   }
 
+  // No fabricated amount — when there's no rent record yet, leave the due amount
+  // unknown (null) so the UI shows "—" instead of inventing ₹8,500.
   const activeRentRecord = portalData.rentRecords?.[0] || {
     period: new Date().toLocaleDateString('en-IN', { month: 'short', year: 'numeric' }),
-    amountDuePaise: 850000,
+    amountDuePaise: null as number | null,
     status: 'pending',
   };
 

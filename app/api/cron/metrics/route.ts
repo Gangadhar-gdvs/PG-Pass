@@ -59,6 +59,7 @@ export const POST = withErrorHandler(
 
     let generatedCount = 0;
     let processedTenants = 0;
+    let skippedNoRent = 0;
     const PAGE = 300;
     // Firestore QueryDocumentSnapshot cursor; typed loosely to avoid the global
     // FirebaseFirestore namespace.
@@ -76,26 +77,44 @@ export const POST = withErrorHandler(
       const page = await tq.get();
       if (page.empty) break;
 
+      // BATCH READS: fetch all this page's existing rent-records and referenced
+      // beds in two getAll() calls instead of two reads PER tenant (the old N+1
+      // that timed out at scale). Empty ref lists are guarded (getAll() throws on
+      // zero args).
+      const rentRefs = page.docs.map((t) => adminDb.collection('rent_records').doc(`${t.id}_${nextPeriod}`));
+      const bedIds = Array.from(
+        new Set(page.docs.map((t) => t.data().bedId).filter((b): b is string => !!b))
+      );
+      const bedRefs = bedIds.map((id) => adminDb.collection('beds').doc(id));
+
+      const [existingRentSnaps, bedSnaps] = await Promise.all([
+        rentRefs.length ? adminDb.getAll(...rentRefs) : Promise.resolve([]),
+        bedRefs.length ? adminDb.getAll(...bedRefs) : Promise.resolve([]),
+      ]);
+
+      const existsById = new Map(existingRentSnaps.map((s) => [s.id, s.exists]));
+      const bedRentById = new Map<string, number | undefined>(
+        bedSnaps.map((s) => [s.id, s.exists ? (s.data()?.rentAmountPaise as number | undefined) : undefined])
+      );
+
       for (const tenantDoc of page.docs) {
         processedTenants++;
         const tenant = tenantDoc.data();
         const docId = `${tenantDoc.id}_${nextPeriod}`;
-        const rentRef = adminDb.collection('rent_records').doc(docId);
+        if (existsById.get(docId)) continue; // already generated
 
-        const existing = await rentRef.get();
-        if (existing.exists) continue;
-
-        let rentAmountPaise = 800000; // fallback 8000
-        if (tenant.bedId) {
-          const bedDoc = await adminDb.collection('beds').doc(tenant.bedId).get();
-          if (bedDoc.exists) {
-            rentAmountPaise = bedDoc.data()?.rentAmountPaise || rentAmountPaise;
-          }
+        // No invented default: the rent must come from the tenant's bed. If it
+        // can't be determined, SKIP (and count it) rather than fabricating a
+        // figure — a wrong amount would create a wrong bill.
+        const rentAmountPaise = tenant.bedId ? bedRentById.get(tenant.bedId) : undefined;
+        if (!rentAmountPaise || rentAmountPaise <= 0) {
+          skippedNoRent++;
+          continue;
         }
 
         const dueDay = await dueDayFor(tenant.ownerId);
 
-        batch.set(rentRef, {
+        batch.set(adminDb.collection('rent_records').doc(docId), {
           id: docId,
           ownerId: tenant.ownerId,
           propertyId: tenant.propertyId || tenant.ownerId,
@@ -138,6 +157,7 @@ export const POST = withErrorHandler(
       metricsDate: todayStr,
       processedTenants,
       generatedRentRecords: generatedCount,
+      skippedNoRent, // tenants whose rent couldn't be determined (no bill made)
       staleClaimsFound: staleCount,
     });
   })
