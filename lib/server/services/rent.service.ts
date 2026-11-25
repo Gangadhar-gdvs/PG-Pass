@@ -80,7 +80,6 @@ export class RentService {
       .collection('rent_records')
       .where('ownerId', '==', ownerId)
       .where('status', 'in', [RENT_STATUS.PENDING, RENT_STATUS.VERIFY])
-      .orderBy('dueDate', 'asc')
       .limit(safeLimit)
       .get();
 

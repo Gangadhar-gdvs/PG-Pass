@@ -197,10 +197,11 @@ export class DiscoveryService {
       .collection('join_requests')
       .where('ownerId', '==', ownerId)
       .where('status', '==', 'pending')
-      .orderBy('createdAt', 'desc')
       .limit(Math.min(limit, 100))
       .get();
-    return snap.docs.map((d) => ({ ...d.data(), id: d.id } as JoinRequest));
+    return snap.docs
+      .map((d) => ({ ...d.data(), id: d.id } as JoinRequest))
+      .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
   }
 
   async review(

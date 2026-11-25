@@ -5,13 +5,13 @@ service cloud.firestore {
 
     // Mirrors lib/constants/status.ts and limits.ts — keep in sync (§3.4).
     function isSignedIn() { return request.auth != null; }
-    function notSuspended() { return isSignedIn() && request.auth.token.suspended != true; }
-    function isAdmin() { return notSuspended() && request.auth.token.admin == true; }
+    function notSuspended() { return isSignedIn() && (!('suspended' in request.auth.token) || request.auth.token.suspended != true); }
+    function isAdmin() { return notSuspended() && ('admin' in request.auth.token && request.auth.token.admin == true); }
     function isOwnerUid(ownerId) { return notSuspended() && request.auth.uid == ownerId; }
     function isStaffFor(ownerId) {
       return notSuspended()
-        && request.auth.token.role == 'staff'
-        && request.auth.token.ownerId == ownerId;
+        && ('role' in request.auth.token && request.auth.token.role == 'staff')
+        && ('ownerId' in request.auth.token && request.auth.token.ownerId == ownerId);
     }
     function canReadOwnerScope(ownerId) { return isOwnerUid(ownerId) || isStaffFor(ownerId) || isAdmin(); }
     function boundedList() { return request.query.limit <= 100; } // MAX_LIST_LIMIT

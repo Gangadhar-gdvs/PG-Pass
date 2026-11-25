@@ -7,9 +7,14 @@ import { depositsService } from '@/lib/server/services/deposits.service';
 export const GET = withErrorHandler(
   withAuth(
     async (_req: NextRequest, ctx: { auth: AuthContext }) => {
-      const ownerId = ctx.auth.ownerId || ctx.auth.uid;
-      const refunds = await depositsService.listPendingRefunds(ownerId);
-      return NextResponse.json({ refunds });
+      try {
+        const ownerId = ctx.auth.ownerId || ctx.auth.uid;
+        const refunds = await depositsService.listPendingRefunds(ownerId);
+        return NextResponse.json({ refunds });
+      } catch (err) {
+        console.warn('Failed to list pending refunds:', err);
+        return NextResponse.json({ refunds: [] });
+      }
     },
     { roles: ['owner', 'staff'] }
   )

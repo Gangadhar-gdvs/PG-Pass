@@ -8,9 +8,14 @@ import { discoveryService } from '@/lib/server/services/discovery.service';
 export const GET = withErrorHandler(
   withAuth(
     async (_req: NextRequest, ctx: { auth: AuthContext }) => {
-      const ownerId = ctx.auth.ownerId || ctx.auth.uid;
-      const requests = await discoveryService.listForOwner(ownerId);
-      return NextResponse.json({ requests });
+      try {
+        const ownerId = ctx.auth.ownerId || ctx.auth.uid;
+        const requests = await discoveryService.listForOwner(ownerId);
+        return NextResponse.json({ requests });
+      } catch (err) {
+        console.warn('Failed to list join requests:', err);
+        return NextResponse.json({ requests: [] });
+      }
     },
     { roles: ['owner', 'staff'] }
   )

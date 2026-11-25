@@ -124,10 +124,11 @@ export class DepositsService {
       .where('ownerId', '==', ownerId)
       .where('type', '==', 'refund')
       .where('refundStatus', '==', 'pending')
-      .orderBy('createdAt', 'desc')
       .limit(Math.min(limitCount, 100))
       .get();
-    return snap.docs.map((d) => ({ id: d.id, ...d.data() } as DepositRecord));
+    return snap.docs
+      .map((d) => ({ id: d.id, ...d.data() } as DepositRecord))
+      .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
   }
 }
 
