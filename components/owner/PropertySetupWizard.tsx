@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useOwnerSession } from '@/hooks/useOwner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 import {
   Building,
   User,
@@ -500,31 +501,25 @@ export function PropertySetupWizard({
             {/* Cuisine & Notice Period */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {foodPlan !== 'no_food' && (
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-[#09090B] block">Food Style / Menu</label>
-                  <select
-                    value={foodCuisine}
-                    onChange={(e) => setFoodCuisine(e.target.value as FoodCuisine)}
-                    className="w-full h-9 rounded-[8px] border border-[#CBD5E1] bg-white px-3 text-xs text-[#09090B] focus:outline-none focus:border-[#D97706]"
-                  >
-                    <option value="both">North & South Indian Menu</option>
-                    <option value="south">South Indian Style</option>
-                    <option value="north">North Indian Style</option>
-                  </select>
-                </div>
+                <Select
+                  label="Food Style / Menu"
+                  value={foodCuisine}
+                  onChange={(e) => setFoodCuisine(e.target.value as FoodCuisine)}
+                >
+                  <option value="both">North & South Indian Menu</option>
+                  <option value="south">South Indian Style</option>
+                  <option value="north">North Indian Style</option>
+                </Select>
               )}
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-[#09090B] block">Move-out Notice Period</label>
-                <select
-                  value={noticePeriodDays}
-                  onChange={(e) => setNoticePeriodDays(Number(e.target.value))}
-                  className="w-full h-9 rounded-[8px] border border-[#CBD5E1] bg-white px-3 text-xs text-[#09090B] focus:outline-none focus:border-[#D97706]"
-                >
-                  <option value={15}>15 Days Notice</option>
-                  <option value={30}>30 Days Notice (Standard)</option>
-                </select>
-              </div>
+              <Select
+                label="Move-out Notice Period"
+                value={noticePeriodDays}
+                onChange={(e) => setNoticePeriodDays(Number(e.target.value))}
+              >
+                <option value={15}>15 Days Notice</option>
+                <option value={30}>30 Days Notice (Standard)</option>
+              </Select>
             </div>
 
             <div className="pt-4 border-t border-[#E2E8F0] flex justify-end">

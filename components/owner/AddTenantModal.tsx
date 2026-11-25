@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Bed } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 import { PhoneInput } from '@/components/ui/phone-input';
 import { Drawer } from '@/components/ui/drawer';
 import { validatePhone, sanitizeText } from '@/lib/security';
@@ -185,28 +186,20 @@ export function AddTenantModal({
             disabled={loading}
           />
 
-          <div className="space-y-1.5">
-            <label
-              htmlFor="add-tenant-idproof"
-              className="text-xs font-semibold text-[#334155]"
-            >
-              ID Proof Type
-            </label>
-            <select
-              id="add-tenant-idproof"
-              value={idProofType}
-              onChange={(e) => setIdProofType(e.target.value)}
-              disabled={loading}
-              className="w-full h-11 rounded-[8px] border border-[#CBD5E1] bg-white px-2.5 text-sm text-[#09090B] focus:border-[#D97706] focus:outline-none disabled:opacity-50"
-            >
-              <option value="aadhaar">Aadhaar Card</option>
-              <option value="pan">PAN Card</option>
-              <option value="driving_license">Driving License</option>
-              <option value="voter_id">Voter ID</option>
-              <option value="passport">Passport</option>
-              <option value="other">Other</option>
-            </select>
-          </div>
+          <Select
+            label="ID Proof Type"
+            id="add-tenant-idproof"
+            value={idProofType}
+            onChange={(e) => setIdProofType(e.target.value)}
+            disabled={loading}
+          >
+            <option value="aadhaar">Aadhaar Card</option>
+            <option value="pan">PAN Card</option>
+            <option value="driving_license">Driving License</option>
+            <option value="voter_id">Voter ID</option>
+            <option value="passport">Passport</option>
+            <option value="other">Other</option>
+          </Select>
         </div>
 
         {/* Emergency contact (optional) */}

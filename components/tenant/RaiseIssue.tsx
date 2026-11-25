@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Select } from '@/components/ui/select';
 import { Wrench } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -78,23 +79,18 @@ export function RaiseIssue({ portalAuth }: { portalAuth: { token: string; pin: s
 
       {open && (
         <form onSubmit={submit} className="mt-3 space-y-3">
-          <div>
-            <label htmlFor="issue-cat" className="text-[11px] font-semibold text-[#64748B] block mb-1">
-              Category
-            </label>
-            <select
-              id="issue-cat"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="w-full h-11 px-3 rounded-[8px] border border-[#CBD5E1] bg-white text-sm text-[#09090B] focus:border-[#D97706] focus:outline-none"
-            >
-              {CATEGORIES.map((c) => (
-                <option key={c.value} value={c.value}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
-          </div>
+          <Select
+            label="Category"
+            id="issue-cat"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+          >
+            {CATEGORIES.map((c) => (
+              <option key={c.value} value={c.value}>
+                {c.label}
+              </option>
+            ))}
+          </Select>
           <div>
             <label htmlFor="issue-desc" className="text-[11px] font-semibold text-[#64748B] block mb-1">
               What's the problem?

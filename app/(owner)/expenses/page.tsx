@@ -5,6 +5,7 @@ import { useOwnerSession } from '@/hooks/useOwner';
 import { formatCurrency, formatDateIN } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Wallet, Trash2, Plus } from 'lucide-react';
@@ -120,19 +121,17 @@ export default function ExpensesPage() {
       {/* Add expense */}
       <form onSubmit={addExpense} className="bg-white border border-[#E2E8F0] rounded-[12px] p-4 shadow-xs space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="space-y-1.5">
-            <label htmlFor="exp-cat" className="text-xs font-semibold text-[#334155]">Category</label>
-            <select
-              id="exp-cat"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="w-full h-11 px-3 rounded-[8px] border border-[#CBD5E1] bg-white text-sm focus:border-[#D97706] focus:outline-none"
-            >
-              {CATEGORIES.map((c) => (
-                <option key={c.value} value={c.value}>{c.label}</option>
-              ))}
-            </select>
-          </div>
+          <Select
+            label="Category"
+            id="exp-cat"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            disabled={saving}
+          >
+            {CATEGORIES.map((c) => (
+              <option key={c.value} value={c.value}>{c.label}</option>
+            ))}
+          </Select>
           <Input label="Amount (₹)" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} required disabled={saving} />
           <Input label="Vendor (optional)" value={vendor} onChange={(e) => setVendor(e.target.value)} disabled={saving} />
           <Input label="Date" type="date" value={date} onChange={(e) => setDate(e.target.value)} disabled={saving} />

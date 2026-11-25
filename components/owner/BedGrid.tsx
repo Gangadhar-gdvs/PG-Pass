@@ -8,6 +8,7 @@ import { Search, Layers, Building, LayoutGrid, Grid3X3, Users } from 'lucide-rea
 import { TabBar } from '@/components/ui/tab-bar';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Button } from '@/components/ui/button';
+import { Select } from '@/components/ui/select';
 
 interface BedGridProps {
   beds: Bed[];
@@ -121,23 +122,25 @@ export function BedGrid({
         {/* Filter Controls */}
         <div className="flex flex-wrap items-center gap-2">
           {/* Status Filter */}
-          <select
+          <Select
+            aria-label="Filter by status"
             value={activeFilter}
             onChange={(e) => setActiveFilter(e.target.value as any)}
-            className="h-11 rounded-[8px] border border-[#CBD5E1] bg-white px-2.5 text-xs font-semibold text-[#09090B] focus:border-[#D97706] focus:outline-none"
+            containerClassName="w-auto" className="h-11 text-xs font-semibold"
           >
             <option value="all">All Statuses</option>
             <option value="pending">Pending Rent</option>
             <option value="verify">Proof Verification</option>
             <option value="paid">Settled</option>
             <option value="vacant">Available Beds</option>
-          </select>
+          </Select>
 
           {/* Sharing Format Filter */}
-          <select
+          <Select
+            aria-label="Filter by sharing format"
             value={sharingFilter}
             onChange={(e) => setSharingFilter(e.target.value)}
-            className="h-11 rounded-[8px] border border-[#CBD5E1] bg-white px-2.5 text-xs font-semibold text-[#09090B] focus:border-[#D97706] focus:outline-none"
+            containerClassName="w-auto" className="h-11 text-xs font-semibold"
           >
             <option value="all">All Sharing Formats</option>
             <option value="1">Single Room (1-Share)</option>
@@ -146,18 +149,19 @@ export function BedGrid({
             <option value="4">4-Sharing</option>
             <option value="5">5-Sharing</option>
             <option value="6">6-Sharing</option>
-          </select>
+          </Select>
 
           {/* AC Filter */}
-          <select
+          <Select
+            aria-label="Filter by climate"
             value={acFilter}
             onChange={(e) => setAcFilter(e.target.value)}
-            className="h-11 rounded-[8px] border border-[#CBD5E1] bg-white px-2.5 text-xs font-semibold text-[#09090B] focus:border-[#D97706] focus:outline-none"
+            containerClassName="w-auto" className="h-11 text-xs font-semibold"
           >
             <option value="all">All Climate</option>
             <option value="ac">AC Only</option>
             <option value="non-ac">Non-AC Only</option>
-          </select>
+          </Select>
 
           <div className="relative flex-1 sm:w-48">
             <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8]" />

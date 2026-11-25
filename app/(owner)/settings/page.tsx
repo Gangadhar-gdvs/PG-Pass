@@ -193,52 +193,35 @@ function SettingsPageInner() {
             </h2>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="space-y-1.5">
-                <label htmlFor="rent-due-day" className="text-xs font-semibold text-[#334155]">
-                  Rent Due Day (of month)
-                </label>
-                <input
-                  id="rent-due-day"
-                  type="number"
-                  min={1}
-                  max={28}
-                  value={rentDueDay}
-                  onChange={(e) => setRentDueDay(e.target.value)}
-                  disabled={saving}
-                  className="w-full h-11 rounded-[8px] border border-[#CBD5E1] px-3 text-sm text-[#09090B] focus:border-[#D97706] focus:outline-none disabled:opacity-50"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label htmlFor="late-fee" className="text-xs font-semibold text-[#334155]">
-                  Late Fee / day (₹)
-                </label>
-                <input
-                  id="late-fee"
-                  type="number"
-                  min={0}
-                  value={lateFeePerDay}
-                  onChange={(e) => setLateFeePerDay(e.target.value)}
-                  disabled={saving}
-                  className="w-full h-11 rounded-[8px] border border-[#CBD5E1] px-3 text-sm text-[#09090B] focus:border-[#D97706] focus:outline-none disabled:opacity-50"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label htmlFor="late-grace" className="text-xs font-semibold text-[#334155]">
-                  Grace Days
-                </label>
-                <input
-                  id="late-grace"
-                  type="number"
-                  min={0}
-                  max={28}
-                  value={lateFeeGraceDays}
-                  onChange={(e) => setLateFeeGraceDays(e.target.value)}
-                  disabled={saving}
-                  className="w-full h-11 rounded-[8px] border border-[#CBD5E1] px-3 text-sm text-[#09090B] focus:border-[#D97706] focus:outline-none disabled:opacity-50"
-                />
-              </div>
+              <Input
+                id="rent-due-day"
+                label="Rent Due Day (of month)"
+                type="number"
+                min={1}
+                max={28}
+                value={rentDueDay}
+                onChange={(e) => setRentDueDay(e.target.value)}
+                disabled={saving}
+              />
+              <Input
+                id="late-fee"
+                label="Late Fee / day (₹)"
+                type="number"
+                min={0}
+                value={lateFeePerDay}
+                onChange={(e) => setLateFeePerDay(e.target.value)}
+                disabled={saving}
+              />
+              <Input
+                id="late-grace"
+                label="Grace Days"
+                type="number"
+                min={0}
+                max={28}
+                value={lateFeeGraceDays}
+                onChange={(e) => setLateFeeGraceDays(e.target.value)}
+                disabled={saving}
+              />
             </div>
             <p className="text-[11px] text-[#64748B]">
               Due day applies to newly generated rent records. Set late fee to ₹0 to disable penalties.

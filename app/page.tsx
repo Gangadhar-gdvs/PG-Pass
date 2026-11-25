@@ -14,6 +14,7 @@ import {
   Wallet,
   QrCode,
   ChevronRight,
+  KeyRound,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import toast from 'react-hot-toast';
@@ -268,21 +269,32 @@ export default function LandingPage() {
               rent status or download your HRA receipt.
             </p>
 
-            <form onSubmit={handleLookup} className="mt-5 flex flex-col sm:flex-row gap-2">
-              <input
-                type="text"
-                placeholder="e.g. abcd1234efgh"
-                value={tokenInput}
-                onChange={(e) => setTokenInput(e.target.value)}
-                className="flex-1 h-12 px-4 rounded-full border border-[#E2E8F0] text-sm font-mono text-[#09090B] placeholder:text-[#94A3B8] bg-white focus:outline-none focus:border-[#D97706] focus:ring-2 focus:ring-[#FDE68A]"
-              />
+            <form onSubmit={handleLookup} className="mt-5 space-y-2.5 text-left">
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-[#475569] block text-center">
+                Resident portal token
+              </label>
+              <div className="relative">
+                <KeyRound className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#94A3B8]" />
+                <input
+                  type="text"
+                  inputMode="text"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  maxLength={16}
+                  placeholder="abcd1234efgh"
+                  value={tokenInput}
+                  onChange={(e) => setTokenInput(e.target.value.trim())}
+                  className="w-full h-12 pl-11 pr-4 rounded-2xl border border-[#E2E8F0] bg-[#F8FAFC] text-[15px] font-mono tracking-[0.15em] text-[#09090B] placeholder:text-[#CBD5E1] placeholder:tracking-normal shadow-xs transition-all focus:outline-none focus:bg-white focus:border-[#D97706] focus:ring-2 focus:ring-[#FDE68A]"
+                />
+              </div>
               <Button
                 type="submit"
                 variant="solid"
-                className="h-12 rounded-full bg-[#D97706] hover:bg-[#B45309] text-white text-sm font-bold px-6 shrink-0"
+                className="w-full h-12 rounded-2xl bg-[#D97706] hover:bg-[#B45309] text-white text-sm font-bold shadow-[0_8px_24px_-8px_rgba(217,119,6,0.55)]"
               >
-                Open portal
-                <ArrowRight className="w-4 h-4 ml-1" />
+                Open my portal
+                <ArrowRight className="w-4 h-4 ml-1.5" />
               </Button>
             </form>
             <p className="text-[11px] text-[#94A3B8] mt-3">
