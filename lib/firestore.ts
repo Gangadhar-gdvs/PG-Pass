@@ -41,7 +41,8 @@ const noop = () => {};
 export function subscribeToOwnerBeds(
   ownerId: string,
   callback: (beds: Bed[]) => void,
-  propertyId?: string
+  propertyId?: string,
+  onError?: (error: { code: string }) => void
 ): () => void {
   if (!ownerId || !isFirebaseConfigured()) {
     callback([]);
@@ -63,8 +64,10 @@ export function subscribeToOwnerBeds(
           .filter((b) => !(b as any).deletedAt)
       ),
     (error) => {
+      // Surface the failure (missing index, permission-denied, unreachable) so
+      // the UI can show an actionable error instead of spinning forever.
       console.warn('Firestore beds subscription error:', error.code);
-      callback([]);
+      onError?.({ code: error.code });
     }
   );
 }

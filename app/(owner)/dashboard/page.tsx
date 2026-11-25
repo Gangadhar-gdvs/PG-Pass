@@ -56,9 +56,10 @@ export default function OwnerDashboardPage() {
 
   const [owner, setOwner] = useState<Owner | null>(null);
   const [loadingOwner, setLoadingOwner] = useState(true);
+  const [ownerError, setOwnerError] = useState(false);
 
   // Active Hooks for Beds, Tenants, Records
-  const { beds } = useBeds(ownerId, propertyFilter);
+  const { beds, error: bedsError } = useBeds(ownerId, propertyFilter);
   const { tenants } = useTenants(ownerId, propertyFilter);
   const [rentRecords, setRentRecords] = useState<RentRecord[]>([]);
   const [selectedPeriod, setSelectedPeriod] = useState(getCurrentPeriod());
@@ -89,28 +90,40 @@ export default function OwnerDashboardPage() {
   const [actionBusy, setActionBusy] = useState(false); // in-flight guard for paid/approve/vacate
 
   // Load Owner Profile
-  useEffect(() => {
+  const reloadOwner = React.useCallback(async () => {
     if (!ownerId) {
       setLoadingOwner(false);
       return;
     }
+    setLoadingOwner(true);
+    setOwnerError(false);
 
-    async function loadOwner() {
-      try {
-        const res = await fetch('/api/owners');
-        if (res.ok) {
-          const profile = await res.json();
-          setOwner(profile);
-        }
-      } catch (e) {
-        console.error('Error fetching owner profile:', e);
-      } finally {
-        setLoadingOwner(false);
+    // Fail fast instead of spinning forever if the API/Firebase is unreachable.
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 12_000);
+    try {
+      const res = await fetch('/api/owners', { signal: controller.signal });
+      if (res.ok) {
+        setOwner(await res.json());
+      } else if (res.status === 404) {
+        // No profile yet → first-time onboarding (wizard). Not an error.
+        setOwner(null);
+      } else {
+        setOwnerError(true);
       }
+    } catch (e) {
+      // Network failure or the 12s abort above.
+      console.error('Error fetching owner profile:', e);
+      setOwnerError(true);
+    } finally {
+      clearTimeout(timeout);
+      setLoadingOwner(false);
     }
-
-    loadOwner();
   }, [ownerId]);
+
+  useEffect(() => {
+    reloadOwner();
+  }, [reloadOwner]);
 
   // Subscribe to real-time Rent Records for the selected billing period.
   // Re-subscribes when the owner navigates to a different month so past-due and
@@ -419,6 +432,31 @@ export default function OwnerDashboardPage() {
       <div className="py-20 flex flex-col items-center justify-center">
         <div className="w-8 h-8 border-2 border-[#D97706] border-t-transparent rounded-full animate-spin mb-3" />
         <span className="text-xs text-[#64748B] font-medium">Loading PG data...</span>
+      </div>
+    );
+  }
+
+  // ---------------- LOAD FAILURE (never spin forever) ----------------
+  if (ownerError || bedsError) {
+    return (
+      <div className="py-20 flex flex-col items-center justify-center text-center px-6">
+        <div className="w-12 h-12 rounded-2xl bg-[#FEF2F2] border border-[#FECACA] flex items-center justify-center mb-4">
+          <ShieldAlert className="w-6 h-6 text-[#DC2626]" />
+        </div>
+        <h2 className="text-base font-bold text-[#09090B]">Couldn&apos;t load your dashboard</h2>
+        <p className="text-xs text-[#64748B] mt-1 max-w-sm leading-relaxed">
+          We couldn&apos;t reach the server in time. This is usually a temporary
+          connection issue. Please check your internet and try again.
+        </p>
+        <button
+          onClick={() => {
+            setOwnerError(false);
+            reloadOwner();
+          }}
+          className="mt-5 h-11 px-5 rounded-full bg-[#D97706] hover:bg-[#B45309] text-white text-sm font-bold press"
+        >
+          Retry
+        </button>
       </div>
     );
   }
