@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useOwnerSession } from '@/hooks/useOwner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
+import { Dropdown } from '@/components/ui/dropdown';
 import {
   Building,
   User,
@@ -362,7 +362,7 @@ export function PropertySetupWizard({
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8">
+    <div className="flex flex-col items-center justify-center py-2 sm:py-4">
       <div className="w-full max-w-3xl bg-white border border-[#E2E8F0] rounded-[14px] shadow-sm overflow-hidden text-left">
         {/* Top Progress Header */}
         <div className="border-b border-[#E2E8F0] p-6 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent">
@@ -501,25 +501,27 @@ export function PropertySetupWizard({
             {/* Cuisine & Notice Period */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {foodPlan !== 'no_food' && (
-                <Select
+                <Dropdown
                   label="Food Style / Menu"
                   value={foodCuisine}
-                  onChange={(e) => setFoodCuisine(e.target.value as FoodCuisine)}
-                >
-                  <option value="both">North & South Indian Menu</option>
-                  <option value="south">South Indian Style</option>
-                  <option value="north">North Indian Style</option>
-                </Select>
+                  onChange={(v) => setFoodCuisine(v as FoodCuisine)}
+                  options={[
+                    { value: 'both', label: 'North & South Indian Menu' },
+                    { value: 'south', label: 'South Indian Style' },
+                    { value: 'north', label: 'North Indian Style' },
+                  ]}
+                />
               )}
 
-              <Select
+              <Dropdown
                 label="Move-out Notice Period"
-                value={noticePeriodDays}
-                onChange={(e) => setNoticePeriodDays(Number(e.target.value))}
-              >
-                <option value={15}>15 Days Notice</option>
-                <option value={30}>30 Days Notice (Standard)</option>
-              </Select>
+                value={String(noticePeriodDays)}
+                onChange={(v) => setNoticePeriodDays(Number(v))}
+                options={[
+                  { value: '15', label: '15 Days Notice' },
+                  { value: '30', label: '30 Days Notice (Standard)' },
+                ]}
+              />
             </div>
 
             <div className="pt-4 border-t border-[#E2E8F0] flex justify-end">

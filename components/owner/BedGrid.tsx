@@ -8,7 +8,7 @@ import { Search, Layers, Building, LayoutGrid, Grid3X3, Users } from 'lucide-rea
 import { TabBar } from '@/components/ui/tab-bar';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Button } from '@/components/ui/button';
-import { Select } from '@/components/ui/select';
+import { Dropdown } from '@/components/ui/dropdown';
 
 interface BedGridProps {
   beds: Bed[];
@@ -119,63 +119,71 @@ export function BedGrid({
           variant="pill"
         />
 
-        {/* Filter Controls */}
-        <div className="flex flex-wrap items-center gap-2">
+        {/* Filter Controls — on small screens the selects go in a 2-col grid,
+            the search spans full width, and the view toggle sits on its own row,
+            so nothing overflows the viewport. */}
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap sm:items-center gap-2">
           {/* Status Filter */}
-          <Select
+          <Dropdown
             aria-label="Filter by status"
             value={activeFilter}
-            onChange={(e) => setActiveFilter(e.target.value as any)}
-            containerClassName="w-auto" className="h-11 text-xs font-semibold"
-          >
-            <option value="all">All Statuses</option>
-            <option value="pending">Pending Rent</option>
-            <option value="verify">Proof Verification</option>
-            <option value="paid">Settled</option>
-            <option value="vacant">Available Beds</option>
-          </Select>
+            onChange={(v) => setActiveFilter(v as any)}
+            containerClassName="w-full sm:w-40"
+            className="h-11 text-xs font-semibold"
+            options={[
+              { value: 'all', label: 'All Statuses' },
+              { value: 'pending', label: 'Pending Rent' },
+              { value: 'verify', label: 'Proof Verification' },
+              { value: 'paid', label: 'Settled' },
+              { value: 'vacant', label: 'Available Beds' },
+            ]}
+          />
 
           {/* Sharing Format Filter */}
-          <Select
+          <Dropdown
             aria-label="Filter by sharing format"
             value={sharingFilter}
-            onChange={(e) => setSharingFilter(e.target.value)}
-            containerClassName="w-auto" className="h-11 text-xs font-semibold"
-          >
-            <option value="all">All Sharing Formats</option>
-            <option value="1">Single Room (1-Share)</option>
-            <option value="2">2-Sharing (Double)</option>
-            <option value="3">3-Sharing (Triple)</option>
-            <option value="4">4-Sharing</option>
-            <option value="5">5-Sharing</option>
-            <option value="6">6-Sharing</option>
-          </Select>
+            onChange={setSharingFilter}
+            containerClassName="w-full sm:w-40"
+            className="h-11 text-xs font-semibold"
+            options={[
+              { value: 'all', label: 'All Sharing' },
+              { value: '1', label: 'Single (1-Share)' },
+              { value: '2', label: '2-Sharing' },
+              { value: '3', label: '3-Sharing' },
+              { value: '4', label: '4-Sharing' },
+              { value: '5', label: '5-Sharing' },
+              { value: '6', label: '6-Sharing' },
+            ]}
+          />
 
           {/* AC Filter */}
-          <Select
+          <Dropdown
             aria-label="Filter by climate"
             value={acFilter}
-            onChange={(e) => setAcFilter(e.target.value)}
-            containerClassName="w-auto" className="h-11 text-xs font-semibold"
-          >
-            <option value="all">All Climate</option>
-            <option value="ac">AC Only</option>
-            <option value="non-ac">Non-AC Only</option>
-          </Select>
+            onChange={setAcFilter}
+            containerClassName="w-full sm:w-36"
+            className="h-11 text-xs font-semibold"
+            options={[
+              { value: 'all', label: 'All Climate' },
+              { value: 'ac', label: 'AC Only' },
+              { value: 'non-ac', label: 'Non-AC Only' },
+            ]}
+          />
 
-          <div className="relative flex-1 sm:w-48">
+          <div className="relative col-span-1 sm:flex-1 sm:w-48">
             <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8]" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search bed, room, resident..."
+              placeholder="Search bed, room…"
               className="w-full h-11 pl-8 pr-3 rounded-[8px] border border-[#E2E8F0] text-xs text-[#09090B] placeholder:text-[#94A3B8] bg-white focus:border-[#D97706] focus:outline-none"
             />
           </div>
 
           {/* View Mode Toggle: Room Grouping vs Flat Beds */}
-          <div className="flex items-center bg-[#F1F5F9] p-0.5 rounded-[8px] border border-[#E2E8F0] shrink-0">
+          <div className="col-span-2 sm:col-span-1 flex items-center justify-center bg-[#F1F5F9] p-0.5 rounded-[8px] border border-[#E2E8F0] shrink-0">
             <button
               type="button"
               onClick={() => setViewMode('rooms')}

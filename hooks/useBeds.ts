@@ -16,6 +16,7 @@ export function useBeds(ownerId: string | null, propertyId?: string) {
   useEffect(() => {
     if (!ownerId) {
       setLoading(false);
+      setError(null);
       return;
     }
 

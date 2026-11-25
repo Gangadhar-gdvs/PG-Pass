@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Bed } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
+import { Dropdown } from '@/components/ui/dropdown';
 import { PhoneInput } from '@/components/ui/phone-input';
 import { Drawer } from '@/components/ui/drawer';
 import { validatePhone, sanitizeText } from '@/lib/security';
@@ -42,8 +42,10 @@ export function AddTenantModal({
   const [moveInDate, setMoveInDate] = useState(
     new Date().toISOString().split('T')[0]
   );
-  const [rent, setRent] = useState(String(bed.monthlyRent || 8500));
-  const [deposit, setDeposit] = useState(String(bed.monthlyRent || 8500));
+  // Prefill from the bed's configured rent when it has one; otherwise leave empty
+  // so the owner enters the amount (no hidden default value).
+  const [rent, setRent] = useState(bed.monthlyRent ? String(bed.monthlyRent) : '');
+  const [deposit, setDeposit] = useState(bed.monthlyRent ? String(bed.monthlyRent) : '');
   const [idProofType, setIdProofType] = useState('aadhaar');
   const [emName, setEmName] = useState('');
   const [emPhone, setEmPhone] = useState('');
@@ -71,11 +73,21 @@ export function AddTenantModal({
     }
     const cleanPhone = phoneValidation.cleaned;
 
+    // Explicit numeric validation — no hidden default rent. Rent must be a
+    // positive amount the owner entered; deposit may be zero but never negative.
+    const rentVal = Number(rent);
+    if (!Number.isFinite(rentVal) || rentVal <= 0) {
+      toast.error('Please enter a valid monthly rent');
+      return;
+    }
+    const depositVal = Number(deposit);
+    if (!Number.isFinite(depositVal) || depositVal < 0) {
+      toast.error('Please enter a valid security deposit');
+      return;
+    }
+
     setLoading(true);
     try {
-      const depositVal = Number(deposit) || 0;
-      const rentVal = Number(rent) || bed.monthlyRent || 8500;
-
       const res = await fetch('/api/tenants', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -118,12 +130,13 @@ export function AddTenantModal({
       description={`Room ${bed.roomNumber} · Floor ${bed.floor}`}
       width="md"
       footer={
-        <div className="flex items-center justify-end gap-2">
+        <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2">
           <Button
             type="button"
             variant="outline"
             onClick={onClose}
             disabled={loading}
+            className="w-full sm:w-auto"
           >
             Cancel
           </Button>
@@ -132,8 +145,9 @@ export function AddTenantModal({
             form="add-tenant-form"
             loading={loading}
             variant="solid"
+            className="w-full sm:w-auto"
           >
-            Assign Resident & Generate Link
+            Assign Resident &amp; Generate Link
           </Button>
         </div>
       }
@@ -160,6 +174,8 @@ export function AddTenantModal({
           <Input
             label="Monthly Rent (₹)"
             type="number"
+            min={1}
+            placeholder="Enter rent"
             value={rent}
             onChange={(e) => setRent(e.target.value)}
             required
@@ -169,6 +185,8 @@ export function AddTenantModal({
           <Input
             label="Security Deposit (₹)"
             type="number"
+            min={0}
+            placeholder="Enter deposit"
             value={deposit}
             onChange={(e) => setDeposit(e.target.value)}
             required
@@ -186,20 +204,21 @@ export function AddTenantModal({
             disabled={loading}
           />
 
-          <Select
+          <Dropdown
             label="ID Proof Type"
             id="add-tenant-idproof"
             value={idProofType}
-            onChange={(e) => setIdProofType(e.target.value)}
+            onChange={setIdProofType}
             disabled={loading}
-          >
-            <option value="aadhaar">Aadhaar Card</option>
-            <option value="pan">PAN Card</option>
-            <option value="driving_license">Driving License</option>
-            <option value="voter_id">Voter ID</option>
-            <option value="passport">Passport</option>
-            <option value="other">Other</option>
-          </Select>
+            options={[
+              { value: 'aadhaar', label: 'Aadhaar Card' },
+              { value: 'pan', label: 'PAN Card' },
+              { value: 'driving_license', label: 'Driving License' },
+              { value: 'voter_id', label: 'Voter ID' },
+              { value: 'passport', label: 'Passport' },
+              { value: 'other', label: 'Other' },
+            ]}
+          />
         </div>
 
         {/* Emergency contact (optional) */}

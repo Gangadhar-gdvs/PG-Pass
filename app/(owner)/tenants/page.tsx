@@ -26,7 +26,7 @@ import toast from 'react-hot-toast';
 export default function TenantsPage() {
   const { ownerId, properties, selectedPropertyId } = useOwnerSession();
   const propertyFilter = properties.length > 1 ? selectedPropertyId : undefined;
-  const { tenants, loading } = useTenants(ownerId, propertyFilter);
+  const { tenants, loading, error } = useTenants(ownerId, propertyFilter);
   const { beds } = useBeds(ownerId, propertyFilter);
 
   const [search, setSearch] = useState('');
@@ -252,6 +252,20 @@ export default function TenantsPage() {
             </div>
           ))}
         </div>
+      ) : error ? (
+        <EmptyState
+          icon={<Users className="w-6 h-6 text-[#DC2626]" />}
+          title="Couldn't load residents"
+          description="We couldn't reach the server in time. Check your connection and try again."
+          action={
+            <button
+              onClick={() => window.location.reload()}
+              className="h-11 px-5 rounded-full bg-[#D97706] hover:bg-[#B45309] text-white text-sm font-bold press"
+            >
+              Retry
+            </button>
+          }
+        />
       ) : filteredTenants.length === 0 ? (
         <EmptyState
           icon={<Users className="w-6 h-6 text-[#64748B]" />}

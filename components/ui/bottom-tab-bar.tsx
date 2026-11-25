@@ -18,14 +18,16 @@ export interface CenterAction {
 }
 
 /**
- * Floating bottom tab bar (bold mobile-app style). Shows a few ESSENTIAL tabs
- * plus a prominent center action and a "More" button that opens a full-menu
- * sheet with every destination. Used on mobile/tablet across all panels; the
- * theme accent is inherited from the panel's `theme-*` class.
+ * Bottom tab bar (bold mobile-app style), flush to the screen edge with a
+ * rounded top. Shows a few ESSENTIAL tabs plus a "More" button that opens a
+ * full-menu sheet. The theme accent is inherited from the panel's `theme-*`
+ * class.
  *
- * - `primary`: the 2–4 essential tabs shown directly in the bar.
- * - `center`: optional prominent "+" action (e.g. Add Tenant / Find PG).
- * - `more`: everything else, revealed in the full-menu sheet.
+ * - `primary`: the 2–4 essential tabs shown directly in the bar. The ACTIVE one
+ *   renders as an icon-only circular accent pill (no label).
+ * - `center`: optional prominent "+" action (e.g. resident "Find a PG").
+ * - `more`: everything else, revealed in the full-menu sheet. The "More" button
+ *   itself shows as active when the current route is one of these items.
  */
 export function BottomTabBar({
   primary,
@@ -42,9 +44,14 @@ export function BottomTabBar({
   const [menuOpen, setMenuOpen] = useState(false);
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/');
 
-  // The active tab lifts into a filled accent "pill" (icon + label) that floats
-  // above the bar; inactive tabs are plain icons. This is the floating-selected
-  // style used by modern consumer apps, replacing the old center "+" action.
+  // "More" is active when the current route lives in the more-menu AND no
+  // primary tab already owns it (primary takes precedence, so a route can never
+  // light up both a primary tab and the More button at once).
+  const primaryActive = primary.some((p) => isActive(p.href));
+  const moreActive = !primaryActive && more.some((m) => isActive(m.href));
+
+  // Active tab = icon only, inside a filled circular accent pill (no text).
+  // Inactive tabs = icon + small label in muted grey.
   const Tab = ({ item }: { item: TabItem }) => {
     const Icon = item.icon;
     const active = isActive(item.href);
@@ -53,10 +60,12 @@ export function BottomTabBar({
         <Link
           href={item.href}
           aria-current="page"
-          className="accent-bg -mt-5 flex items-center gap-1.5 h-11 px-3.5 rounded-full shadow-[0_8px_20px_-6px_rgba(15,23,42,0.35)] press"
+          aria-label={item.label}
+          className="flex items-center justify-center min-w-[52px]"
         >
-          <Icon className="w-[20px] h-[20px]" />
-          <span className="text-[11px] font-bold">{item.label}</span>
+          <span className="accent-bg w-12 h-12 rounded-full flex items-center justify-center shadow-[0_6px_16px_-4px_rgba(15,23,42,0.35)] press">
+            <Icon className="w-[22px] h-[22px]" />
+          </span>
         </Link>
       );
     }
@@ -73,16 +82,18 @@ export function BottomTabBar({
 
   return (
     <>
-      {/* Floating bar */}
-      <nav
-        className="md:hidden fixed inset-x-0 bottom-0 z-40 flex justify-center pointer-events-none"
-        style={{ paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom))' }}
-      >
-        <div className="pointer-events-auto mx-3 mb-1 w-full max-w-md flex items-center justify-around bg-white rounded-[22px] px-2 py-1.5 border border-slate-100 shadow-[0_10px_40px_-10px_rgba(15,23,42,0.25)]">
-          {/* With a center action (e.g. resident "Find a PG"), split the primary
-              tabs around it. Without one (owner panel), render all four inline. */}
-          {center ? primary.slice(0, 2).map((t) => <Tab key={t.href} item={t} />)
-                  : primary.slice(0, 4).map((t) => <Tab key={t.href} item={t} />)}
+      {/* Bottom bar — flush to the edge, rounded top corners only */}
+      <nav className="md:hidden fixed inset-x-0 bottom-0 z-40">
+        <div
+          className="flex items-center justify-around bg-white rounded-t-[24px] px-2 pt-2 border-t border-slate-100 shadow-[0_-8px_30px_-12px_rgba(15,23,42,0.18)]"
+          style={{ paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom))' }}
+        >
+          {/* With a center action, split the primary tabs EVENLY around it so the
+              bar stays balanced regardless of tab count; otherwise render all
+              four inline. */}
+          {center
+            ? primary.slice(0, Math.ceil(primary.length / 2)).map((t) => <Tab key={t.href} item={t} />)
+            : primary.slice(0, 4).map((t) => <Tab key={t.href} item={t} />)}
 
           {center && (
             <button
@@ -95,23 +106,34 @@ export function BottomTabBar({
             </button>
           )}
 
-          {center && primary.slice(2, 4).map((t) => <Tab key={t.href} item={t} />)}
+          {center && primary.slice(Math.ceil(primary.length / 2)).map((t) => <Tab key={t.href} item={t} />)}
 
           {more.length > 0 && (
             <button
               type="button"
               onClick={() => setMenuOpen(true)}
               aria-label="More"
-              className="flex flex-col items-center justify-center gap-0.5 min-w-[52px] min-h-[48px] text-slate-400 press"
+              className={`flex flex-col items-center justify-center gap-0.5 min-w-[52px] min-h-[48px] press ${
+                moreActive ? '' : 'text-slate-400'
+              }`}
             >
-              <Menu className="w-[22px] h-[22px]" />
-              <span className="text-[10px] font-semibold">More</span>
+              {moreActive ? (
+                <span className="accent-bg w-12 h-12 rounded-full flex items-center justify-center shadow-[0_6px_16px_-4px_rgba(15,23,42,0.35)]">
+                  <Menu className="w-[22px] h-[22px]" />
+                </span>
+              ) : (
+                <>
+                  <Menu className="w-[22px] h-[22px]" />
+                  <span className="text-[10px] font-semibold">More</span>
+                </>
+              )}
             </button>
           )}
         </div>
       </nav>
 
-      {/* Full-menu sheet */}
+      {/* Full-menu sheet — lists ONLY the overflow (more) items, never the ones
+          already present in the primary bottom tabs. */}
       {menuOpen && (
         <div className="md:hidden fixed inset-0 z-50" role="dialog" aria-modal="true">
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setMenuOpen(false)} />
@@ -131,7 +153,7 @@ export function BottomTabBar({
               </button>
             </div>
             <div className="grid grid-cols-3 gap-3">
-              {[...primary, ...more].map((item) => {
+              {more.map((item) => {
                 const Icon = item.icon;
                 const active = isActive(item.href);
                 return (

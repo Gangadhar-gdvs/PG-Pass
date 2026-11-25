@@ -5,7 +5,7 @@ import { useOwnerSession } from '@/hooks/useOwner';
 import { formatCurrency, formatDateIN } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
+import { Dropdown } from '@/components/ui/dropdown';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Wallet, Trash2, Plus } from 'lucide-react';
@@ -121,17 +121,14 @@ export default function ExpensesPage() {
       {/* Add expense */}
       <form onSubmit={addExpense} className="bg-white border border-[#E2E8F0] rounded-[12px] p-4 shadow-xs space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Select
+          <Dropdown
             label="Category"
             id="exp-cat"
             value={category}
-            onChange={(e) => setCategory(e.target.value)}
+            onChange={setCategory}
             disabled={saving}
-          >
-            {CATEGORIES.map((c) => (
-              <option key={c.value} value={c.value}>{c.label}</option>
-            ))}
-          </Select>
+            options={CATEGORIES.map((c) => ({ value: c.value, label: c.label }))}
+          />
           <Input label="Amount (₹)" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} required disabled={saving} />
           <Input label="Vendor (optional)" value={vendor} onChange={(e) => setVendor(e.target.value)} disabled={saving} />
           <Input label="Date" type="date" value={date} onChange={(e) => setDate(e.target.value)} disabled={saving} />

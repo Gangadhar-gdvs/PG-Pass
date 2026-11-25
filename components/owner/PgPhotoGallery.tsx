@@ -5,7 +5,7 @@ import { uploadPropertyPhoto } from '@/lib/client/uploader';
 import { PROPERTY_PHOTO_CATEGORIES } from '@/lib/constants/storage';
 import { PROPERTY_PHOTO_MAX } from '@/lib/constants/limits';
 import { Button } from '@/components/ui/button';
-import { Select } from '@/components/ui/select';
+import { Dropdown } from '@/components/ui/dropdown';
 import { Camera, Trash2, ImagePlus, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -124,30 +124,22 @@ export function PgPhotoGallery({ propertyId }: { propertyId?: string }) {
 
       {/* Upload controls */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <Select
+        <Dropdown
           label="Category"
           value={category}
-          onChange={(e) => setCategory(e.target.value)}
-        >
-          {PROPERTY_PHOTO_CATEGORIES.map((c) => (
-            <option key={c} value={c}>
-              {CATEGORY_LABELS[c]}
-            </option>
-          ))}
-        </Select>
+          onChange={setCategory}
+          options={PROPERTY_PHOTO_CATEGORIES.map((c) => ({ value: c, label: CATEGORY_LABELS[c] }))}
+        />
         {category === 'room' && (
-          <Select
+          <Dropdown
             label="Sharing (optional)"
             value={sharingType}
-            onChange={(e) => setSharingType(e.target.value)}
-          >
-            <option value="">Any</option>
-            {['1', '2', '3', '4', '5', '6'].map((s) => (
-              <option key={s} value={s}>
-                {s}-sharing
-              </option>
-            ))}
-          </Select>
+            onChange={setSharingType}
+            options={[
+              { value: '', label: 'Any' },
+              ...['1', '2', '3', '4', '5', '6'].map((s) => ({ value: s, label: `${s}-sharing` })),
+            ]}
+          />
         )}
         <div className="space-y-1.5 sm:col-span-2">
           <label className="text-xs font-semibold text-[#334155]">Caption (optional)</label>

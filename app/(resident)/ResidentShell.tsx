@@ -17,7 +17,7 @@ export function ResidentShell({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="theme-resident min-h-screen app-gradient-tint flex flex-col pb-24">
+    <div className="theme-resident min-h-screen app-gradient-tint flex flex-col">
       <IdleLogout role="resident" redirectTo="/resident/login" />
       {/* Gradient header band */}
       <header className="app-gradient px-5 pt-5 pb-6 rounded-b-[28px] shadow-[0_8px_24px_-12px_rgba(13,148,136,0.5)]">
@@ -42,7 +42,7 @@ export function ResidentShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <main className="flex-1 overflow-x-hidden px-4 -mt-3 max-w-2xl mx-auto w-full">
+      <main className="flex-1 overflow-x-hidden px-4 -mt-3 pb-24 max-w-2xl mx-auto w-full">
         <div className="animate-fade-up">{children}</div>
       </main>
 

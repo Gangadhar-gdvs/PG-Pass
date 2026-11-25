@@ -60,7 +60,7 @@ export default function OwnerDashboardPage() {
 
   // Active Hooks for Beds, Tenants, Records
   const { beds, error: bedsError } = useBeds(ownerId, propertyFilter);
-  const { tenants } = useTenants(ownerId, propertyFilter);
+  const { tenants, error: tenantsError } = useTenants(ownerId, propertyFilter);
   const [rentRecords, setRentRecords] = useState<RentRecord[]>([]);
   const [selectedPeriod, setSelectedPeriod] = useState(getCurrentPeriod());
   const [defaulters, setDefaulters] = useState<
@@ -89,40 +89,50 @@ export default function OwnerDashboardPage() {
   const [reverseBusy, setReverseBusy] = useState(false);
   const [actionBusy, setActionBusy] = useState(false); // in-flight guard for paid/approve/vacate
 
-  // Load Owner Profile
-  const reloadOwner = React.useCallback(async () => {
-    if (!ownerId) {
-      setLoadingOwner(false);
-      return;
-    }
-    setLoadingOwner(true);
-    setOwnerError(false);
-
-    // Fail fast instead of spinning forever if the API/Firebase is unreachable.
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 12_000);
-    try {
-      const res = await fetch('/api/owners', { signal: controller.signal });
-      if (res.ok) {
-        setOwner(await res.json());
-      } else if (res.status === 404) {
-        // No profile yet → first-time onboarding (wizard). Not an error.
-        setOwner(null);
-      } else {
-        setOwnerError(true);
+  // Load Owner Profile. `isCurrent` guards against a slow response from a
+  // previous ownerId resolving after a newer one (last-writer-by-latency race).
+  const reloadOwner = React.useCallback(
+    async (isCurrent: () => boolean = () => true) => {
+      if (!ownerId) {
+        setLoadingOwner(false);
+        return;
       }
-    } catch (e) {
-      // Network failure or the 12s abort above.
-      console.error('Error fetching owner profile:', e);
-      setOwnerError(true);
-    } finally {
-      clearTimeout(timeout);
-      setLoadingOwner(false);
-    }
-  }, [ownerId]);
+      setLoadingOwner(true);
+      setOwnerError(false);
+
+      // Fail fast instead of spinning forever if the API/Firebase is unreachable.
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 12_000);
+      try {
+        const res = await fetch('/api/owners', { signal: controller.signal });
+        if (!isCurrent()) return; // a newer load superseded this one
+        if (res.ok) {
+          setOwner(await res.json());
+        } else if (res.status === 404) {
+          // No profile yet → first-time onboarding (wizard). Not an error.
+          setOwner(null);
+        } else {
+          setOwnerError(true);
+        }
+      } catch (e) {
+        // Network failure or the 12s abort above.
+        if (!isCurrent()) return;
+        console.error('Error fetching owner profile:', e);
+        setOwnerError(true);
+      } finally {
+        clearTimeout(timeout);
+        if (isCurrent()) setLoadingOwner(false);
+      }
+    },
+    [ownerId]
+  );
 
   useEffect(() => {
-    reloadOwner();
+    let active = true;
+    reloadOwner(() => active);
+    return () => {
+      active = false;
+    };
   }, [reloadOwner]);
 
   // Subscribe to real-time Rent Records for the selected billing period.
@@ -437,7 +447,7 @@ export default function OwnerDashboardPage() {
   }
 
   // ---------------- LOAD FAILURE (never spin forever) ----------------
-  if (ownerError || bedsError) {
+  if (ownerError || bedsError || tenantsError) {
     return (
       <div className="py-20 flex flex-col items-center justify-center text-center px-6">
         <div className="w-12 h-12 rounded-2xl bg-[#FEF2F2] border border-[#FECACA] flex items-center justify-center mb-4">
@@ -556,7 +566,7 @@ export default function OwnerDashboardPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {/* Single "Room Setup" entry point. When there are no beds yet, the
               onboarding banner below is the primary call-to-action, so this
               duplicate header button is hidden to avoid two identical actions on

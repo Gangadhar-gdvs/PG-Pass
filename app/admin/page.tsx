@@ -37,7 +37,7 @@ import {
 import { auth } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
+import { Dropdown } from '@/components/ui/dropdown';
 import { Drawer } from '@/components/ui/drawer';
 import { formatCurrency } from '@/lib/utils';
 import type { SuperAdminPgOverview } from '@/lib/server/services/adminOverview.service';
@@ -687,21 +687,22 @@ export default function SuperAdminPortalPage() {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <Select
+              <Dropdown
                 aria-label="Filter logs by level"
                 value={logFilter}
-                onChange={(e) => {
-                  setLogFilter(e.target.value);
-                  loadLogs(e.target.value);
+                onChange={(v) => {
+                  setLogFilter(v);
+                  loadLogs(v);
                 }}
-                containerClassName="w-auto"
+                containerClassName="w-40"
                 className="h-9 text-xs font-medium"
-              >
-                <option value="all">All Levels</option>
-                <option value="error">Errors Only</option>
-                <option value="warn">Warnings Only</option>
-                <option value="info">Info Only</option>
-              </Select>
+                options={[
+                  { value: 'all', label: 'All Levels' },
+                  { value: 'error', label: 'Errors Only' },
+                  { value: 'warn', label: 'Warnings Only' },
+                  { value: 'info', label: 'Info Only' },
+                ]}
+              />
               <Button
                 size="sm"
                 variant="outline"

@@ -74,7 +74,7 @@ export function OwnerShell({
   return (
     <OwnerSessionProvider value={session}>
       <IdleLogout role={session.role} redirectTo="/login" />
-      <div className="theme-owner min-h-screen app-gradient-tint text-slate-900 flex flex-col md:flex-row pb-24 md:pb-0">
+      <div className="theme-owner min-h-screen app-gradient-tint text-slate-900 flex flex-col md:flex-row">
         {/* Desktop sidebar */}
         <aside className="hidden md:flex flex-col justify-between w-64 shrink-0 bg-white h-screen sticky top-0 px-4 py-5 shadow-[0_0_24px_-12px_rgba(15,23,42,0.1)] border-r border-slate-100">
           <div className="space-y-6">
@@ -134,34 +134,19 @@ export function OwnerShell({
           </div>
         </aside>
 
-        {/* Mobile gradient header — sticky so it stays pinned like modern
-            consumer apps (Swiggy/Zomato) while the content scrolls underneath. */}
-        <header className="md:hidden sticky top-0 z-30 app-gradient px-5 pt-5 pb-6 rounded-b-[28px] shadow-[0_8px_24px_-12px_rgba(217,119,6,0.5)]">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-[12px] bg-white/20 backdrop-blur flex items-center justify-center">
-                <Building className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <div className="font-extrabold text-white text-[15px] leading-none">PGPass</div>
-                <div className="text-white/70 text-[11px] font-semibold mt-0.5">Owner</div>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <PropertySwitcher compact />
-              <button
-                type="button"
-                onClick={signOut}
-                className="w-9 h-9 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center press"
-                title="Sign out"
-              >
-                <LogOut className="w-4 h-4 text-white" />
-              </button>
-            </div>
+        {/* No mobile top header — the bottom tab bar is the primary nav. A slim
+            property switcher stays accessible on mobile when the owner has more
+            than one PG. */}
+        {session.role !== 'staff' && (
+          <div className="md:hidden px-4 pt-4">
+            <PropertySwitcher />
           </div>
-        </header>
+        )}
 
-        <main className="flex-1 overflow-x-hidden px-4 sm:px-6 lg:px-8 py-4 md:py-6 lg:py-8 max-w-7xl -mt-3 md:mt-0">
+        {/* `pb-24` on mobile reserves room for the fixed bottom tab bar WITHOUT
+            adding height on top of the full-screen container (which previously
+            forced every page to scroll even with little content). */}
+        <main className="flex-1 overflow-x-hidden px-4 sm:px-6 lg:px-8 py-4 md:py-6 lg:py-8 pb-24 md:pb-8 max-w-7xl w-full">
           <div className="animate-fade-up">{children}</div>
         </main>
 
@@ -182,6 +167,16 @@ export function OwnerShell({
             { href: '/support', label: 'Support', icon: LifeBuoy },
             { href: '/settings', label: 'Settings', icon: Settings },
           ])}
+          footer={
+            <button
+              type="button"
+              onClick={signOut}
+              className="w-full flex items-center justify-center gap-1.5 py-3 rounded-2xl border-2 border-slate-200 text-sm font-bold text-slate-500 hover:bg-[#FEF2F2] hover:text-[#EF4444] hover:border-[#FECACA] transition-colors press"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Sign Out</span>
+            </button>
+          }
         />
       </div>
     </OwnerSessionProvider>

@@ -76,7 +76,8 @@ export function subscribeToOwnerBeds(
 export function subscribeToOwnerTenants(
   ownerId: string,
   callback: (tenants: Tenant[]) => void,
-  propertyId?: string
+  propertyId?: string,
+  onError?: (error: { code: string }) => void
 ): () => void {
   if (!ownerId || !isFirebaseConfigured()) {
     callback([]);
@@ -99,7 +100,7 @@ export function subscribeToOwnerTenants(
     (snap) => callback(snap.docs.map((d) => ({ ...d.data(), id: d.id } as Tenant))),
     (error) => {
       console.warn('Firestore tenants subscription error:', error.code);
-      callback([]);
+      onError?.({ code: error.code });
     }
   );
 }

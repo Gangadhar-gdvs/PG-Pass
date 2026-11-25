@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Select } from '@/components/ui/select';
+import { Dropdown } from '@/components/ui/dropdown';
 import { Wrench } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -79,18 +79,13 @@ export function RaiseIssue({ portalAuth }: { portalAuth: { token: string; pin: s
 
       {open && (
         <form onSubmit={submit} className="mt-3 space-y-3">
-          <Select
+          <Dropdown
             label="Category"
             id="issue-cat"
             value={category}
-            onChange={(e) => setCategory(e.target.value)}
-          >
-            {CATEGORIES.map((c) => (
-              <option key={c.value} value={c.value}>
-                {c.label}
-              </option>
-            ))}
-          </Select>
+            onChange={setCategory}
+            options={CATEGORIES.map((c) => ({ value: c.value, label: c.label }))}
+          />
           <div>
             <label htmlFor="issue-desc" className="text-[11px] font-semibold text-[#64748B] block mb-1">
               What's the problem?
