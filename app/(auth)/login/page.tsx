@@ -30,6 +30,10 @@ function LoginFormContent() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
+  // True from the moment the session is established until the destination page
+  // takes over. Keeps a full-screen loader on top of the (now stale) login form
+  // so the user never stares at the old page during the server round-trip.
+  const [redirecting, setRedirecting] = useState(false);
 
   // Exchange Firebase ID token for httpOnly session cookie. Runs only AFTER
   // Firebase has verified the user's credentials, so the "log out other device"
@@ -70,8 +74,30 @@ function LoginFormContent() {
       throw new Error(data.error || 'Failed to establish server session');
     }
 
+    // Route by the server-verified role, NOT by `from`. The owner login is a
+    // shared entry point, so an admin or resident who signs in here must be sent
+    // to their own console instead of defaulting into the owner dashboard.
+    const data = await res.json().catch(() => ({}));
+    const role: string = data.role || 'owner';
+
     toast.success('Signed in successfully');
-    router.push(from);
+
+    // Show the full-screen loader NOW — the destination is a server-rendered
+    // page that must verify the session before it can paint, so without this the
+    // user would keep seeing the stale login form during that round-trip.
+    setRedirecting(true);
+
+    let dest = '/dashboard';
+    if (role === 'admin') {
+      dest = '/admin';
+    } else if (role === 'resident' || role === 'tenant') {
+      dest = '/resident/home';
+    } else {
+      // Owner / staff: honour the requested page, but never let an admin-only
+      // destination leak through `from`.
+      dest = from.startsWith('/admin') ? '/dashboard' : from;
+    }
+    router.replace(dest);
   };
 
   const handleGoogleSignIn = async () => {
@@ -159,6 +185,16 @@ function LoginFormContent() {
       setLoading(false);
     }
   };
+
+  if (redirecting) {
+    return (
+      <div className="min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center p-4">
+        <div className="h-9 w-9 rounded-full border-2 border-[#D97706] border-t-transparent animate-spin mb-4" />
+        <span className="text-sm font-semibold text-[#09090B]">Signing you in…</span>
+        <span className="text-xs text-[#64748B] mt-1">Loading your dashboard</span>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center p-4 sm:p-6 lg:p-8">

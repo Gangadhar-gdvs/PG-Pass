@@ -79,13 +79,24 @@ export default function AnalyticsPage() {
   const [data, setData] = useState<Analytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  // True when the failure is specifically "the admin hasn't enabled Analytics
+  // for this PG" — shown as an informative notice rather than a generic error.
+  const [featureDisabled, setFeatureDisabled] = useState(false);
 
   const load = React.useCallback(async () => {
     setLoading(true);
     setError(false);
+    setFeatureDisabled(false);
     try {
       const res = await fetch('/api/analytics');
-      if (!res.ok) throw new Error('failed');
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        if (res.status === 403 && body?.code === 'FEATURE_DISABLED') {
+          setFeatureDisabled(true);
+          return;
+        }
+        throw new Error('failed');
+      }
       setData(await res.json());
     } catch {
       setError(true);
@@ -108,6 +119,18 @@ export default function AnalyticsPage() {
           ))}
         </div>
         <Skeleton className="h-64" />
+      </div>
+    );
+  }
+
+  if (featureDisabled) {
+    return (
+      <div className="max-w-5xl mx-auto py-16">
+        <EmptyState
+          icon={<BarChart3 className="w-6 h-6 text-[#64748B]" />}
+          title="Analytics isn't enabled for your PG"
+          description="The Analytics module is managed by the PGPass team for your plan. Contact support to have it enabled for your account."
+        />
       </div>
     );
   }

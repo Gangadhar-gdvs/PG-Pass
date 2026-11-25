@@ -42,14 +42,28 @@ export function BottomTabBar({
   const [menuOpen, setMenuOpen] = useState(false);
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/');
 
+  // The active tab lifts into a filled accent "pill" (icon + label) that floats
+  // above the bar; inactive tabs are plain icons. This is the floating-selected
+  // style used by modern consumer apps, replacing the old center "+" action.
   const Tab = ({ item }: { item: TabItem }) => {
     const Icon = item.icon;
     const active = isActive(item.href);
+    if (active) {
+      return (
+        <Link
+          href={item.href}
+          aria-current="page"
+          className="accent-bg -mt-5 flex items-center gap-1.5 h-11 px-3.5 rounded-full shadow-[0_8px_20px_-6px_rgba(15,23,42,0.35)] press"
+        >
+          <Icon className="w-[20px] h-[20px]" />
+          <span className="text-[11px] font-bold">{item.label}</span>
+        </Link>
+      );
+    }
     return (
       <Link
         href={item.href}
-        className="flex flex-col items-center justify-center gap-0.5 min-w-[56px] min-h-[48px] press"
-        style={active ? { color: 'var(--accent)' } : { color: '#94A3B8' }}
+        className="flex flex-col items-center justify-center gap-0.5 min-w-[52px] min-h-[48px] press text-slate-400"
       >
         <Icon className="w-[22px] h-[22px]" />
         <span className="text-[10px] font-semibold">{item.label}</span>
@@ -65,9 +79,10 @@ export function BottomTabBar({
         style={{ paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom))' }}
       >
         <div className="pointer-events-auto mx-3 mb-1 w-full max-w-md flex items-center justify-around bg-white rounded-[22px] px-2 py-1.5 border border-slate-100 shadow-[0_10px_40px_-10px_rgba(15,23,42,0.25)]">
-          {primary.slice(0, 2).map((t) => (
-            <Tab key={t.href} item={t} />
-          ))}
+          {/* With a center action (e.g. resident "Find a PG"), split the primary
+              tabs around it. Without one (owner panel), render all four inline. */}
+          {center ? primary.slice(0, 2).map((t) => <Tab key={t.href} item={t} />)
+                  : primary.slice(0, 4).map((t) => <Tab key={t.href} item={t} />)}
 
           {center && (
             <button
@@ -80,16 +95,14 @@ export function BottomTabBar({
             </button>
           )}
 
-          {primary.slice(2, 4).map((t) => (
-            <Tab key={t.href} item={t} />
-          ))}
+          {center && primary.slice(2, 4).map((t) => <Tab key={t.href} item={t} />)}
 
           {more.length > 0 && (
             <button
               type="button"
               onClick={() => setMenuOpen(true)}
               aria-label="More"
-              className="flex flex-col items-center justify-center gap-0.5 min-w-[56px] min-h-[48px] text-slate-400 press"
+              className="flex flex-col items-center justify-center gap-0.5 min-w-[52px] min-h-[48px] text-slate-400 press"
             >
               <Menu className="w-[22px] h-[22px]" />
               <span className="text-[10px] font-semibold">More</span>

@@ -44,7 +44,7 @@ export default function LandingPage() {
                 PGPass
               </span>
               <span className="text-[10px] text-[#D97706] font-semibold tracking-wide uppercase mt-0.5 block">
-                Bento Hospitality
+                PG Management
               </span>
             </div>
           </Link>
@@ -117,16 +117,22 @@ export default function LandingPage() {
           {/* Right Preview Frame Column */}
           <div className="lg:col-span-5 text-left">
             <div className="rounded-[14px] border border-[#E2E8F0] bg-white p-5 shadow-[0_20px_50px_rgba(0,0,0,0.06)] space-y-4">
+              {/* Illustrative product preview — sample data, clearly labelled. */}
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-[#94A3B8]">
+                  Product preview · sample data
+                </span>
+              </div>
               {/* Mock Top bar */}
               <div className="flex items-center justify-between pb-3 border-b border-[#E2E8F0]">
                 <div>
                   <span className="text-xs font-bold text-[#09090B] block">
-                    Skyline Luxury Coliving
+                    Your PG Dashboard
                   </span>
-                  <span className="text-[10px] text-[#64748B]">Madhapur, Hyderabad</span>
+                  <span className="text-[10px] text-[#64748B]">Live bed inventory &amp; rent</span>
                 </div>
                 <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-[4px] bg-[#FEF3C7] text-[#92400E]">
-                  24 Beds · 81% Occ.
+                  Beds · Occupancy
                 </span>
               </div>
 
@@ -155,14 +161,14 @@ export default function LandingPage() {
                   <div className="relative p-2 rounded-[8px] border border-[#E2E8F0] bg-white overflow-hidden shadow-xs">
                     <div className="absolute top-0 bottom-0 left-0 w-1 bg-[#10B981]" />
                     <span className="font-mono text-[11px] font-bold text-[#09090B] block pl-1">101-A</span>
-                    <span className="text-[10px] text-[#475569] block pl-1 truncate">Rahul S.</span>
+                    <span className="text-[10px] text-[#475569] block pl-1 truncate">Resident</span>
                     <span className="text-[9px] text-[#10B981] font-semibold block pl-1">● Paid</span>
                   </div>
 
                   <div className="relative p-2 rounded-[8px] border border-[#E2E8F0] bg-white overflow-hidden shadow-xs">
                     <div className="absolute top-0 bottom-0 left-0 w-1 bg-[#F59E0B]" />
                     <span className="font-mono text-[11px] font-bold text-[#09090B] block pl-1">101-B</span>
-                    <span className="text-[10px] text-[#475569] block pl-1 truncate">Amit V.</span>
+                    <span className="text-[10px] text-[#475569] block pl-1 truncate">Resident</span>
                     <span className="text-[9px] text-[#D97706] font-semibold block pl-1">● Due</span>
                   </div>
 
@@ -189,27 +195,24 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* TRUST BAR */}
+        {/* VALUE BAR — factual capability claims only, no invented usage counts */}
         <section className="border-y border-[#E2E8F0] bg-white py-6">
-          <div className="max-w-6xl mx-auto px-5 flex flex-wrap items-center justify-around gap-6 text-center">
+          <div className="max-w-6xl mx-auto px-5 grid grid-cols-2 sm:grid-cols-4 gap-6 text-center">
             <div>
-              <span className="text-xl font-bold font-mono text-[#09090B] block">200+</span>
-              <span className="text-xs text-[#64748B]">PGs Managed</span>
+              <span className="text-xl font-bold font-mono text-[#10B981] block">0%</span>
+              <span className="text-xs text-[#64748B]">Payment gateway fees</span>
             </div>
-            <div className="h-6 w-px bg-[#E2E8F0] hidden sm:block" />
-            <div>
-              <span className="text-xl font-bold font-mono text-[#09090B] block">₹2.4 Crore+</span>
-              <span className="text-xs text-[#64748B]">Rent Tracked</span>
-            </div>
-            <div className="h-6 w-px bg-[#E2E8F0] hidden sm:block" />
             <div>
               <span className="text-xl font-bold font-mono text-[#09090B] block">0</span>
-              <span className="text-xs text-[#64748B]">App Downloads Required</span>
+              <span className="text-xs text-[#64748B]">App downloads for residents</span>
             </div>
-            <div className="h-6 w-px bg-[#E2E8F0] hidden sm:block" />
             <div>
-              <span className="text-xl font-bold font-mono text-[#10B981] block">100%</span>
-              <span className="text-xs text-[#64748B]">Free Forever</span>
+              <span className="text-xl font-bold font-mono text-[#09090B] block">UPI</span>
+              <span className="text-xs text-[#64748B]">Direct to your bank</span>
+            </div>
+            <div>
+              <span className="text-xl font-bold font-mono text-[#D97706] block">HRA</span>
+              <span className="text-xs text-[#64748B]">10(13A) receipts built in</span>
             </div>
           </div>
         </section>
@@ -325,7 +328,7 @@ export default function LandingPage() {
                 <span className="font-mono text-xs font-bold text-[#D97706] block">01</span>
                 <h3 className="text-sm font-bold text-[#09090B]">Register Property</h3>
                 <p className="text-xs text-[#475569] leading-relaxed">
-                  Enter your number of floors, rooms, and default monthly rent. Your entire bed inventory is generated in 30 seconds.
+                  Enter your floors, rooms, and your own rent for each sharing type. Your entire bed inventory is generated in under a minute.
                 </p>
               </div>
 

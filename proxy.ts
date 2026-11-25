@@ -4,6 +4,10 @@ import { SESSION_COOKIE_NAME } from './lib/constants/limits';
 import { buildCsp } from './lib/server/security/csp';
 import crypto from 'crypto';
 
+// NOTE: `/admin` is intentionally NOT listed. The admin console renders its own
+// self-contained admin login form (claim-gated), so it must stay reachable when
+// signed out — redirecting it to the owner `/login` is wrong (that was the
+// "Master Admin link opens the normal login" bug).
 const PROTECTED_PREFIXES = [
   '/dashboard',
   '/beds',
@@ -16,7 +20,6 @@ const PROTECTED_PREFIXES = [
   '/rent',
   '/staff',
   '/billing',
-  '/admin',
 ];
 
 export function proxy(request: NextRequest) {

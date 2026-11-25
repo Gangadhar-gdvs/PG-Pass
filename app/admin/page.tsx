@@ -31,6 +31,7 @@ import {
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
+  getIdTokenResult,
   User,
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
@@ -50,6 +51,11 @@ import Link from 'next/link';
 export default function SuperAdminPortalPage() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
+  // Verified super-admin status from the Firebase custom claim `{ admin: true }`.
+  // A signed-in Firebase user is NOT an admin until this is confirmed, so we
+  // never render the console (and never fire the admin APIs that would 403) for
+  // a non-admin account.
+  const [isAdmin, setIsAdmin] = useState(false);
 
   // Sign In states only (no public registration for security)
   const [email, setEmail] = useState('');
@@ -148,16 +154,32 @@ export default function SuperAdminPortalPage() {
     }
   };
 
-  // Listen to Firebase Auth state
+  // Listen to Firebase Auth state and verify the admin custom claim before
+  // treating the session as an admin session.
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
-      setIsInitializing(false);
       if (user) {
-        await loadPlatformData();
+        // Force-refresh so a claim granted after the user last signed in (via
+        // the bootstrap script / claims route) is picked up without re-login.
+        let admin = false;
+        try {
+          const token = await getIdTokenResult(user, true);
+          admin = token.claims.admin === true;
+        } catch {
+          admin = false;
+        }
+        setIsAdmin(admin);
+        if (admin) {
+          await loadPlatformData();
+        } else {
+          setStats(null);
+        }
       } else {
+        setIsAdmin(false);
         setStats(null);
       }
+      setIsInitializing(false);
     });
 
     return () => unsubscribe();
@@ -189,7 +211,21 @@ export default function SuperAdminPortalPage() {
 
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
-      const idToken = await userCredential.user.getIdToken();
+
+      // Verify the super-admin custom claim BEFORE establishing a session. A
+      // valid Firebase login is not enough — only accounts bootstrapped with
+      // `{ admin: true }` may enter the console. This is what stops ordinary
+      // owner credentials from reaching the admin panel.
+      const token = await getIdTokenResult(userCredential.user, true);
+      if (token.claims.admin !== true) {
+        await signOut(auth).catch(() => {});
+        setIsAdmin(false);
+        throw new Error(
+          'This account is not an authorized administrator. Admin access is restricted to provisioned admin accounts.'
+        );
+      }
+
+      const idToken = token.token;
       const res = await fetch('/api/auth/session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -198,6 +234,7 @@ export default function SuperAdminPortalPage() {
       if (!res.ok) {
         throw new Error('Failed to establish secure session cookie');
       }
+      setIsAdmin(true);
       toast.success('Admin authenticated successfully');
     } catch (err: any) {
       console.error(err);
@@ -228,6 +265,7 @@ export default function SuperAdminPortalPage() {
       await signOut(auth);
       clearLocalData();
       setCurrentUser(null);
+      setIsAdmin(false);
       setStats(null);
       setEmail('');
       setPassword('');
@@ -260,8 +298,12 @@ export default function SuperAdminPortalPage() {
     );
   }
 
-  // ---------------- AUTHENTICATION GATE (STRICT LOGIN ONLY - NO PUBLIC REGISTRATION) ----------------
-  if (!currentUser) {
+  // ---------------- AUTHENTICATION GATE (STRICT ADMIN-CLAIM ONLY) ----------------
+  // Show the admin login form for signed-out visitors AND for signed-in users
+  // who are not verified admins (e.g. an owner who typed /admin). The latter get
+  // an explicit "not authorized" banner instead of a broken, 403-ing console.
+  if (!currentUser || !isAdmin) {
+    const signedInButNotAdmin = !!currentUser && !isAdmin;
     return (
       <div className="theme-admin min-h-screen app-gradient-tint text-slate-900 flex flex-col items-center justify-center p-4">
         <div className="w-full max-w-sm app-card p-8 text-center text-left animate-pop">
@@ -280,6 +322,33 @@ export default function SuperAdminPortalPage() {
               Sign in with your authorized admin email and password.
             </p>
           </div>
+
+          {signedInButNotAdmin && (
+            <div className="mb-5 p-3 rounded-[8px] bg-[#FEF2F2] border border-[#FECACA] text-left space-y-2">
+              <div className="flex items-start gap-2">
+                <ShieldAlert className="w-4 h-4 text-[#DC2626] shrink-0 mt-0.5" />
+                <p className="text-xs font-semibold text-[#991B1B] leading-relaxed">
+                  You are signed in, but this account is not an authorized administrator.
+                  The admin console is restricted to provisioned admin accounts.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 pt-1">
+                <Link
+                  href="/dashboard"
+                  className="flex-1 text-center text-xs font-bold text-[#D97706] hover:underline"
+                >
+                  Go to Owner Dashboard
+                </Link>
+                <button
+                  type="button"
+                  onClick={handleAdminLogout}
+                  className="flex-1 text-center text-xs font-bold text-[#64748B] hover:text-[#09090B]"
+                >
+                  Sign out
+                </button>
+              </div>
+            </div>
+          )}
 
           <form onSubmit={handleAuthSubmit} className="space-y-4">
             <Input
@@ -461,8 +530,9 @@ export default function SuperAdminPortalPage() {
         </div>
       </div>
 
-      {/* Admin Navigation Tabs */}
-      <div className="border-b border-[#E2E8F0] bg-white px-6 flex items-center gap-6 text-xs font-semibold">
+      {/* Admin Navigation Tabs — horizontally scrollable on small screens so all
+          tabs remain reachable without wrapping or clipping. */}
+      <div className="border-b border-[#E2E8F0] bg-white px-4 sm:px-6 flex items-center gap-5 sm:gap-6 text-xs font-semibold overflow-x-auto whitespace-nowrap no-scrollbar">
         <button
           type="button"
           onClick={() => setActiveTab('telemetry')}
@@ -715,9 +785,10 @@ export default function SuperAdminPortalPage() {
           )}
         </div>
       ) : (
-        <div className="flex-1 flex overflow-hidden">
-          {/* Left Master List: PGs */}
-          <aside className="w-80 shrink-0 border-r border-[#E2E8F0] bg-white flex flex-col">
+        <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
+          {/* Left Master List: PGs — full width on mobile (bounded height so the
+              detail panel stays reachable below), fixed sidebar on desktop. */}
+          <aside className="w-full md:w-80 shrink-0 border-b md:border-b-0 md:border-r border-[#E2E8F0] bg-white flex flex-col max-h-64 md:max-h-none">
             {/* Search bar */}
             <div className="p-3 border-b border-[#E2E8F0]">
               <div className="relative">

@@ -32,8 +32,12 @@ export default function OwnerSupportPage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-5 pb-28 md:pb-10">
-      <header className="flex items-center gap-3 mb-4">
+    // Fixed-height column that fits within the viewport (minus the mobile header
+    // and bottom tab bar) so ONLY the chat's message list scrolls — the page
+    // itself never scrolls. `min-h-0` lets the chat card shrink so its inner
+    // overflow-y-auto region is what actually scrolls.
+    <div className="max-w-2xl mx-auto px-4 py-5 flex flex-col h-[calc(100dvh-7rem)] md:h-[calc(100dvh-4rem)]">
+      <header className="flex items-center gap-3 mb-4 shrink-0">
         <div className="w-11 h-11 rounded-2xl accent-soft-bg flex items-center justify-center">
           <LifeBuoy className="w-5 h-5 accent-text" />
         </div>
@@ -43,7 +47,7 @@ export default function OwnerSupportPage() {
         </div>
       </header>
 
-      <div className="app-card h-[70vh] min-h-[460px] flex flex-col overflow-hidden p-0">
+      <div className="app-card flex-1 min-h-0 flex flex-col overflow-hidden p-0">
         <SupportChat
           threadOwnerId={ownerId}
           viewerSide="owner"
@@ -53,7 +57,7 @@ export default function OwnerSupportPage() {
         />
       </div>
 
-      <div className="mt-4 text-center">
+      <div className="mt-3 text-center shrink-0">
         <SupportLink />
       </div>
     </div>

@@ -189,6 +189,16 @@ body {
   background: #94A3B8;
 }
 
+/* Hide the scrollbar on horizontally-scrolling nav strips (tabs, chip rows)
+   while keeping them scrollable — the modern consumer-app pattern. */
+.no-scrollbar {
+  -ms-overflow-style: none;   /* IE/Edge */
+  scrollbar-width: none;      /* Firefox */
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;              /* Chrome/Safari */
+}
+
 /* ==========================================================================
    Universal Cursor System (20+ Year UI/UX Professional Standard)
    Ensures every interactive element across the entire web application

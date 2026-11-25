@@ -105,16 +105,19 @@ export function PropertySetupWizard({
     '6': false,
   });
 
-  const [rents, setRents] = useState<Record<SharingType, number>>({
-    '1': 13500,
-    '2': 9000,
-    '3': 7000,
-    '4': 5800,
-    '5': 5000,
-    '6': 4500,
+  // No default prices — the owner enters their own rent per sharing type. Empty
+  // string means "not yet entered"; inputs show a placeholder, never a value the
+  // owner didn't choose.
+  const [rents, setRents] = useState<Record<SharingType, number | ''>>({
+    '1': '',
+    '2': '',
+    '3': '',
+    '4': '',
+    '5': '',
+    '6': '',
   });
 
-  const [acSurcharge, setAcSurcharge] = useState<number>(1500);
+  const [acSurcharge, setAcSurcharge] = useState<number | ''>('');
 
   const [selectedRoomAmenities, setSelectedRoomAmenities] = useState<string[]>([
     'attached_washroom',
@@ -209,8 +212,8 @@ export function PropertySetupWizard({
       Object.entries(f.roomCounts).forEach(([sharingKey, count]) => {
         if (count > 0 && enabledFormats[sharingKey as SharingType]) {
           const cap = Number(sharingKey);
-          const baseRent = rents[sharingKey as SharingType] || 0;
-          const roomRentPerBed = f.isAcFloor ? baseRent + acSurcharge : baseRent;
+          const baseRent = Number(rents[sharingKey as SharingType]) || 0;
+          const roomRentPerBed = f.isAcFloor ? baseRent + (Number(acSurcharge) || 0) : baseRent;
 
           totalRooms += count;
           totalBeds += count * cap;
@@ -245,6 +248,20 @@ export function PropertySetupWizard({
   const handleFinalSubmit = async () => {
     if (totalCalculations.totalBeds === 0) {
       toast.error('Please configure at least 1 room with beds');
+      return;
+    }
+
+    // Every enabled sharing type that is actually used on a floor must have a
+    // rent entered — no hidden defaults are applied on the owner's behalf.
+    const usedSharing = new Set<SharingType>();
+    floors.forEach((fl) => {
+      (Object.keys(fl.roomCounts) as SharingType[]).forEach((s) => {
+        if ((fl.roomCounts[s] || 0) > 0) usedSharing.add(s);
+      });
+    });
+    const missingRent = [...usedSharing].find((s) => !(Number(rents[s]) > 0));
+    if (missingRent) {
+      toast.error(`Please enter the monthly rent for ${missingRent}-sharing rooms before continuing`);
       return;
     }
 
@@ -297,8 +314,8 @@ export function PropertySetupWizard({
           const roomCount = fl.roomCounts[fmt.sharing] || 0;
           for (let r = 0; r < roomCount; r++) {
             const roomNum = `${fl.floorNumber}${String(roomCounter).padStart(2, '0')}`;
-            const baseRent = rents[fmt.sharing] || fmt.defaultRent;
-            const finalRent = fl.isAcFloor ? baseRent + acSurcharge : baseRent;
+            const baseRent = Number(rents[fmt.sharing]) || 0;
+            const finalRent = fl.isAcFloor ? baseRent + (Number(acSurcharge) || 0) : baseRent;
             const acType: 'ac' | 'non-ac' = fl.isAcFloor ? 'ac' : 'non-ac';
 
             for (let b = 1; b <= fmt.capacity; b++) {
@@ -633,14 +650,16 @@ export function PropertySetupWizard({
                             </span>
                             <input
                               type="number"
-                              value={rents[fmt.sharing] || ''}
+                              value={rents[fmt.sharing]}
+                              placeholder="Enter rent"
+                              min={0}
                               onChange={(e) =>
                                 setRents((prev) => ({
                                   ...prev,
-                                  [fmt.sharing]: Number(e.target.value),
+                                  [fmt.sharing]: e.target.value === '' ? '' : Number(e.target.value),
                                 }))
                               }
-                              className="w-full h-8.5 pl-6 pr-2 rounded-[6px] border border-[#CBD5E1] text-xs font-mono font-bold text-[#09090B] bg-white focus:outline-none focus:border-[#D97706]"
+                              className="w-full h-8.5 pl-6 pr-2 rounded-[6px] border border-[#CBD5E1] text-xs font-mono font-bold text-[#09090B] bg-white focus:outline-none focus:border-[#D97706] placeholder:font-sans placeholder:font-normal placeholder:text-[#94A3B8]"
                             />
                           </div>
                         </div>
@@ -668,7 +687,11 @@ export function PropertySetupWizard({
                 <input
                   type="number"
                   value={acSurcharge}
-                  onChange={(e) => setAcSurcharge(Number(e.target.value))}
+                  placeholder="e.g. 1500"
+                  min={0}
+                  onChange={(e) =>
+                    setAcSurcharge(e.target.value === '' ? '' : Number(e.target.value))
+                  }
                   className="w-full h-8.5 pl-8 pr-2 rounded-[6px] border border-[#CBD5E1] text-xs font-mono font-bold text-[#09090B] bg-white focus:outline-none focus:border-[#D97706]"
                 />
               </div>
@@ -796,12 +819,12 @@ export function PropertySetupWizard({
                         }`}
                       >
                         <Zap className="w-3 h-3" />
-                        <span>{fl.isAcFloor ? 'AC Floor (+₹' + acSurcharge + ')' : 'Non-AC'}</span>
+                        <span>{fl.isAcFloor ? 'AC Floor (+₹' + (Number(acSurcharge) || 0) + ')' : 'Non-AC'}</span>
                       </button>
                     </div>
 
                     {/* Room count counters */}
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
                       {activeFormatsList.map((fmt) => {
                         const count = fl.roomCounts[fmt.sharing] || 0;
                         return (
@@ -814,11 +837,12 @@ export function PropertySetupWizard({
                                 {fmt.label}
                               </span>
                               <span className="text-[10px] text-[#64748B] font-mono">
-                                {formatCurrency(
-                                  fl.isAcFloor
-                                    ? (rents[fmt.sharing] || fmt.defaultRent) + acSurcharge
-                                    : rents[fmt.sharing] || fmt.defaultRent
-                                )}
+                                {Number(rents[fmt.sharing]) > 0
+                                  ? formatCurrency(
+                                      (Number(rents[fmt.sharing]) || 0) +
+                                        (fl.isAcFloor ? Number(acSurcharge) || 0 : 0)
+                                    )
+                                  : 'Set rent'}
                               </span>
                             </div>
 

@@ -428,7 +428,17 @@ export default function OwnerDashboardPage() {
     return (
       <PropertySetupWizard
         initialOwnerPhone={phoneNumber || '9876543210'}
-        onComplete={(newOwner) => setOwner(newOwner)}
+        onComplete={(newOwner) => {
+          setOwner(newOwner);
+          // First-time onboarding just created the owner profile AND the initial
+          // bed inventory in Firestore. The live beds subscription was started at
+          // mount while the owner had no beds; a full reload guarantees the fresh
+          // profile + generated beds are both reflected, instead of the dashboard
+          // showing an empty inventory until something else re-triggers the query.
+          if (typeof window !== 'undefined') {
+            window.location.reload();
+          }
+        }}
       />
     );
   }
@@ -464,6 +474,11 @@ export default function OwnerDashboardPage() {
             setOwner(newOwner);
             setShowSetupWizard(false);
             toast.success('Bed inventory successfully generated!');
+            // Guarantee the newly generated beds appear even if the live
+            // subscription hasn't yet delivered the batch write.
+            if (typeof window !== 'undefined') {
+              window.location.reload();
+            }
           }}
         />
       </div>
@@ -504,15 +519,21 @@ export default function OwnerDashboardPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setShowSetupWizard(true)}
-            className="text-xs border-[#CBD5E1] text-[#334155] hover:bg-[#F8FAFC]"
-          >
-            <Building className="w-3.5 h-3.5 mr-1.5 text-[#D97706]" />
-            <span>Room Setup</span>
-          </Button>
+          {/* Single "Room Setup" entry point. When there are no beds yet, the
+              onboarding banner below is the primary call-to-action, so this
+              duplicate header button is hidden to avoid two identical actions on
+              the same screen. */}
+          {beds.length > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setShowSetupWizard(true)}
+              className="text-xs border-[#CBD5E1] text-[#334155] hover:bg-[#F8FAFC]"
+            >
+              <Building className="w-3.5 h-3.5 mr-1.5 text-[#D97706]" />
+              <span>Room Setup</span>
+            </Button>
+          )}
           <Button
             size="sm"
             variant="outline"
@@ -769,7 +790,6 @@ export default function OwnerDashboardPage() {
         onVerifyProof={(bed, rec) => setProofModalRecord({ bed, record: rec })}
         onVacate={(bed) => setConfirmVacateBed(bed)}
         onSelectBed={(bed) => setActiveBedDrawer(bed)}
-        onConfigureRooms={() => setShowSetupWizard(true)}
       />
 
       {/* RIGHT-SIDE BED DETAILS COMMAND DRAWER */}

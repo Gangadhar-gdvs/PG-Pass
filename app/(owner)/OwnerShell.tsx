@@ -16,7 +16,6 @@ import {
   BarChart3,
   Wrench,
   Wallet,
-  Plus,
   BedDouble,
   LifeBuoy,
 } from 'lucide-react';
@@ -58,9 +57,16 @@ export function OwnerShell({
   const visibleFor = <T extends { href: string }>(items: T[]) =>
     isStaff ? items.filter((i) => !OWNER_ONLY_HREFS.has(i.href)) : items;
 
-  const signOut = () => {
-    logout();
-    router.push('/login');
+  const signOut = async () => {
+    await logout();
+    // Full document navigation (not router.push) so the browser does NOT serve
+    // the authenticated owner shell from bfcache when the user navigates back or
+    // reopens the tab. `replace` also drops the owner page from history.
+    if (typeof window !== 'undefined') {
+      window.location.replace('/login');
+    } else {
+      router.replace('/login');
+    }
   };
 
   const displayPhone = session.phoneNumber || '+91 Owner';
@@ -128,8 +134,9 @@ export function OwnerShell({
           </div>
         </aside>
 
-        {/* Mobile gradient header */}
-        <header className="md:hidden app-gradient px-5 pt-5 pb-6 rounded-b-[28px] shadow-[0_8px_24px_-12px_rgba(217,119,6,0.5)]">
+        {/* Mobile gradient header — sticky so it stays pinned like modern
+            consumer apps (Swiggy/Zomato) while the content scrolls underneath. */}
+        <header className="md:hidden sticky top-0 z-30 app-gradient px-5 pt-5 pb-6 rounded-b-[28px] shadow-[0_8px_24px_-12px_rgba(217,119,6,0.5)]">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="w-9 h-9 rounded-[12px] bg-white/20 backdrop-blur flex items-center justify-center">
@@ -158,7 +165,8 @@ export function OwnerShell({
           <div className="animate-fade-up">{children}</div>
         </main>
 
-        {/* Floating bottom tab bar — essentials + center "Add" + More */}
+        {/* Floating bottom tab bar — essentials with the active tab shown as a
+            floating pill; everything else lives in "More". No center "+". */}
         <BottomTabBar
           primary={[
             { href: '/dashboard', label: 'Beds', icon: LayoutDashboard },
@@ -174,7 +182,6 @@ export function OwnerShell({
             { href: '/support', label: 'Support', icon: LifeBuoy },
             { href: '/settings', label: 'Settings', icon: Settings },
           ])}
-          center={{ label: 'Add', icon: Plus, onClick: () => router.push('/dashboard') }}
         />
       </div>
     </OwnerSessionProvider>
