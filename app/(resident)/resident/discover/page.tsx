@@ -2,13 +2,15 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
+import { Input, SearchInput } from '@/components/ui/input';
 import { CardListSkeleton } from '@/components/ui/skeletons';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Search, MapPin, Building2, Star } from 'lucide-react';
+import { Search, MapPin, ArrowRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { PgDetailDrawer } from '@/components/resident/PgDetailDrawer';
-import { HeroHeader } from '@/components/ui/dashboard-kit';
-import { errorMessage } from '@/lib/utils';
+import { PageHeader, FilterChips } from '@/components/ui/dashboard-kit';
+import { Icon3D, IconTile } from '@/components/brand/Icon3D';
+import { errorMessage, formatCurrency } from '@/lib/utils';
 
 interface Listing {
   propertyId: string;
@@ -16,10 +18,14 @@ interface Listing {
   city?: string;
   area?: string;
   pgCategory?: string;
+  foodPlan?: string;
+  monthlyRent?: number;
   coverPhotoUrl?: string;
   ratingAvg?: number;
   ratingCount?: number;
 }
+
+const ALL = 'all';
 
 export default function DiscoverPage() {
   const [q, setQ] = useState('');
@@ -28,6 +34,8 @@ export default function DiscoverPage() {
   const [loading, setLoading] = useState(true);
   const [joiningId, setJoiningId] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
+  // Client-side narrowing of the returned results by PG type (no extra fetch).
+  const [category, setCategory] = useState<string>(ALL);
 
   const search = useCallback(async () => {
     setLoading(true);
@@ -73,11 +81,28 @@ export default function DiscoverPage() {
     }
   };
 
+  // Category chips are derived from the current results; if a new search drops
+  // the selected category, fall back to "All" (derived, not synced).
+  const categories = Array.from(new Set(listings.map((l) => l.pgCategory || 'coliving')));
+  const activeCategory = categories.includes(category) ? category : ALL;
+  const visible =
+    activeCategory === ALL ? listings : listings.filter((l) => (l.pgCategory || 'coliving') === activeCategory);
+  const chipOptions = [
+    { value: ALL, label: 'All', count: listings.length },
+    ...categories.map((c) => ({
+      value: c,
+      label: <span className="capitalize">{c}</span>,
+      count: listings.filter((l) => (l.pgCategory || 'coliving') === c).length,
+    })),
+  ];
+
   return (
-    <div className="space-y-4 pt-4">
-      <HeroHeader
-        eyebrow="Discover"
-        title="Find a PG"
+    <div className="space-y-5 pt-3">
+      <PageHeader
+        icon="building"
+        tint="violet"
+        title="Find a"
+        highlight="PG"
         subtitle="Browse PGs near you and request to join."
       />
 
@@ -87,78 +112,95 @@ export default function DiscoverPage() {
           e.preventDefault();
           search();
         }}
-        className="app-card p-3.5 space-y-2.5"
+        className="app-card p-3.5 sm:p-4 space-y-2.5"
       >
-        <div className="relative">
-          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search name or area…"
-            className="w-full h-12 pl-10 pr-3 rounded-[14px] border-2 border-slate-200 text-sm focus:border-[color:var(--accent)] focus:outline-none"
-          />
-        </div>
+        <SearchInput
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search name or area…"
+          aria-label="Search name or area"
+        />
         <div className="flex gap-2">
-          <input
-            value={city}
-            onChange={(e) => setCity(e.target.value)}
-            placeholder="City (e.g. Bengaluru)"
-            className="flex-1 h-12 px-4 rounded-[14px] border-2 border-slate-200 text-sm focus:border-[color:var(--accent)] focus:outline-none"
-          />
-          <Button type="submit" variant="solid" size="md">
+          <div className="min-w-0 flex-1">
+            <Input
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              placeholder="City (e.g. Bengaluru)"
+              aria-label="City"
+              leading={<MapPin />}
+            />
+          </div>
+          <Button type="submit" variant="solid" size="lg" className="!px-4 sm:!px-6">
             <Search className="w-4 h-4" /> Search
           </Button>
         </div>
       </form>
 
+      {!loading && categories.length > 1 && (
+        <FilterChips options={chipOptions} value={activeCategory} onChange={setCategory} className="-mx-1 px-1 pb-1" />
+      )}
+
       {loading ? (
-        <CardListSkeleton rows={3} height="h-24" />
-      ) : listings.length === 0 ? (
-        <div className="app-card p-6">
+        <CardListSkeleton rows={3} height="h-[112px]" />
+      ) : visible.length === 0 ? (
+        <div className="app-card p-2">
           <EmptyState
-            icon={<Search className="w-6 h-6 accent-text" />}
+            illustration="clipboard"
             title="No PGs found"
             description="Try a different city or term. Only PGs that opted into public listing appear here."
           />
         </div>
       ) : (
-        <div className="space-y-2.5 stagger">
-          {listings.map((l) => (
+        <div className="space-y-3 stagger">
+          {visible.map((l) => (
             <button
               key={l.propertyId}
               type="button"
               onClick={() => setDetailId(l.propertyId)}
-              className="app-card p-4 flex items-center gap-3.5 w-full text-left press cursor-pointer"
+              className="app-card lift press flex w-full items-stretch gap-3.5 p-3 text-left cursor-pointer"
             >
               {l.coverPhotoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={l.coverPhotoUrl}
                   alt={l.pgName}
-                  className="w-14 h-14 rounded-[16px] object-cover shrink-0"
+                  className="h-[88px] w-[88px] shrink-0 rounded-2xl object-cover shadow-[0_8px_18px_-10px_rgba(70,40,160,0.45)]"
                 />
               ) : (
-                <div className="w-14 h-14 rounded-[16px] accent-soft-bg flex items-center justify-center shrink-0">
-                  <Building2 className="w-6 h-6" />
-                </div>
+                <IconTile icon="building" tint="violet" size={88} className="!rounded-2xl" />
               )}
-              <div className="min-w-0 flex-1">
-                <div className="font-extrabold text-[15px] text-slate-900 truncate">{l.pgName}</div>
-                <div className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
-                  <MapPin className="w-3 h-3" />
-                  {[l.area, l.city].filter(Boolean).join(', ') || 'Location n/a'}
+              <div className="flex min-w-0 flex-1 flex-col justify-between py-0.5">
+                <div className="min-w-0">
+                  <div className="truncate text-[15.5px] font-extrabold tracking-[-0.01em] text-ink">{l.pgName}</div>
+                  <div className="mt-0.5 flex min-w-0 items-center gap-1 text-[12.5px] font-medium text-ink-2/75">
+                    <MapPin className="h-3.5 w-3.5 shrink-0 text-brand" />
+                    <span className="truncate">{[l.area, l.city].filter(Boolean).join(', ') || 'Location n/a'}</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-[11px] text-slate-400 capitalize">{l.pgCategory || 'coliving'}</span>
-                  {(l.ratingCount ?? 0) > 0 && (
-                    <span className="text-[11px] font-bold text-amber-600 flex items-center gap-0.5">
-                      <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
-                      {l.ratingAvg} ({l.ratingCount})
-                    </span>
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  {typeof l.monthlyRent === 'number' && l.monthlyRent > 0 && (
+                    <span className="chip font-mono-numbers font-bold">{formatCurrency(l.monthlyRent)}/mo</span>
+                  )}
+                  <span className="chip bg-lilac-2 text-ink-2 capitalize">{l.pgCategory || 'coliving'}</span>
+                  {l.foodPlan && (
+                    <span className="chip bg-lilac-2 text-ink-2 capitalize">{l.foodPlan.replace('_', ' ')}</span>
                   )}
                 </div>
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  {(l.ratingCount ?? 0) > 0 ? (
+                    <span className="inline-flex items-center gap-1 text-[12.5px] font-bold text-ink">
+                      <Icon3D name="star" size={16} />
+                      {l.ratingAvg}
+                      <span className="font-medium text-muted">({l.ratingCount})</span>
+                    </span>
+                  ) : (
+                    <span className="text-[12px] font-medium text-faint">No reviews yet</span>
+                  )}
+                  <span className="inline-flex shrink-0 items-center gap-1 text-[13px] font-bold text-brand-700">
+                    View <ArrowRight className="h-3.5 w-3.5" strokeWidth={2.6} />
+                  </span>
+                </div>
               </div>
-              <span className="text-xs font-bold accent-text shrink-0">View →</span>
             </button>
           ))}
         </div>

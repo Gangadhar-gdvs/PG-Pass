@@ -81,10 +81,10 @@ export function OtpInput({
           onChange={(e) => handleChange(i, e)}
           onKeyDown={(e) => handleKeyDown(i, e)}
           onPaste={handlePaste}
-          className={`h-12 w-11 rounded-[8px] border text-center font-mono-numbers text-lg font-bold text-[#09090B] bg-white transition-all focus:outline-none focus:ring-2 disabled:bg-[#F1F5F9] disabled:text-[#94A3B8] ${
+          className={`h-14 w-12 rounded-2xl border text-center font-mono-numbers text-xl font-extrabold text-ink bg-white/90 shadow-[inset_0_1px_2px_rgba(70,40,160,0.05),0_6px_14px_-10px_rgba(70,40,160,0.35)] transition-all focus:outline-none disabled:bg-lilac disabled:text-faint ${
             error
-              ? "border-[#EF4444] focus:border-[#EF4444] focus:ring-[#EF4444]/20"
-              : "border-[#E2E8F0] hover:border-[#CBD5E1] focus:border-[#D97706] focus:ring-[#D97706]/20"
+              ? "border-danger focus:shadow-[0_0_0_4px_rgba(229,72,77,0.14)]"
+              : "border-line-strong hover:border-[#C7BBF0] focus:border-brand focus:bg-white focus:shadow-[0_0_0_4px_rgba(123,63,242,0.14)]"
           }`}
           aria-label={`Digit ${i + 1}`}
         />

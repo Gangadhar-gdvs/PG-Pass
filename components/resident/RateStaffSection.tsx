@@ -1,9 +1,13 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Star, UserCheck } from 'lucide-react';
+import { Star } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { errorMessage } from '@/lib/utils';
+import { Avatar } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/input';
+import { SectionCard } from '@/components/ui/dashboard-kit';
 
 interface StaffRow {
   uid: string;
@@ -14,10 +18,19 @@ interface StaffRow {
 
 function StarsInput({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   return (
-    <div className="flex items-center gap-0.5">
+    <div className="-ml-2 flex items-center">
       {[1, 2, 3, 4, 5].map((n) => (
-        <button key={n} type="button" onClick={() => onChange(n)} className="cursor-pointer" aria-label={`${n} star`}>
-          <Star className={`w-5 h-5 ${n <= value ? 'fill-amber-500 text-amber-500' : 'text-slate-300'}`} />
+        <button
+          key={n}
+          type="button"
+          onClick={() => onChange(n)}
+          className="grid h-11 w-11 cursor-pointer place-items-center rounded-full transition-transform hover:bg-brand-50 active:scale-90"
+          aria-label={`${n} star`}
+        >
+          <Star
+            className={`h-7 w-7 ${n <= value ? 'fill-warning text-warning' : 'text-line-strong'}`}
+            strokeWidth={1.8}
+          />
         </button>
       ))}
     </div>
@@ -59,70 +72,62 @@ export function RateStaffSection({ staff }: { staff: StaffRow[] }) {
   };
 
   return (
-    <section>
-      <h2 className="text-sm font-extrabold text-slate-900 mb-2 px-1">Rate Staff & Wardens</h2>
-      <div className="space-y-2 stagger">
+    <SectionCard title="Rate Staff & Wardens" icon="staff">
+      <div className="divide-y divide-line stagger">
         {staff.map((s) => (
-          <div key={s.uid} className="app-card p-3.5">
+          <div key={s.uid} className="py-3 first:pt-0 last:pb-0">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-[14px] accent-soft-bg flex items-center justify-center shrink-0">
-                <UserCheck className="w-5 h-5" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-bold text-slate-900 truncate">{s.name}</div>
+              <Avatar name={s.name} size="md" />
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[14.5px] font-bold text-ink">{s.name}</div>
                 {s.ratingCount > 0 ? (
-                  <div className="text-[11px] font-semibold text-amber-600 flex items-center gap-0.5">
-                    <Star className="w-3 h-3 fill-amber-500 text-amber-500" /> {s.ratingAvg} ({s.ratingCount})
+                  <div className="mt-0.5 flex items-center gap-1 text-[12.5px] font-bold text-ink-2">
+                    <Star className="h-3.5 w-3.5 fill-warning text-warning" /> {s.ratingAvg}
+                    <span className="font-medium text-muted">({s.ratingCount})</span>
                   </div>
                 ) : (
-                  <div className="text-[11px] text-slate-400">No ratings yet</div>
+                  <div className="mt-0.5 text-[12.5px] font-medium text-muted">No ratings yet</div>
                 )}
               </div>
               {openUid !== s.uid && (
-                <button
+                <Button
+                  variant="soft"
+                  size="md"
                   onClick={() => {
                     setOpenUid(s.uid);
                     setRating(0);
                     setNote('');
                   }}
-                  className="text-xs font-bold accent-text press"
                 >
-                  Rate
-                </button>
+                  <Star className="h-4 w-4" /> Rate
+                </Button>
               )}
             </div>
 
             {openUid === s.uid && (
-              <div className="mt-3 space-y-2 animate-pop">
+              <div className="well mt-3 space-y-3 p-3.5 animate-pop">
                 <StarsInput value={rating} onChange={setRating} />
-                <textarea
+                <Textarea
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                   rows={2}
                   maxLength={500}
                   placeholder="Optional note about this staff member…"
-                  className="w-full px-3 py-2 rounded-[12px] border-2 border-slate-200 text-sm focus:border-[color:var(--accent)] focus:outline-none resize-none"
+                  aria-label={`Note about ${s.name}`}
                 />
                 <div className="flex gap-2">
-                  <button
-                    onClick={() => submit(s.uid)}
-                    disabled={busy}
-                    className="flex-1 h-10 rounded-full accent-bg text-sm font-bold disabled:opacity-60 press"
-                  >
+                  <Button variant="solid" size="md" onClick={() => submit(s.uid)} disabled={busy} className="flex-1">
                     {busy ? 'Submitting…' : 'Submit'}
-                  </button>
-                  <button
-                    onClick={() => setOpenUid(null)}
-                    className="h-10 px-4 rounded-full border-2 border-slate-200 text-sm font-bold text-slate-600 press"
-                  >
+                  </Button>
+                  <Button variant="outline" size="md" onClick={() => setOpenUid(null)}>
                     Cancel
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}
           </div>
         ))}
       </div>
-    </section>
+    </SectionCard>
   );
 }

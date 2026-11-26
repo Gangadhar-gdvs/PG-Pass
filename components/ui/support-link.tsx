@@ -32,9 +32,9 @@ export function SupportLink({
   return (
     <a
       href={href}
-      className={`inline-flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-slate-900 press ${className}`}
+      className={`inline-flex items-center gap-2 rounded-full bg-white/70 border border-white px-4 py-2 text-[13px] font-semibold text-ink-2 shadow-[0_6px_16px_-10px_rgba(70,40,160,0.35)] hover:text-brand-700 press ${className}`}
     >
-      <LifeBuoy className="w-4 h-4" />
+      <LifeBuoy className="w-4 h-4 text-brand" />
       <span>Need help? Contact support</span>
     </a>
   );

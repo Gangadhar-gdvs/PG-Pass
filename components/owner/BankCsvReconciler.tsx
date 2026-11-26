@@ -10,10 +10,14 @@ import {
   ReconcileMatch,
   type ReconcilableRentRecord,
 } from '@/lib/client/bankCsv';
+import { Badge } from '@/components/ui/badge';
+import { KeyValue, SectionHeader } from '@/components/ui/dashboard-kit';
+import { Icon3D, IconBubble } from '@/components/brand/Icon3D';
 import {
   FileSpreadsheet,
   CheckCircle2,
   RefreshCw,
+  Loader2,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -133,21 +137,20 @@ export function BankCsvReconciler({
       description="Automatically match UPI bank credits against pending resident rent records"
       width="lg"
       footer={
-        <div className="flex items-center justify-between w-full">
-          <Button variant="outline" size="sm" onClick={onClose} disabled={confirming}>
+        <div className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <Button variant="outline" onClick={onClose} disabled={confirming} className="w-full sm:w-auto">
             Cancel
           </Button>
 
           {matchedItems.length > 0 && (
             <Button
-              variant="solid"
-              size="sm"
+              variant="success"
               loading={confirming}
               disabled={selectedIds.size === 0}
               onClick={handleBatchConfirm}
-              className="bg-[#10B981] hover:bg-[#059669] text-white"
+              className="w-full sm:w-auto"
             >
-              <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
+              {!confirming && <CheckCircle2 className="h-4 w-4" />}
               <span>Confirm & Issue Receipts ({selectedIds.size})</span>
             </Button>
           )}
@@ -164,87 +167,99 @@ export function BankCsvReconciler({
         />
 
         {matches.length === 0 ? (
-          <div
+          <button
+            type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="border-2 border-dashed border-[#CBD5E1] hover:border-[color:var(--accent)] bg-[#F8FAFC] hover:bg-white rounded-[12px] p-8 text-center transition-all cursor-pointer group space-y-2"
+            aria-busy={parsing}
+            className="group flex w-full flex-col items-center rounded-[22px] border-2 border-dashed border-brand-200 bg-brand-50/60 px-5 py-8 text-center transition-all hover:border-brand-300 hover:bg-white/80 press sm:py-10 animate-pop"
           >
-            <div className="w-12 h-12 rounded-full accent-soft-bg accent-text flex items-center justify-center mx-auto mb-2 group-hover:scale-105 transition-transform">
-              <FileSpreadsheet className="w-6 h-6" />
-            </div>
-            <span className="text-sm font-bold text-[#09090B] block">
+            <span
+              className="icon-bubble tint-violet mb-4 transition-transform group-hover:scale-105"
+              style={{ width: 80, height: 80 }}
+            >
+              <Icon3D name="report" size={48} />
+            </span>
+            <span className="block text-base font-extrabold tracking-[-0.01em] text-ink">
               {parsing ? 'Parsing Statement Columns...' : 'Upload Bank Statement CSV'}
             </span>
-            <p className="text-xs text-[#64748B] max-w-sm mx-auto">
+            <span className="mx-auto mt-1.5 block max-w-sm text-[13px] font-medium leading-relaxed text-muted">
               Export your statement from HDFC, ICICI, SBI, Axis, or Paytm Bank and drop it here.
-            </p>
-          </div>
+            </span>
+            <span className="btn-pill mt-5 h-11 text-[13.5px]">
+              {parsing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
+              Choose CSV file
+            </span>
+          </button>
         ) : (
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-[#09090B]">
-                Matched Transactions ({matchedItems.length} found)
-              </span>
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="text-xs accent-text font-semibold hover:underline inline-flex items-center gap-1"
-              >
-                <RefreshCw className="w-3 h-3" />
-                <span>Upload Another CSV</span>
-              </button>
+            <SectionHeader
+              title="Matched Transactions"
+              icon="check"
+              className="flex-wrap"
+              action={
+                <Button variant="soft" onClick={() => fileInputRef.current?.click()}>
+                  <RefreshCw className="h-4 w-4" />
+                  <span>Upload Another CSV</span>
+                </Button>
+              }
+            />
+
+            {/* Summary */}
+            <div className="well divide-y divide-line px-3.5 py-1">
+              <KeyValue label="Matched transactions" value={`${matchedItems.length} found`} />
+              <KeyValue
+                label="Exact UTR matches"
+                value={matchedItems.filter((m) => m.confidence === 'exact_utr').length}
+              />
+              <KeyValue label="Selected to confirm" value={<span className="text-success-ink">{selectedIds.size}</span>} />
             </div>
 
-            <div className="bg-white border border-[#E2E8F0] rounded-[10px] divide-y divide-[#E2E8F0] max-h-96 overflow-y-auto">
+            <div className="app-card max-h-96 divide-y divide-line overflow-y-auto overscroll-contain">
               {matchedItems.map((m, idx) => {
                 const rec = m.rentRecord;
                 const isSelected = rec?.id ? selectedIds.has(rec.id) : false;
+                const exact = m.confidence === 'exact_utr';
 
                 return (
                   <div
                     key={idx}
                     onClick={() => rec?.id && toggleSelection(rec.id)}
-                    className={`p-3.5 flex items-start gap-3 transition-colors cursor-pointer ${
-                      isSelected ? 'bg-[#ECFDF5]' : 'hover:bg-[#F8FAFC]'
+                    className={`flex items-start gap-3 px-3 py-3 transition-colors cursor-pointer sm:px-4 ${
+                      isSelected ? 'bg-success-bg/70' : 'hover:bg-lilac'
                     }`}
                   >
                     <input
                       type="checkbox"
                       checked={isSelected}
                       onChange={() => {}} // Controlled via parent div onClick
-                      className="mt-1 h-4 w-4 rounded border-[#CBD5E1] text-[#10B981] focus:ring-[#10B981] cursor-pointer"
+                      className="mt-3 h-5 w-5 shrink-0 cursor-pointer"
                     />
 
-                    <div className="flex-1 min-w-0 space-y-1 text-xs">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-[#09090B]">
+                    <IconBubble icon={exact ? 'check' : 'alert'} tint={exact ? 'mint' : 'peach'} size={40} />
+
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                          <span className="truncate text-[14px] font-bold text-ink">
                             {rec?.tenantName || rec?.bedLabel || 'Resident'}
                           </span>
-                          <span
-                            className={`text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded-[4px] ${
-                              m.confidence === 'exact_utr'
-                                ? 'bg-[#ECFDF5] text-[#065F46] border border-[#A7F3D0]'
-                                : 'bg-[#FEF3C7] text-[#92400E] border border-[#FDE68A]'
-                            }`}
-                          >
-                            {m.confidence === 'exact_utr' ? 'Exact UTR Match' : 'Amount Match'}
-                          </span>
+                          <Badge variant={exact ? 'paid' : 'pending'}>
+                            {exact ? 'Exact UTR Match' : 'Amount Match'}
+                          </Badge>
                         </div>
-                        <span className="font-mono font-bold text-[#09090B]">
+                        <span className="shrink-0 text-[14px] font-extrabold font-mono-numbers text-ink">
                           {formatCurrency(m.transaction.creditAmount)}
                         </span>
                       </div>
 
-                      <div className="text-[11px] text-[#64748B] flex items-center justify-between">
-                        <span className="font-mono truncate max-w-[280px]">
-                          {m.transaction.narration}
-                        </span>
-                        <span>{m.transaction.date}</span>
+                      <div className="flex items-center justify-between gap-3 text-xs font-medium text-muted">
+                        <span className="min-w-0 truncate font-mono">{m.transaction.narration}</span>
+                        <span className="shrink-0 font-mono-numbers">{m.transaction.date}</span>
                       </div>
 
                       {m.transaction.utr && (
-                        <div className="text-[10px] text-[#047857] font-mono">
-                          Extracted UTR: <strong>{m.transaction.utr}</strong>
+                        <div className="text-[11.5px] font-medium text-success-ink">
+                          Extracted UTR: <strong className="font-mono">{m.transaction.utr}</strong>
                         </div>
                       )}
                     </div>

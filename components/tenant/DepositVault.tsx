@@ -3,7 +3,9 @@
 import React, { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { uploadPhotoToB2 } from '@/lib/client/uploader';
-import { ShieldCheck, Plus, Share2 } from 'lucide-react';
+import { ShieldCheck, Plus, Share2, Loader2 } from 'lucide-react';
+import { Icon3D, IconBubble, IconTile } from '@/components/brand/Icon3D';
+import { KeyValue } from '@/components/ui/dashboard-kit';
 import { formatCurrency, getWhatsAppLink, errorMessage } from '@/lib/utils';
 import { config } from '@/lib/config';
 import toast from 'react-hot-toast';
@@ -80,28 +82,24 @@ export function DepositVault({
   };
 
   return (
-    <div className="bg-white border border-[#E2E8F0] rounded-[12px] p-5 shadow-xs text-left space-y-4">
-      <div className="flex items-start justify-between">
-        <div>
+    <section className="app-card p-4 sm:p-5 text-left space-y-4">
+      <div className="flex items-start gap-3">
+        <IconTile icon="wallet" tint="violet" size={48} />
+        <div className="min-w-0">
           <div className="flex items-center gap-1.5">
-            <ShieldCheck className="w-4 h-4 text-[#10B981]" />
-            <h3 className="text-sm font-bold text-[#09090B]">
+            <h3 className="text-[15.5px] font-bold leading-snug text-ink">
               Move-In Condition Vault
             </h3>
+            <ShieldCheck className="w-4 h-4 shrink-0 text-success" />
           </div>
-          <p className="text-[11px] text-[#64748B] mt-0.5">
+          <p className="mt-0.5 text-[12.5px] leading-relaxed text-muted">
             Document pre-existing wall marks, switches, or furniture condition to ensure your full deposit refund.
           </p>
         </div>
+      </div>
 
-        <div className="text-right">
-          <span className="text-[10px] uppercase font-semibold text-[#94A3B8] block">
-            Deposit
-          </span>
-          <span className="text-sm font-bold font-mono-numbers text-[#09090B]">
-            {formatCurrency(depositAmount)}
-          </span>
-        </div>
+      <div className="well px-3.5">
+        <KeyValue label="Deposit" value={formatCurrency(depositAmount)} />
       </div>
 
       <input
@@ -113,36 +111,50 @@ export function DepositVault({
         className="hidden"
       />
 
-      {/* Upload button area */}
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={loading}
-          className="flex-1 py-3 px-4 rounded-[8px] border border-dashed border-[#CBD5E1] hover:border-[#D97706] bg-[#F8FAFC] hover:bg-white flex items-center justify-center gap-2 transition-colors text-xs font-semibold text-[#64748B] hover:text-[#D97706] cursor-pointer disabled:cursor-not-allowed"
-        >
-          <Plus className="w-4 h-4" />
-          <span>{loading ? 'Securing photo in B2 vault...' : 'Add Move-In Condition Photo'}</span>
-        </button>
-      </div>
+      {/* Upload drop zone */}
+      <button
+        type="button"
+        onClick={() => fileInputRef.current?.click()}
+        disabled={loading}
+        className="group flex w-full flex-col items-center justify-center gap-2 rounded-[22px] border-2 border-dashed border-brand-200 bg-brand-50/70 px-4 py-5 text-center transition-colors hover:border-brand-300 hover:bg-white cursor-pointer disabled:cursor-not-allowed disabled:opacity-75 press"
+      >
+        <IconBubble
+          icon={
+            loading ? (
+              <Loader2 className="h-6 w-6 animate-spin text-brand" />
+            ) : (
+              <Plus className="h-6 w-6 text-brand" strokeWidth={2.4} />
+            )
+          }
+          tint="violet"
+          size={52}
+          className="transition-transform group-hover:scale-105"
+        />
+        <span className="text-[13.5px] font-bold text-ink">
+          {loading ? 'Securing photo in B2 vault...' : 'Add Move-In Condition Photo'}
+        </span>
+      </button>
 
       {photosCount > 0 && (
-        <div className="text-xs text-[#065F46] bg-[#ECFDF5] border border-[#A7F3D0] p-2.5 rounded-[6px] flex items-center justify-between">
-          <span>{photosCount} photo(s) added during this session.</span>
+        <div className="flex items-center gap-2.5 rounded-2xl border border-success-line bg-success-bg px-3.5 py-2.5 animate-pop">
+          <Icon3D name="check" size={26} />
+          <span className="text-[13px] font-semibold text-success-ink">
+            {photosCount} photo(s) added during this session.
+          </span>
         </div>
       )}
 
       {ownerPhone && (
         <Button
-          size="sm"
+          size="full"
           variant="outline"
           onClick={handleShareVault}
-          className="w-full text-xs"
+          className="!h-auto min-h-12 py-3 !whitespace-normal text-center leading-tight"
         >
-          <Share2 className="w-3.5 h-3.5 mr-1.5 text-[#10B981]" />
+          <Share2 className="w-4 h-4 shrink-0 text-success" />
           <span>Share Timestamped Vault via WhatsApp</span>
         </Button>
       )}
-    </div>
+    </section>
   );
 }

@@ -9,7 +9,12 @@ import {
 } from '@/lib/constants/permissions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ShieldCheck, UserPlus, Crown, UserCog, Ban, RotateCcw } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Avatar } from '@/components/ui/avatar';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Skeleton } from '@/components/ui/skeleton';
+import { SectionCard, InfoBanner } from '@/components/ui/dashboard-kit';
+import { ShieldCheck, UserPlus, Crown, Ban, RotateCcw, Mail } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { errorMessage } from '@/lib/utils';
 
@@ -31,21 +36,36 @@ function PermToggles({
   onToggle: (p: AdminPermission) => void;
 }) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
       {GRANTABLE_ADMIN_PERMISSIONS.map((p) => {
         const on = selected.has(p);
         return (
           <button
             key={p}
             type="button"
+            role="switch"
+            aria-checked={on}
             onClick={() => onToggle(p)}
-            className={`flex items-center justify-between gap-2 px-3 py-2 rounded-[8px] border text-left text-xs transition-colors cursor-pointer ${
-              on ? 'border-[color:var(--accent)] accent-soft-bg' : 'border-[#E2E8F0] bg-white text-[#64748B] hover:bg-[#F8FAFC]'
+            className={`flex min-h-12 items-center justify-between gap-3 rounded-2xl px-3.5 py-2.5 text-left transition-colors press ${
+              on
+                ? 'bg-brand-50 ring-1 ring-inset ring-brand-200'
+                : 'bg-lilac ring-1 ring-inset ring-line hover:bg-brand-50/60'
             }`}
           >
-            <span className="min-w-0 truncate">{ADMIN_PERMISSION_LABELS[p]}</span>
-            <span className={`relative w-8 shrink-0 rounded-full transition-colors ${on ? 'accent-bg' : 'bg-[#CBD5E1]'}`} style={{ height: 18 }}>
-              <span className="absolute top-0.5 h-3.5 w-3.5 rounded-full bg-white transition-all" style={{ left: on ? 16 : 2 }} />
+            <span className={`min-w-0 text-[13px] font-semibold leading-snug ${on ? 'text-ink' : 'text-muted'}`}>
+              {ADMIN_PERMISSION_LABELS[p]}
+            </span>
+            <span
+              aria-hidden="true"
+              className={`relative h-6 w-10 shrink-0 rounded-full transition-colors ${
+                on ? 'bg-[image:var(--grad-brand)]' : 'bg-line-strong'
+              }`}
+            >
+              <span
+                className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-[0_2px_6px_rgba(70,40,160,0.3)] transition-transform ${
+                  on ? 'translate-x-4' : 'translate-x-0'
+                }`}
+              />
             </span>
           </button>
         );
@@ -178,110 +198,148 @@ export function AdminUsersPanel() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto space-y-4">
+    <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]">
       {/* Add admin */}
-      <section className="app-card p-4 space-y-3">
-        <div className="flex items-center gap-2">
-          <span className="icon-chip accent-text"><UserPlus className="h-5 w-5" /></span>
-          <div>
-            <h2 className="text-sm font-bold text-[#0F172A]">Add an admin</h2>
-            <p className="text-[11px] text-[#64748B]">They must have signed in once (so their account exists). New admins are staff-tier.</p>
+      <SectionCard title="Add an admin" icon="user-add" className="lg:sticky lg:top-36">
+        <p className="-mt-1 mb-4 text-[12.5px] font-medium leading-relaxed text-muted">
+          They must have signed in once (so their account exists). New admins are staff-tier.
+        </p>
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+            <Input
+              label="Email"
+              type="email"
+              placeholder="admin@domain.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              disabled={creating}
+              leading={<Mail />}
+            />
+            <Input label="Name (optional)" placeholder="Full name" value={name} onChange={(e) => setName(e.target.value)} disabled={creating} />
           </div>
+          <div className="space-y-2">
+            <span className="block text-[13px] font-semibold text-ink-2">Permissions</span>
+            <PermToggles selected={newPerms} onToggle={toggleNew} />
+          </div>
+          <Button size="full" variant="solid" loading={creating} onClick={createAdmin}>
+            <UserPlus className="h-4 w-4" /> Add admin
+          </Button>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          <Input label="Email" type="email" placeholder="admin@domain.com" value={email} onChange={(e) => setEmail(e.target.value)} disabled={creating} />
-          <Input label="Name (optional)" placeholder="Full name" value={name} onChange={(e) => setName(e.target.value)} disabled={creating} />
-        </div>
-        <div className="space-y-1.5">
-          <span className="text-[11px] font-bold uppercase tracking-wide text-[#64748B]">Permissions</span>
-          <PermToggles selected={newPerms} onToggle={toggleNew} />
-        </div>
-        <Button size="sm" variant="solid" loading={creating} onClick={createAdmin}>
-          <UserPlus className="h-3.5 w-3.5 mr-1" /> Add admin
-        </Button>
-      </section>
+      </SectionCard>
 
       {/* Roster */}
-      <section className="app-card p-4">
-        <h2 className="mb-3 text-sm font-bold text-[#0F172A]">Admins</h2>
+      <SectionCard
+        title="Admins"
+        icon="users-purple"
+        action={!loading && !error ? <span className="chip shrink-0 font-mono-numbers">{admins.length}</span> : undefined}
+      >
         {loading ? (
-          <p className="text-xs text-[#94A3B8] py-4 text-center">Loading admins…</p>
-        ) : error ? (
-          <div className="py-4 text-center">
-            <p className="text-xs text-[#DC2626] mb-2">Couldn’t load admins.</p>
-            <Button size="sm" variant="outline" onClick={load}>Retry</Button>
+          <div className="space-y-3" aria-label="Loading admins">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3 py-1.5">
+                <Skeleton className="h-10 w-10 shrink-0 rounded-full" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-3.5 w-1/3" />
+                  <Skeleton className="h-3 w-1/2 rounded-full" />
+                </div>
+              </div>
+            ))}
+            <span className="sr-only">Loading admins…</span>
           </div>
+        ) : error ? (
+          <InfoBanner
+            tone="danger"
+            title="Couldn’t load admins."
+            action={
+              <Button size="sm" variant="outline" onClick={load}>
+                Retry
+              </Button>
+            }
+          />
         ) : admins.length === 0 ? (
-          <p className="text-xs text-[#94A3B8] py-4 text-center">No admins yet.</p>
+          <EmptyState icon3d="staff" title="No admins yet." className="py-8" />
         ) : (
-          <div className="divide-y divide-[#F1F5F9]">
+          <div className="divide-y divide-line">
             {admins.map((a) => {
               const isSuper = a.role === 'super';
               const suspended = a.accountStatus === 'suspended';
               return (
-                <div key={a.id} className="py-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <span className={`icon-chip ${isSuper ? 'accent-text' : 'text-[#64748B]'}`}>
-                        {isSuper ? <Crown className="h-5 w-5" /> : <UserCog className="h-5 w-5" />}
-                      </span>
+                <div key={a.id} className="py-3.5 first:pt-1 last:pb-1">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <Avatar name={a.name || a.email} size="md" />
                       <div className="min-w-0">
-                        <div className="text-sm font-semibold text-[#0F172A] truncate">
-                          {a.name || a.email}
-                          {isSuper && <span className="ml-2 text-[10px] font-bold accent-text accent-soft-bg px-1.5 py-0.5 rounded">SUPER</span>}
-                          {suspended && <span className="ml-2 text-[10px] font-bold text-[#DC2626] bg-[#FEF2F2] px-1.5 py-0.5 rounded">SUSPENDED</span>}
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                          <span className="truncate text-[14.5px] font-bold text-ink">{a.name || a.email}</span>
+                          {isSuper && (
+                            <Badge variant="brand">
+                              <Crown className="h-3 w-3" aria-hidden="true" /> Super admin
+                            </Badge>
+                          )}
+                          {suspended && (
+                            <Badge variant="danger" dot>
+                              Suspended
+                            </Badge>
+                          )}
                         </div>
-                        <div className="text-[11px] text-[#64748B] truncate">{a.email}</div>
+                        <div className="truncate text-[12.5px] font-medium text-muted">{a.email}</div>
                       </div>
                     </div>
                     {!isSuper && (
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <button
-                          type="button"
+                      <div className="flex shrink-0 flex-wrap items-center gap-2">
+                        <Button
+                          variant="soft"
+                          size="md"
+                          aria-expanded={editId === a.id}
                           onClick={() => {
                             setEditId(editId === a.id ? null : a.id);
                             setEditPerms(new Set(a.permissions));
                           }}
-                          className="text-[11px] font-bold accent-text px-2 py-1 rounded hover:bg-[#F8FAFC]"
                         >
                           {editId === a.id ? 'Close' : 'Permissions'}
-                        </button>
+                        </Button>
                         {suspended ? (
-                          <button type="button" disabled={busyId === a.id} onClick={() => setStatus(a.id, 'active')} className="inline-flex items-center gap-1 text-[11px] font-bold text-[#10B981] px-2 py-1 rounded hover:bg-[#ECFDF5]">
-                            <RotateCcw className="h-3 w-3" /> Reactivate
-                          </button>
+                          <Button variant="success" size="md" disabled={busyId === a.id} onClick={() => setStatus(a.id, 'active')}>
+                            <RotateCcw className="h-4 w-4" /> Reactivate
+                          </Button>
                         ) : (
-                          <button type="button" disabled={busyId === a.id} onClick={() => setStatus(a.id, 'suspended')} className="inline-flex items-center gap-1 text-[11px] font-bold text-[#DC2626] px-2 py-1 rounded hover:bg-[#FEF2F2]">
-                            <Ban className="h-3 w-3" /> Suspend
-                          </button>
+                          <Button variant="destructive" size="md" disabled={busyId === a.id} onClick={() => setStatus(a.id, 'suspended')}>
+                            <Ban className="h-4 w-4" /> Suspend
+                          </Button>
                         )}
                       </div>
                     )}
                   </div>
 
                   {isSuper ? (
-                    <p className="mt-1.5 ml-[2.75rem] text-[11px] text-[#94A3B8]">Full access to everything (super admin).</p>
+                    <p className="mt-2 pl-13 text-[12.5px] font-medium text-muted">Full access to everything (super admin).</p>
                   ) : editId === a.id ? (
-                    <div className="mt-3 ml-0 sm:ml-[2.75rem] space-y-2.5">
-                      <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-[#64748B]">
-                        <ShieldCheck className="h-3.5 w-3.5 accent-text" /> Grant only what this admin needs
+                    <div className="well mt-3 space-y-3 p-3.5 sm:ml-13 animate-pop">
+                      <div className="flex items-center gap-1.5 text-[13px] font-semibold text-ink-2">
+                        <ShieldCheck className="h-4 w-4 text-brand" aria-hidden="true" /> Grant only what this admin needs
                       </div>
                       <PermToggles selected={editPerms} onToggle={toggleEdit} />
-                      <Button size="sm" variant="solid" loading={busyId === a.id} onClick={() => savePerms(a.id)}>
+                      <Button size="full" variant="solid" loading={busyId === a.id} onClick={() => savePerms(a.id)}>
                         Save permissions
                       </Button>
                     </div>
+                  ) : a.permissions.length === 0 ? (
+                    <p className="mt-2 pl-13 text-[12.5px] font-medium text-muted">No permissions granted.</p>
                   ) : (
-                    <p className="mt-1.5 ml-[2.75rem] text-[11px] text-[#64748B]">
-                      {a.permissions.length === 0 ? 'No permissions granted.' : a.permissions.map((p) => ADMIN_PERMISSION_LABELS[p]).join(' · ')}
-                    </p>
+                    <div className="mt-2 flex flex-wrap gap-1.5 pl-13">
+                      {a.permissions.map((p) => (
+                        <Badge key={p} variant="neutral">
+                          {ADMIN_PERMISSION_LABELS[p]}
+                        </Badge>
+                      ))}
+                    </div>
                   )}
                 </div>
               );
             })}
           </div>
         )}
-      </section>
+      </SectionCard>
     </div>
   );
 }

@@ -91,7 +91,48 @@ Status legend: 🔴 open · 🟡 in progress · 🟢 fixed · ⚪ deferred (deci
   convenience-link trade-off, consistent with the existing staff `manage_tenants`
   role. Revisit only if staff should not see resident portal links.
 
-## UI redesign (in progress — match design-ref screenshots: violet gradients, 3D depth, soft/clean)
+## UI redesign v4 — "Lavender Glass 3D", strict match to the 4 reference screens (27 Nov 2026)
+Supersedes the v3 notes below (v3 kept per-panel teal/indigo accents and only restyled
+headline cards). Spec: `docs/design-system.md`.
+- 🟢 **Reference assets** — the 3D icons (39) and scene illustrations (7) were extracted
+  from `docs/screenshots/*.png` with transparent/feathered edges into `public/brand/`;
+  logo redrawn as SVG (`components/brand/Logo.tsx`, `public/icon.svg`).
+- 🟢 **One theme for Admin / Owner / Resident** — tokens sampled from the refs in
+  `app/globals.css` (`@theme` + `@layer components`); Plus Jakarta Sans; slate/gray/amber
+  scales remapped so legacy classes land on-palette; 1,247 hard-coded hex colours
+  codemodded to tokens.
+- 🟢 **Every screen restyled** — all owner pages + modals/wizard, admin console + login,
+  resident home/tenancy/discover, token portal, auth, landing, legal, idle-logout; new
+  styled `app/not-found.tsx` + `app/error.tsx` (error boundary reports via the client logger).
+- 🟢 **Fixed: drawers/dialogs anchored to the content column** — the shell's
+  `animate-fade-up` used fill-mode `both`, leaving `transform` on the wrapper, which made it
+  the containing block for `position: fixed` children. Now `backwards` (globals.css).
+  Verified: bed drawer stays on the viewport after scrolling 2,600px.
+- 🟢 **Fixed: ProofUploader "Upload Different Screenshot" submitted the UTR claim form**
+  (button had no `type`). Now `type="button"`.
+- 🟢 **Fixed: admin resident table "Monthly Rent" never sorted** — column key `rent` is not
+  a Tenant field; now `monthlyRent`.
+- 🟢 **Fixed: DataTable mobile rows were `<button disabled>` wrapping links/buttons**
+  (invalid nesting, swallowed taps) → `div role="button"` with keyboard support.
+- ✅ Gates: typecheck 0 · lint 0 · 86 tests · build ✓. All 24 routes screenshotted at 390px
+  (and key ones at 1280px) against a seeded emulator: no horizontal overflow, no console errors.
+
+### Bugs found during the redesign QA (not UI — logged, not changed)
+- 🔴 `/tenants` + bed drawer read `tenant.depositPaid`, server writes `depositPaidPaise` → deposits show ₹0.
+- 🔴 `/billing` reads `profile.planTier`, server writes `plan` → a Pro owner shows "Free Plan · 30/20 beds".
+- 🔴 `/admin` resident table shows `tenant.monthlyRent`, which tenant creation never writes → ₹0/month.
+- 🔴 `lib/config.ts isConfigured()` returns false for project id `pgpass-demo`, so the documented
+  emulator setup disables every client listener (use `demo-pgpass` locally).
+- 🔴 Local emulator session writes fail with "Could not load the default credentials" because the
+  Admin SDK uses `preferRest`; workaround: point `GOOGLE_APPLICATION_CREDENTIALS` at a dummy SA key.
+- 🔴 RoomCard: guest beds fall through to the "Due" badge and show the WhatsApp reminder button.
+- 🔴 Bed tiles/rows are click-only `div`s — not keyboard-operable.
+- 🔴 BankCsvReconciler says "drop it here" but has no drag-and-drop handler.
+- 🔴 WhatsAppReminderModal doesn't await `navigator.clipboard.writeText` (toast shows even on failure).
+- ⚪ `PropertySetupWizard` accepts `onCancel` but never uses it; staff revoke + PG photo delete still use
+  `window.confirm()` instead of `ConfirmDialog`.
+
+## UI redesign v3 (superseded by v4 above — match design-ref screenshots: violet gradients, 3D depth, soft/clean)
 - 🟢 **Design foundation** — `app/globals.css` v3 tokens: lavender canvas, violet
   accent, pastel tint palette, layered soft "3D" shadows, `.hero-gradient`,
   `.tint-card`, `.icon-chip`, bigger radii. Per-panel accents kept (owner violet /

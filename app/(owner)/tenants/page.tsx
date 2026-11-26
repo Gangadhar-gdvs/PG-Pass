@@ -8,21 +8,37 @@ import { formatCurrency, getWhatsAppLink } from '@/lib/utils';
 import { config } from '@/lib/config';
 import { Tenant } from '@/types';
 import {
-  Users,
-  Search,
   Download,
   Copy,
   ExternalLink,
   Phone,
   Send,
+  BedDouble,
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  RotateCw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DataTable, Column } from '@/components/ui/data-table';
 import { Avatar } from '@/components/ui/avatar';
 import { EmptyState } from '@/components/ui/empty-state';
-import { ListSkeleton } from '@/components/ui/skeletons';
-import { HeroHeader } from '@/components/ui/dashboard-kit';
+import { SearchInput } from '@/components/ui/input';
+import { ListSkeleton, StatGridSkeleton } from '@/components/ui/skeletons';
+import { PageHeader, SectionCard, StatTile } from '@/components/ui/dashboard-kit';
 import toast from 'react-hot-toast';
+
+/* Round icon links (call / open portal / WhatsApp). Mobile keeps the 44px
+   touch target; desktop table rows use a tighter 36px. */
+const roundLink =
+  'inline-grid h-11 w-11 sm:h-9 sm:w-9 shrink-0 place-items-center rounded-full transition-colors press';
+const roundSoft = `${roundLink} bg-brand-50 text-brand-700 hover:bg-brand-100`;
+const roundSuccess = `${roundLink} bg-success-bg text-success-ink hover:bg-success-line`;
+
+const moveInLabel = (t: Tenant) =>
+  t.moveInDate
+    ? new Date(t.moveInDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+    : '—';
 
 export default function TenantsPage() {
   const { ownerId, properties, selectedPropertyId } = useOwnerSession();
@@ -62,6 +78,11 @@ export default function TenantsPage() {
     });
   }, [search]);
 
+  // Display-only totals derived from the data already on the page.
+  const vacantBeds = beds.filter((b) => b.status === 'vacant').length;
+  const depositsHeld = tenants.reduce((sum, t) => sum + (t.depositPaid || 0), 0);
+  const portalReady = tenants.filter((t) => Boolean(t.token)).length;
+
   const handleCopyLink = (token?: string) => {
     if (!token) {
       toast.error('No portal token generated for this resident');
@@ -94,9 +115,9 @@ export default function TenantsPage() {
       header: 'Resident',
       sortable: true,
       render: (t) => (
-        <div className="flex items-center gap-2.5">
-          <Avatar name={t.name} size="sm" />
-          <span className="font-bold text-[#09090B] text-xs">{t.name}</span>
+        <div className="flex items-center gap-3">
+          <Avatar name={t.name} size="md" />
+          <span className="font-bold text-ink text-[13.5px]">{t.name}</span>
         </div>
       ),
     },
@@ -104,7 +125,7 @@ export default function TenantsPage() {
       key: 'phone',
       header: 'Phone',
       render: (t) => (
-        <span className="font-mono-numbers text-xs text-[#475569]">
+        <span className="font-mono-numbers text-[13px] font-medium text-ink-2">
           +91 {t.phone}
         </span>
       ),
@@ -114,7 +135,8 @@ export default function TenantsPage() {
       header: 'Assigned Unit',
       sortable: true,
       render: (t) => (
-        <span className="inline-flex items-center font-mono-numbers text-xs font-semibold px-2 py-0.5 rounded-[6px] bg-[#F1F5F9] border border-[#E2E8F0] text-[#09090B]">
+        <span className="chip font-mono-numbers">
+          <BedDouble className="h-3.5 w-3.5" />
           {t.bedLabel || 'Bed'}
         </span>
       ),
@@ -123,11 +145,7 @@ export default function TenantsPage() {
       key: 'moveInDate',
       header: 'Move-In Date',
       sortable: true,
-      render: (t) => (
-        <span className="text-xs text-[#64748B]">
-          {t.moveInDate ? new Date(t.moveInDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
-        </span>
-      ),
+      render: (t) => <span className="text-[13px] font-medium text-muted">{moveInLabel(t)}</span>,
     },
     {
       key: 'depositPaid',
@@ -135,7 +153,7 @@ export default function TenantsPage() {
       sortable: true,
       align: 'right',
       render: (t) => (
-        <span className="font-mono-numbers text-xs font-bold text-[#09090B]">
+        <span className="font-mono-numbers text-[14px] font-extrabold text-ink">
           {formatCurrency(t.depositPaid || 0)}
         </span>
       ),
@@ -150,9 +168,9 @@ export default function TenantsPage() {
             type="button"
             title="Copy resident link"
             onClick={() => handleCopyLink(t.token)}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-[6px] border border-[#E2E8F0] hover:bg-[#F8FAFC] text-[11px] font-semibold accent-text transition-colors cursor-pointer"
+            className="inline-flex h-9 items-center gap-1.5 rounded-full bg-brand-50 px-3.5 text-xs font-bold text-brand-700 transition-colors hover:bg-brand-100 cursor-pointer press"
           >
-            <Copy className="w-3 h-3 accent-text" />
+            <Copy className="h-3.5 w-3.5" />
             <span>Copy</span>
           </button>
           <a
@@ -160,9 +178,9 @@ export default function TenantsPage() {
             target="_blank"
             rel="noopener noreferrer"
             title="Open portal"
-            className="p-1 rounded-[6px] border border-[#E2E8F0] hover:bg-[#F8FAFC] text-[#64748B] transition-colors cursor-pointer"
+            className={roundSoft}
           >
-            <ExternalLink className="w-3 h-3" />
+            <ExternalLink className="h-3.5 w-3.5" />
           </a>
         </div>
       ),
@@ -173,21 +191,17 @@ export default function TenantsPage() {
       align: 'right',
       render: (t) => (
         <div className="flex items-center justify-end gap-1.5">
-          <a
-            href={`tel:${t.phone}`}
-            title="Call"
-            className="p-1.5 rounded-[6px] border border-[#E2E8F0] hover:bg-[#F8FAFC] text-[#475569] transition-colors"
-          >
-            <Phone className="w-3.5 h-3.5" />
+          <a href={`tel:${t.phone}`} title="Call" className={roundSoft}>
+            <Phone className="h-4 w-4" />
           </a>
           <a
             href={getWhatsAppLink(t.phone, `Namaste ${t.name} ji 🙏`)}
             target="_blank"
             rel="noopener noreferrer"
             title="WhatsApp"
-            className="p-1.5 rounded-[6px] bg-[#10B981] hover:bg-[#059669] text-white transition-colors"
+            className={roundSuccess}
           >
-            <Send className="w-3.5 h-3.5" />
+            <Send className="h-4 w-4" />
           </a>
         </div>
       ),
@@ -196,100 +210,193 @@ export default function TenantsPage() {
 
   return (
     <div className="space-y-5 text-left">
-      {/* Top Header */}
-      <HeroHeader
-        eyebrow="Residents"
-        title="Resident Directory"
+      <PageHeader
+        icon="users"
+        tint="violet"
+        title="Resident"
+        highlight="Directory"
         subtitle={`Active leaseholders, private portal URLs, and deposit ledger (${tenants.length} total).`}
-        right={
-          <button
-            type="button"
-            onClick={handleExportCsv}
-            className="inline-flex items-center h-9 px-4 rounded-full bg-white/15 hover:bg-white/25 border border-white/25 text-white text-xs font-bold press"
-          >
-            <Download className="w-3.5 h-3.5 mr-1.5" />
-            <span>Export CSV</span>
-          </button>
+        actions={
+          <Button variant="outline" onClick={handleExportCsv}>
+            <Download className="h-4 w-4" />
+            Export CSV
+          </Button>
         }
       />
 
-      {/* Search Input */}
-      <div className="relative max-w-sm">
-        <Search className="w-3.5 h-3.5 text-[#94A3B8] absolute left-3 top-1/2 -translate-y-1/2" />
-        <input
-          type="text"
-          placeholder="Filter by name, phone, or bed label..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full bg-white border border-[#E2E8F0] rounded-[8px] pl-9 pr-3 py-2 text-xs text-[#09090B] placeholder:text-[#94A3B8] focus:outline-none focus:border-[color:var(--accent)]"
-        />
-      </div>
+      {/* Stat row — derived from the residents + beds already loaded */}
+      {loading ? (
+        <StatGridSkeleton count={4} />
+      ) : !error ? (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 stagger">
+          <StatTile icon="users" tint="violet" label="Residents" value={tenants.length} />
+          <StatTile icon="bed" tint="sky" label="Vacant Beds" value={vacantBeds} />
+          <StatTile icon="wallet" tint="mint" label="Deposits Held" value={formatCurrency(depositsHeld)} />
+          <StatTile icon="check" tint="peach" label="Portal Links Ready" value={portalReady} />
+        </div>
+      ) : null}
 
-      {/* Data Table */}
+      {/* Search */}
+      <SearchInput
+        placeholder="Filter by name, phone, or bed label..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        aria-label="Search residents"
+        containerClassName="w-full sm:max-w-md"
+      />
+
+      {/* Directory */}
       {loading ? (
         <ListSkeleton rows={6} />
       ) : error ? (
-        <EmptyState
-          icon={<Users className="w-6 h-6 text-[#DC2626]" />}
-          title="Couldn't load residents"
-          description="We couldn't reach the server in time. Check your connection and try again."
-          action={
-            <button
-              onClick={() => window.location.reload()}
-              className="h-11 px-5 rounded-full accent-bg text-white text-sm font-bold press"
-            >
-              Retry
-            </button>
-          }
-        />
-      ) : filteredTenants.length === 0 ? (
-        <EmptyState
-          icon={<Users className="w-6 h-6 text-[#64748B]" />}
-          title="No residents found"
-          description={
-            tenants.length === 0
-              ? 'Assign residents to beds from your dashboard inventory to populate this directory.'
-              : 'Try clearing your search query.'
-          }
-        />
-      ) : (
-        <>
-          <DataTable
-            columns={columns}
-            data={pagedTenants}
-            keyExtractor={(t) => t.id}
+        <div className="app-card">
+          <EmptyState
+            icon3d="alert"
+            title="Couldn't load residents"
+            description="We couldn't reach the server in time. Check your connection and try again."
+            action={
+              <Button onClick={() => window.location.reload()}>
+                <RotateCw className="h-4 w-4" />
+                Retry
+              </Button>
+            }
           />
+        </div>
+      ) : filteredTenants.length === 0 ? (
+        <div className="app-card">
+          {tenants.length === 0 ? (
+            <EmptyState
+              illustration="clipboard"
+              title="No residents found"
+              description="Assign residents to beds from your dashboard inventory to populate this directory."
+            />
+          ) : (
+            <EmptyState
+              icon3d="users"
+              title="No residents found"
+              description="Try clearing your search query."
+            />
+          )}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {/* Phones: rich resident cards (avatar, unit + move-in chips, actions). */}
+          <SectionCard
+            className="sm:hidden"
+            title="Residents"
+            icon="users"
+            action={<span className="chip font-mono-numbers">{filteredTenants.length}</span>}
+          >
+            <ul className="divide-y divide-line stagger">
+              {pagedTenants.map((t) => (
+                <li key={t.id} className="py-3.5 first:pt-1 last:pb-1">
+                  <div className="flex items-center gap-3">
+                    <Avatar name={t.name} size="lg" />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[15px] font-bold text-ink">{t.name}</div>
+                      <div className="font-mono-numbers text-[12.5px] font-medium text-muted">+91 {t.phone}</div>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <div className="font-mono-numbers text-[15px] font-extrabold text-ink">
+                        {formatCurrency(t.depositPaid || 0)}
+                      </div>
+                      <div className="text-[11px] font-semibold text-muted">Deposit</div>
+                    </div>
+                  </div>
+
+                  <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                    <span className="chip font-mono-numbers">
+                      <BedDouble className="h-3.5 w-3.5" />
+                      {t.bedLabel || 'Bed'}
+                    </span>
+                    <span className="chip">
+                      <CalendarDays className="h-3.5 w-3.5" />
+                      Moved in {moveInLabel(t)}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 flex items-center gap-2">
+                    <button
+                      type="button"
+                      title="Copy resident link"
+                      onClick={() => handleCopyLink(t.token)}
+                      className="inline-flex h-11 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-full bg-brand-50 px-3 text-[13px] font-bold text-brand-700 transition-colors hover:bg-brand-100 cursor-pointer press"
+                    >
+                      <Copy className="h-4 w-4 shrink-0" />
+                      <span className="truncate">Copy</span>
+                    </button>
+                    <a
+                      href={`/t/${t.token}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Open portal"
+                      aria-label="Open portal"
+                      className={roundSoft}
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </a>
+                    <a href={`tel:${t.phone}`} title="Call" aria-label="Call" className={roundSoft}>
+                      <Phone className="h-4 w-4" />
+                    </a>
+                    <a
+                      href={getWhatsAppLink(t.phone, `Namaste ${t.name} ji 🙏`)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="WhatsApp"
+                      aria-label="WhatsApp"
+                      className={roundSuccess}
+                    >
+                      <Send className="h-4 w-4" />
+                    </a>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </SectionCard>
+
+          {/* Tablet / desktop: sortable table. */}
+          <div className="hidden sm:block">
+            <DataTable
+              columns={columns}
+              data={pagedTenants}
+              keyExtractor={(t) => t.id}
+            />
+          </div>
+
           {pageCount > 1 && (
-            <div className="flex items-center justify-between mt-3 text-xs">
-              <span className="text-[#64748B]">
-                Showing {safePage * PAGE_SIZE + 1}–
-                {Math.min(filteredTenants.length, safePage * PAGE_SIZE + PAGE_SIZE)} of{' '}
-                {filteredTenants.length}
+            <div className="flex flex-col-reverse items-center gap-3 sm:flex-row sm:justify-between">
+              <span className="text-[13px] font-medium text-muted">
+                Showing{' '}
+                <span className="font-mono-numbers font-bold text-ink">
+                  {safePage * PAGE_SIZE + 1}–
+                  {Math.min(filteredTenants.length, safePage * PAGE_SIZE + PAGE_SIZE)}
+                </span>{' '}
+                of <span className="font-mono-numbers font-bold text-ink">{filteredTenants.length}</span>
               </span>
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
-                  size="sm"
                   disabled={safePage === 0}
                   onClick={() => setPage((p) => Math.max(0, p - 1))}
                 >
+                  <ChevronLeft className="h-4 w-4" />
                   Previous
                 </Button>
-                <span className="text-[#64748B] font-semibold">
+                <span className="chip font-mono-numbers">
                   {safePage + 1} / {pageCount}
                 </span>
                 <Button
                   variant="outline"
-                  size="sm"
                   disabled={safePage >= pageCount - 1}
                   onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
                 >
                   Next
+                  <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   );

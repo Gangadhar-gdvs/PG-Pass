@@ -1,13 +1,35 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <defs>
-    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#818cf8"/>
-      <stop offset="100%" stop-color="#4f46e5"/>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#F7F2FF"/>
+      <stop offset="1" stop-color="#E4D6FF"/>
+    </linearGradient>
+    <linearGradient id="house" x1="60" y1="70" x2="440" y2="430" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#5B4BD1"/>
+      <stop offset="1" stop-color="#2B2196"/>
+    </linearGradient>
+    <linearGradient id="check" x1="190" y1="380" x2="470" y2="230" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7C2CF6"/>
+      <stop offset="1" stop-color="#B068FF"/>
+    </linearGradient>
+    <linearGradient id="win" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3B7BFF"/>
+      <stop offset="1" stop-color="#1546E0"/>
     </linearGradient>
   </defs>
-  <rect width="512" height="512" rx="128" fill="#090d16"/>
-  <rect x="32" y="32" width="448" height="448" rx="96" fill="url(#grad)"/>
-  <path d="M160 210 L256 130 L352 210 V360 H160 Z" fill="#ffffff" opacity="0.95"/>
-  <rect x="220" y="270" width="72" height="90" rx="12" fill="#4f46e5"/>
-  <path d="M256 180 L290 220 H222 Z" fill="#818cf8"/>
+  <rect width="512" height="512" rx="120" fill="url(#bg)"/>
+  <g transform="translate(56 92) scale(4)" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M7 40 L47 8 L87 40" stroke="url(#house)" stroke-width="7.5"/>
+    <path d="M73 27 V14" stroke="url(#house)" stroke-width="7.5"/>
+    <path d="M20 40 V74 H36" stroke="url(#house)" stroke-width="7.5"/>
+    <path d="M76 49 V74 H66" stroke="url(#house)" stroke-width="7.5"/>
+    <g fill="url(#win)" stroke="none">
+      <rect x="40" y="37" width="6.6" height="6.6" rx="1.2"/>
+      <rect x="48.4" y="37" width="6.6" height="6.6" rx="1.2"/>
+      <rect x="40" y="45.4" width="6.6" height="6.6" rx="1.2"/>
+      <rect x="48.4" y="45.4" width="6.6" height="6.6" rx="1.2"/>
+    </g>
+    <path d="M38 60 L50 71 L93 43" stroke="#FFFFFF" stroke-width="15"/>
+    <path d="M38 60 L50 71 L93 43" stroke="url(#check)" stroke-width="9"/>
+  </g>
 </svg>

@@ -4,19 +4,63 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { formatCurrency, formatDateIN, errorMessage, tsToDate } from '@/lib/utils';
-import { HeaderSkeleton, PanelSkeleton } from '@/components/ui/skeletons';
+import { StatCardSkeleton, PanelSkeleton } from '@/components/ui/skeletons';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { HeroHeader } from '@/components/ui/dashboard-kit';
-import { ArrowLeft, ShieldCheck, Wrench, Star } from 'lucide-react';
+import { Textarea } from '@/components/ui/input';
+import { Badge, type BadgeProps } from '@/components/ui/badge';
+import { EmptyState } from '@/components/ui/empty-state';
+import {
+  HeroHeader,
+  StatTile,
+  InfoBanner,
+  QuickActionGrid,
+  SectionCard,
+  ActivityRow,
+} from '@/components/ui/dashboard-kit';
+import { Icon3D, IconBubble, type Icon3DName, type Tint } from '@/components/brand/Icon3D';
+import { ArrowLeft, ArrowRight, Star, Plus, Clock, Building2, CalendarDays, Pin } from 'lucide-react';
 import { RateStaffSection } from '@/components/resident/RateStaffSection';
 import type { Tenant, RentRecord, MaintenanceTicket, Notice } from '@/types';
 import toast from 'react-hot-toast';
 
-const STATUS_STYLE: Record<string, string> = {
-  paid: 'bg-[#D1FAE5] text-[#065F46]',
-  verify: 'bg-[#E0E7FF] text-[#4338CA]',
-  pending: 'bg-[#FEF3C7] text-[#92400E]',
+type BadgeVariant = NonNullable<BadgeProps['variant']>;
+
+const RENT_STATUS: Record<string, { badge: BadgeVariant; label: string; icon: Icon3DName; tint: Tint }> = {
+  paid: { badge: 'paid', label: 'Paid', icon: 'check', tint: 'mint' },
+  verify: { badge: 'verify', label: 'Verifying', icon: 'clock', tint: 'violet' },
+  pending: { badge: 'pending', label: 'Pending', icon: 'alert', tint: 'peach' },
 };
+
+const TICKET_BADGE: Record<string, BadgeVariant> = {
+  open: 'pending',
+  in_progress: 'verify',
+  resolved: 'paid',
+};
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** "2026-11" → "Nov 2026" (falls back to the raw value). */
+function formatPeriod(period?: string): string {
+  if (!period) return '—';
+  const m = /^(\d{4})-(\d{2})$/.exec(period);
+  if (!m) return period;
+  return `${MONTHS[Number(m[2]) - 1] ?? m[2]} ${m[1]}`;
+}
+
+/** Whole days from `fromISO` to `toISO` (both YYYY-MM-DD). */
+function daysBetween(fromISO: string, toISO: string): number {
+  return Math.round((Date.parse(`${toISO}T00:00:00Z`) - Date.parse(`${fromISO}T00:00:00Z`)) / 86_400_000);
+}
+
+const remainingPaise = (r: RentRecord) => Math.max(0, (r.amountDuePaise || 0) - (r.amountPaidPaise || 0));
+
+/** Scroll to an existing section on this page (quick actions / banner). */
+function scrollToSection(id: string) {
+  const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  document.getElementById(id)?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+}
 
 interface TenancyStaffRow {
   uid: string;
@@ -45,6 +89,11 @@ export default function TenancyDetail() {
   const [pgText, setPgText] = useState('');
   const [pgOpen, setPgOpen] = useState(false);
   const [pgBusy, setPgBusy] = useState(false);
+  // Today's local date (YYYY-MM-DD), read once — used only for due-date display.
+  const [today] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -98,14 +147,43 @@ export default function TenancyDetail() {
 
   if (loading) {
     return (
-      <div className="space-y-3 pt-4">
-        <HeaderSkeleton action={false} />
-        <PanelSkeleton height="h-20" />
-        <PanelSkeleton height="h-40" />
+      <div className="space-y-5 pt-2" aria-busy="true">
+        <Skeleton className="h-11 w-28 rounded-full" />
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-2.5 pt-2">
+            <Skeleton className="h-6 w-20 rounded-full" />
+            <Skeleton className="h-8 w-44" />
+            <Skeleton className="h-4 w-40 rounded-full" />
+          </div>
+          <Skeleton className="h-28 w-36 rounded-[28px]" />
+        </div>
+        <div className="grid grid-cols-3 gap-2.5">
+          <StatCardSkeleton />
+          <StatCardSkeleton />
+          <StatCardSkeleton />
+        </div>
+        <PanelSkeleton height="h-24" />
+        <PanelSkeleton height="h-44" />
       </div>
     );
   }
-  if (!data) return <p className="text-sm text-slate-500 pt-6">Could not load this tenancy.</p>;
+  if (!data) {
+    return (
+      <div className="pt-4">
+        <div className="app-card p-2">
+          <EmptyState
+            icon3d="alert"
+            title="Could not load this tenancy."
+            action={
+              <Link href="/resident/home" className="btn-soft">
+                <ArrowLeft className="h-4 w-4" /> My PGs
+              </Link>
+            }
+          />
+        </div>
+      </div>
+    );
+  }
 
   const { tenant, rentHistory, tickets, staff } = data;
 
@@ -139,97 +217,370 @@ export default function TenancyDetail() {
     }
   };
 
+  /* ---------- Derived display data (no new fetches) ---------- */
+  const currentPeriod = today.slice(0, 7);
+  const latest: RentRecord | undefined = rentHistory[0];
+
+  let banner: {
+    tone: 'success' | 'warning' | 'danger' | 'brand';
+    icon: Icon3DName;
+    headline: string;
+    detail: string;
+  } | null = null;
+  if (latest) {
+    const periodText = latest.period === currentPeriod ? 'this Month' : formatPeriod(latest.period);
+    const paid = formatCurrency((latest.amountPaidPaise || 0) / 100);
+    if (latest.status === 'paid') {
+      banner = {
+        tone: 'success',
+        icon: 'check',
+        headline: `Paid for ${periodText}`,
+        detail: `${paid} paid${latest.receiptNumber ? ` · REC-${String(latest.receiptNumber).padStart(5, '0')}` : ''}`,
+      };
+    } else if (latest.status === 'verify') {
+      banner = {
+        tone: 'brand',
+        icon: 'calendar-clock',
+        headline: 'Payment under verification',
+        detail: `${formatPeriod(latest.period)} · ${paid} awaiting confirmation from your PG`,
+      };
+    } else {
+      const hasDue = !!latest.dueDate && ISO_DATE.test(latest.dueDate);
+      const overdue = hasDue && daysBetween(latest.dueDate as string, today) > 0;
+      banner = {
+        tone: overdue ? 'danger' : 'warning',
+        icon: 'alert',
+        headline: overdue ? 'Rent overdue' : `Rent due for ${periodText}`,
+        detail: `${formatCurrency(remainingPaise(latest) / 100)}${hasDue ? ` · Due ${formatDateIN(latest.dueDate)}` : ''}`,
+      };
+    }
+  }
+
+  const reminders = rentHistory
+    .filter((r) => r.status === 'pending' && !!r.dueDate && ISO_DATE.test(r.dueDate))
+    .sort((a, b) => (a.dueDate as string).localeCompare(b.dueDate as string))
+    .slice(0, 3);
+
   return (
-    <div className="space-y-5 pt-4">
-      <Link href="/resident/home" className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 press">
+    <div className="space-y-5 pt-2">
+      <Link
+        href="/resident/home"
+        className="inline-flex h-11 items-center gap-1.5 rounded-full border border-white bg-white/75 px-4 text-[13px] font-bold text-ink-2 shadow-[0_6px_16px_-10px_rgba(70,40,160,0.4)] hover:text-brand-700 press"
+      >
         <ArrowLeft className="w-4 h-4" /> My PGs
       </Link>
 
       <HeroHeader
-        eyebrow="Your Tenancy"
-        title={tenant.ownerName || 'Your Tenancy'}
-        subtitle={`${tenant.roomNumber ? `Room ${tenant.roomNumber} · ` : ''}Bed ${tenant.bedLabel || '—'} · since ${formatDateIN(tenant.moveInDate)}`}
-      >
-        <div className="rounded-[16px] bg-white/15 backdrop-blur-sm px-4 py-3 flex items-center gap-3">
-          <div className="w-11 h-11 rounded-[14px] bg-white/20 flex items-center justify-center shrink-0">
-            <ShieldCheck className="w-5 h-5 text-white" />
+        variant="light"
+        title="Hello,"
+        highlight={
+          <>
+            {tenant.name || 'there'} <span className="text-ink">👋</span>
+          </>
+        }
+        subtitle="Welcome back to your PG!"
+        meta={
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-white bg-white/85 px-3.5 py-2 text-[13px] font-semibold text-ink shadow-[0_8px_18px_-10px_rgba(70,40,160,0.45)]">
+              <Building2 className="h-4 w-4 shrink-0 text-brand" />
+              <span className="truncate">{tenant.ownerName || 'Your Tenancy'}</span>
+            </span>
+            {tenant.moveInDate && (
+              <span className="chip font-mono-numbers">
+                <CalendarDays className="h-3.5 w-3.5" /> Since {formatDateIN(tenant.moveInDate)}
+              </span>
+            )}
           </div>
-          <div className="flex-1">
-            <div className="text-[11px] font-bold uppercase tracking-wider text-white/80">Security Deposit</div>
-            <div className="font-extrabold font-mono-numbers text-lg text-white">
-              {formatCurrency((tenant.depositPaidPaise || 0) / 100)}
-            </div>
-          </div>
+        }
+        illustration="hero-resident"
+      />
+
+      {/* Room / bed / deposit */}
+      <div className="grid grid-cols-3 gap-2.5 sm:gap-3 stagger">
+        <StatTile icon="bed" tint="violet" label="Room No." value={<span className="break-all">{tenant.roomNumber || '—'}</span>} />
+        <StatTile icon="bed" tint="sky" label="Bed No." value={<span className="break-all">{tenant.bedLabel || '—'}</span>} />
+        <StatTile
+          icon="wallet"
+          tint="mint"
+          label="Deposit"
+          value={
+            <span className="text-[15px] sm:text-[20px]">{formatCurrency((tenant.depositPaidPaise || 0) / 100)}</span>
+          }
+        />
+      </div>
+
+      {/* Rent status */}
+      <div id="rent-status" className="scroll-mt-24">
+        {banner ? (
+          <InfoBanner
+            tone={banner.tone}
+            icon={<Icon3D name={banner.icon} size={52} />}
+            title={
+              <>
+                <span className="block text-[12.5px] font-bold opacity-75">Rent Status</span>
+                <span className="block text-[18px] leading-tight tracking-[-0.015em]">{banner.headline}</span>
+              </>
+            }
+            description={<span className="font-mono-numbers">{banner.detail}</span>}
+            action={
+              <button
+                type="button"
+                onClick={() => scrollToSection('payments')}
+                className="inline-flex h-11 items-center gap-1.5 rounded-full bg-white px-4 text-[13px] font-bold text-brand-700 shadow-[0_10px_20px_-10px_rgba(30,10,90,0.45)] press"
+              >
+                View Details <ArrowRight className="h-4 w-4" strokeWidth={2.4} />
+              </button>
+            }
+            className="animate-pop"
+          />
+        ) : (
+          <InfoBanner tone="info" title="Rent Status" description="No rent records yet." />
+        )}
+      </div>
+
+      {/* The kit's list layout goes 2-up from 380px, which leaves the label
+          ~40px wide on phones — keep it single-column until there's room. */}
+      <SectionCard title="Quick Actions" icon="grid">
+        <div className="max-[519px]:[&>div]:grid-cols-1">
+          <QuickActionGrid
+            layout="list"
+            bare
+            actions={[
+              {
+                label: 'Pay Rent & Bills',
+                description: 'Rent status & dues',
+                icon: 'wallet',
+                tint: 'violet',
+                onClick: () => scrollToSection('rent-status'),
+              },
+              {
+                label: 'Raise Maintenance',
+                description: 'Report issues',
+                icon: 'wrench',
+                tint: 'sky',
+                onClick: () => {
+                  setIssueOpen(true);
+                  scrollToSection('issues');
+                },
+              },
+              {
+                label: 'View Notices',
+                description: 'Stay updated',
+                icon: 'bell',
+                tint: 'peach',
+                onClick: () => scrollToSection('notices'),
+              },
+              {
+                label: 'My Bills',
+                description: 'Check history',
+                icon: 'doc-green',
+                tint: 'mint',
+                onClick: () => scrollToSection('payments'),
+              },
+            ]}
+          />
         </div>
-      </HeroHeader>
+      </SectionCard>
+
+      {/* Upcoming dues */}
+      <SectionCard title="Upcoming Reminders" icon="calendar">
+        {reminders.length === 0 ? (
+          <p className="text-[13px] font-medium text-muted">No upcoming dues — you&apos;re all caught up.</p>
+        ) : (
+          <div className="divide-y divide-line">
+            {reminders.map((r) => {
+              const due = r.dueDate as string;
+              const [, mm, dd] = due.split('-');
+              const days = daysBetween(today, due);
+              return (
+                <div key={r.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+                  <div className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-2xl bg-brand-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+                    <span className="font-mono-numbers text-[19px] font-extrabold leading-none text-ink">{dd}</span>
+                    <span className="mt-0.5 text-[11.5px] font-bold text-brand-700">{MONTHS[Number(mm) - 1] ?? mm}</span>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[14.5px] font-bold text-ink">Rent Due</div>
+                    <div className="truncate font-mono-numbers text-[12.5px] font-medium text-ink-2/75">
+                      {formatCurrency(remainingPaise(r) / 100)} • {formatDateIN(due)}
+                    </div>
+                  </div>
+                  {days > 0 ? (
+                    <span className="chip shrink-0">
+                      <Clock className="h-3.5 w-3.5" /> In {days} day{days === 1 ? '' : 's'}
+                    </span>
+                  ) : days === 0 ? (
+                    <span className="chip shrink-0 bg-warning-bg text-warning-ink">Due today</span>
+                  ) : (
+                    <span className="chip shrink-0 bg-danger-bg text-danger-ink">
+                      Overdue {-days} day{days === -1 ? '' : 's'}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </SectionCard>
 
       {/* Notices from the PG owner */}
-      {notices.length > 0 && (
-        <section>
-          <h2 className="text-sm font-extrabold text-slate-900 mb-2 px-1">Notices</h2>
-          <div className="space-y-2">
-            {notices.map((n) => (
-              <div key={n.id} className="app-card p-3.5">
-                <div className="flex items-center gap-2 flex-wrap">
-                  {n.pinned && <span className="text-[10px] font-bold accent-text accent-soft-bg px-1.5 py-0.5 rounded">PINNED</span>}
-                  <h3 className="text-sm font-bold text-slate-900">{n.title}</h3>
-                </div>
-                <p className="mt-1 text-xs text-slate-600 whitespace-pre-wrap break-words">{n.body}</p>
-                <p className="mt-1.5 text-[11px] text-slate-400">{formatDateIN(tsToDate(n.createdAt))}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
+      <div id="notices" className="scroll-mt-24">
+        <SectionCard title="Latest Notices" icon="megaphone">
+          {notices.length === 0 ? (
+            <p className="text-[13px] font-medium text-muted">No notices from your PG yet.</p>
+          ) : (
+            <div className="divide-y divide-line">
+              {notices.map((n) => {
+                const date = formatDateIN(tsToDate(n.createdAt));
+                return (
+                  <div key={n.id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
+                    <IconBubble icon="megaphone" tint="violet" size={44} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                          {n.pinned && (
+                            <Badge variant="brand">
+                              <Pin className="h-3 w-3" /> Pinned
+                            </Badge>
+                          )}
+                          <h3 className="break-words text-[14.5px] font-bold text-ink">{n.title}</h3>
+                        </div>
+                        {date && <span className="chip shrink-0 font-mono-numbers">{date}</span>}
+                      </div>
+                      <p className="mt-1 whitespace-pre-wrap break-words text-[13px] leading-relaxed text-ink-2/80">
+                        {n.body}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </SectionCard>
+      </div>
 
       {/* Rent history */}
-      <section>
-        <h2 className="text-sm font-extrabold text-slate-900 mb-2 px-1">Payment History</h2>
-        <div className="space-y-2 stagger">
-          {rentHistory.length === 0 && <p className="text-xs text-slate-400 px-1">No rent records yet.</p>}
-          {rentHistory.map((r) => (
-            <div key={r.id} className="app-card p-3.5 flex items-center justify-between">
-              <div>
-                <div className="text-sm font-bold text-slate-900">{r.period}</div>
-                <div className="text-xs text-slate-500 font-mono-numbers mt-0.5">
-                  {formatCurrency((r.amountPaidPaise || 0) / 100)} / {formatCurrency((r.amountDuePaise || 0) / 100)}
-                  {r.receiptNumber ? ` · REC-${String(r.receiptNumber).padStart(5, '0')}` : ''}
-                </div>
-              </div>
-              <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full capitalize ${STATUS_STYLE[r.status] || STATUS_STYLE.pending}`}>
-                {r.status}
-              </span>
+      <div id="payments" className="scroll-mt-24">
+        <SectionCard title="Payment History" icon="rupee">
+          {rentHistory.length === 0 ? (
+            <p className="text-[13px] font-medium text-muted">No rent records yet.</p>
+          ) : (
+            <div className="-my-3 divide-y divide-line stagger">
+              {rentHistory.map((r) => {
+                const s = RENT_STATUS[r.status] || RENT_STATUS.pending;
+                return (
+                  <ActivityRow
+                    key={r.id}
+                    icon={s.icon}
+                    tint={s.tint}
+                    title={formatPeriod(r.period)}
+                    subtitle={
+                      <span className="font-mono-numbers">
+                        {formatCurrency((r.amountPaidPaise || 0) / 100)} / {formatCurrency((r.amountDuePaise || 0) / 100)}
+                        {r.receiptNumber ? ` · REC-${String(r.receiptNumber).padStart(5, '0')}` : ''}
+                      </span>
+                    }
+                    trailing={<Badge variant={s.badge}>{s.label}</Badge>}
+                  />
+                );
+              })}
             </div>
-          ))}
-        </div>
-      </section>
+          )}
+        </SectionCard>
+      </div>
+
+      {/* Issues */}
+      <div id="issues" className="scroll-mt-24">
+        <SectionCard
+          title="My Issues"
+          icon="wrench"
+          action={
+            !issueOpen ? (
+              <Button variant="soft" size="md" onClick={() => setIssueOpen(true)}>
+                <Plus className="h-4 w-4" /> Raise
+              </Button>
+            ) : undefined
+          }
+        >
+          {issueOpen && (
+            <form onSubmit={raiseIssue} className="well mb-3 space-y-3 p-3.5 animate-pop">
+              <Textarea
+                value={desc}
+                onChange={(e) => setDesc(e.target.value)}
+                rows={3}
+                aria-label="Describe the problem"
+                placeholder="Describe the problem (e.g. leaking tap in bathroom)"
+              />
+              <div className="flex gap-2">
+                <Button type="submit" size="md" variant="solid" loading={sending} className="flex-1">
+                  Submit Issue
+                </Button>
+                <Button type="button" size="md" variant="outline" onClick={() => setIssueOpen(false)}>
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          )}
+
+          {tickets.length === 0 ? (
+            <p className="text-[13px] font-medium text-muted">No issues raised.</p>
+          ) : (
+            <div className="divide-y divide-line stagger">
+              {tickets.map((t) => (
+                <div key={t.id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
+                  <IconBubble icon="wrench" tint="sky" size={44} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate text-[14.5px] font-bold capitalize text-ink">{t.category}</span>
+                      <Badge variant={TICKET_BADGE[String(t.status)] || 'default'} className="capitalize">
+                        {String(t.status).replace('_', ' ')}
+                      </Badge>
+                    </div>
+                    <p className="mt-1 break-words text-[13px] leading-relaxed text-ink-2/80">{t.description}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </SectionCard>
+      </div>
 
       {/* Review this PG */}
-      <section>
-        <div className="flex items-center justify-between mb-2 px-1">
-          <h2 className="text-sm font-extrabold text-slate-900">Review this PG</h2>
-          {!pgOpen && (
-            <button onClick={() => setPgOpen(true)} className="text-xs font-bold accent-text press">
-              + Write
-            </button>
-          )}
-        </div>
-        {pgOpen && (
-          <div className="app-card p-3.5 space-y-2 animate-pop">
-            <div className="flex items-center gap-0.5">
+      <SectionCard
+        title="Review this PG"
+        icon="star"
+        action={
+          !pgOpen ? (
+            <Button variant="soft" size="md" onClick={() => setPgOpen(true)}>
+              <Plus className="h-4 w-4" /> Write
+            </Button>
+          ) : undefined
+        }
+      >
+        {pgOpen ? (
+          <div className="space-y-3 animate-pop">
+            <div className="-ml-2 flex items-center">
               {[1, 2, 3, 4, 5].map((n) => (
-                <button key={n} type="button" onClick={() => setPgRating(n)} className="cursor-pointer" aria-label={`${n} star`}>
-                  <Star className={`w-6 h-6 ${n <= pgRating ? 'fill-amber-500 text-amber-500' : 'text-slate-300'}`} />
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setPgRating(n)}
+                  className="grid h-11 w-11 cursor-pointer place-items-center rounded-full transition-transform hover:bg-brand-50 active:scale-90"
+                  aria-label={`${n} star`}
+                >
+                  <Star
+                    className={`h-7 w-7 ${n <= pgRating ? 'fill-warning text-warning' : 'text-line-strong'}`}
+                    strokeWidth={1.8}
+                  />
                 </button>
               ))}
             </div>
-            <textarea
+            <Textarea
               value={pgText}
               onChange={(e) => setPgText(e.target.value)}
               rows={3}
               maxLength={1000}
+              aria-label="Your review"
               placeholder="How is your stay? Cleanliness, food, staff, value…"
-              className="w-full px-3 py-2.5 rounded-[12px] border-2 border-slate-200 text-sm focus:border-[color:var(--accent)] focus:outline-none resize-none"
             />
             <div className="flex gap-2">
               <Button type="button" size="md" variant="solid" loading={pgBusy} onClick={submitPgReview} className="flex-1">
@@ -240,61 +591,13 @@ export default function TenancyDetail() {
               </Button>
             </div>
           </div>
+        ) : (
+          <p className="text-[13px] font-medium text-muted">Share how your stay has been — it helps other residents.</p>
         )}
-      </section>
+      </SectionCard>
 
       {/* Rate individual staff */}
       <RateStaffSection staff={staff || []} />
-
-      {/* Issues */}
-      <section>
-        <div className="flex items-center justify-between mb-2 px-1">
-          <h2 className="text-sm font-extrabold text-slate-900">My Issues</h2>
-          {!issueOpen && (
-            <button onClick={() => setIssueOpen(true)} className="text-xs font-bold accent-text press">
-              + Raise
-            </button>
-          )}
-        </div>
-
-        {issueOpen && (
-          <form onSubmit={raiseIssue} className="app-card p-3.5 space-y-2 mb-2 animate-pop">
-            <textarea
-              value={desc}
-              onChange={(e) => setDesc(e.target.value)}
-              rows={3}
-              placeholder="Describe the problem (e.g. leaking tap in bathroom)"
-              className="w-full px-3 py-2.5 rounded-[12px] border-2 border-slate-200 text-sm focus:border-[color:var(--accent)] focus:outline-none resize-none"
-            />
-            <div className="flex gap-2">
-              <Button type="submit" size="md" variant="solid" loading={sending} className="flex-1">
-                Submit Issue
-              </Button>
-              <Button type="button" size="md" variant="outline" onClick={() => setIssueOpen(false)}>
-                Cancel
-              </Button>
-            </div>
-          </form>
-        )}
-
-        <div className="space-y-2 stagger">
-          {tickets.length === 0 && <p className="text-xs text-slate-400 px-1">No issues raised.</p>}
-          {tickets.map((t) => (
-            <div key={t.id} className="app-card p-3.5">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-bold capitalize flex items-center gap-1.5 text-slate-900">
-                  <Wrench className="w-3.5 h-3.5 text-slate-400" />
-                  {t.category}
-                </span>
-                <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 capitalize">
-                  {String(t.status).replace('_', ' ')}
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 mt-1.5 break-words">{t.description}</p>
-            </div>
-          ))}
-        </div>
-      </section>
     </div>
   );
 }

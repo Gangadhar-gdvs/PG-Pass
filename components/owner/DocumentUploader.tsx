@@ -3,22 +3,26 @@
 import React, { useRef, useState } from 'react';
 import { uploadPhotoToB2 } from '@/lib/client/uploader';
 import { Button } from '@/components/ui/button';
-import { IdCard, FileText } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { IconBubble, type Icon3DName, type Tint } from '@/components/brand/Icon3D';
+import { Check, RefreshCw, Upload } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { errorMessage } from '@/lib/utils';
 
 type DocPhotoType = 'id_proof' | 'agreement';
 
-const PRESETS: Record<DocPhotoType, { label: string; hint: string; icon: React.ReactNode }> = {
+const PRESETS: Record<DocPhotoType, { label: string; hint: string; icon: Icon3DName; tint: Tint }> = {
   id_proof: {
     label: 'ID Proof Document',
     hint: 'Attach Aadhaar/PAN/etc. (private)',
-    icon: <IdCard className="w-4 h-4 text-[#64748B] shrink-0" />,
+    icon: 'doc',
+    tint: 'sky',
   },
   agreement: {
     label: 'Rental Agreement',
     hint: 'Attach the signed agreement (private)',
-    icon: <FileText className="w-4 h-4 text-[#64748B] shrink-0" />,
+    icon: 'doc-green',
+    tint: 'mint',
   },
 };
 
@@ -56,17 +60,24 @@ export function DocumentUploader({
   };
 
   return (
-    <div className="p-3.5 rounded-[8px] bg-[#F8FAFC] border border-[#E2E8F0] flex items-center justify-between">
-      <div className="flex items-center gap-2 min-w-0">
-        {preset.icon}
-        <div className="min-w-0">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-[#64748B] block">
-            {preset.label}
-          </span>
-          <span className="text-[11px] text-[#94A3B8]">
-            {done ? 'Uploaded · stored privately' : preset.hint}
-          </span>
-        </div>
+    <div
+      className={`flex flex-wrap items-center gap-3 rounded-[22px] p-3 transition-all ${
+        done
+          ? 'border border-white bg-white/80 shadow-[var(--shadow-tile)]'
+          : 'border-2 border-dashed border-brand-200 bg-brand-50/60'
+      }`}
+    >
+      <IconBubble icon={preset.icon} tint={preset.tint} size={44} />
+      <div className="min-w-[9rem] flex-1">
+        <span className="block text-[13.5px] font-bold leading-tight text-ink">{preset.label}</span>
+        {done ? (
+          <Badge variant="paid" className="mt-1">
+            <Check className="h-3 w-3" strokeWidth={3} />
+            Uploaded · stored privately
+          </Badge>
+        ) : (
+          <span className="mt-0.5 block text-xs font-medium leading-snug text-muted">{preset.hint}</span>
+        )}
       </div>
       <input
         ref={inputRef}
@@ -77,12 +88,12 @@ export function DocumentUploader({
         onChange={onPick}
       />
       <Button
-        size="sm"
-        variant="outline"
+        variant={done ? 'outline' : 'soft'}
         loading={uploading}
         onClick={() => inputRef.current?.click()}
-        className="shrink-0"
+        className="ml-auto shrink-0"
       >
+        {!uploading && (done ? <RefreshCw className="h-4 w-4" /> : <Upload className="h-4 w-4" />)}
         {done ? 'Replace' : 'Upload'}
       </Button>
     </div>

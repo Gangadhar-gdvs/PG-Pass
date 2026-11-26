@@ -3,7 +3,7 @@
 import React, { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, ShieldCheck, CheckCircle2, Building, AlertCircle } from 'lucide-react';
+import { AlertCircle, ArrowRight, Lock, Mail } from 'lucide-react';
 import {
   signInWithPopup,
   GoogleAuthProvider,
@@ -16,6 +16,9 @@ import { reportClientError } from '@/lib/client/logger';
 import { errorMessage } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { InfoBanner } from '@/components/ui/dashboard-kit';
+import { AuthShell, AuthLoader } from '@/components/brand/AuthShell';
+import { Icon3D } from '@/components/brand/Icon3D';
 import toast from 'react-hot-toast';
 
 /** Narrow an unknown caught value to the Firebase auth error `code` string. */
@@ -200,233 +203,179 @@ function LoginFormContent() {
   };
 
   if (redirecting) {
-    return (
-      <div className="min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center p-4">
-        <div className="h-9 w-9 rounded-full border-2 border-[var(--accent)] border-t-transparent animate-spin mb-4" />
-        <span className="text-sm font-semibold text-[#09090B]">Signing you in…</span>
-        <span className="text-xs text-[#64748B] mt-1">Loading your dashboard</span>
-      </div>
-    );
+    return <AuthLoader />;
   }
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center p-4 sm:p-6 lg:p-8">
-      {/* Main Container Card */}
-      <div className="w-full max-w-4xl app-card border border-[#E2E8F0] rounded-[16px] shadow-[var(--shadow-card)] overflow-hidden grid grid-cols-1 md:grid-cols-2">
-        {/* Left Brand Panel (Desktop) */}
-        <div className="hidden md:flex flex-col justify-between p-10 bg-[#0F172A] text-white">
-          <div>
-            <div className="flex items-center gap-2.5">
-              <div className="h-9 w-9 rounded-[8px] accent-bg flex items-center justify-center text-white shadow-xs">
-                <Building className="h-5 w-5" />
-              </div>
-              <span className="text-xl font-bold tracking-tight text-white">PGPass</span>
-            </div>
+    <AuthShell
+      eyebrow="Owner & Staff Login"
+      title="Smart PG Management,"
+      highlight="Made Easy!"
+      description="Manage rooms, beds, residents, rent and maintenance — with rent paid straight to your bank over UPI."
+      bullets={['Zero-fee direct UPI rent settlement', 'PIN-protected resident pass links', 'Anti-fraud UTR deduplication']}
+      illustration="hero-landing"
+      footnote="Secure httpOnly session cookies"
+    >
+      <div className="space-y-5">
+        {isExpired && (
+          <InfoBanner tone="warning" title="Session expired" description="Your session has expired. Please sign in to continue." />
+        )}
+        {wasKicked && (
+          <InfoBanner
+            tone="warning"
+            title="Signed out on this device"
+            description="You were signed out because this account was logged in on another device."
+          />
+        )}
+        {wasIdle && (
+          <InfoBanner
+            tone="info"
+            icon="clock"
+            title="Signed out for your security"
+            description="You were signed out automatically after a period of inactivity, for your security."
+          />
+        )}
 
-            <div className="mt-12 space-y-3">
-              <h1 className="text-2xl font-bold leading-snug tracking-tight text-white">
-                Bento-grade PG bed management & 0% UPI rent settlement.
-              </h1>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                Streamline bed inventory, collect rents with direct 0%-fee UPI settlement, and issue tamper-evident receipts without app downloads.
-              </p>
-            </div>
-
-            <div className="mt-10 space-y-3.5">
-              <div className="flex items-center gap-2.5 text-xs font-semibold text-slate-200">
-                <CheckCircle2 className="h-4 w-4 text-[var(--accent-2)] shrink-0" />
-                <span>Zero gateway fee direct UPI settlement</span>
-              </div>
-              <div className="flex items-center gap-2.5 text-xs font-semibold text-slate-200">
-                <CheckCircle2 className="h-4 w-4 text-[var(--accent-2)] shrink-0" />
-                <span>PIN-protected Resident Pass links</span>
-              </div>
-              <div className="flex items-center gap-2.5 text-xs font-semibold text-slate-200">
-                <CheckCircle2 className="h-4 w-4 text-[var(--accent-2)] shrink-0" />
-                <span>Anti-fraud UTR deduplication</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="pt-8 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-400 font-mono">
-            <span>PGPass Production</span>
-            <span>Secured via Firebase & B2</span>
-          </div>
+        <div>
+          <h2 className="text-[24px] font-extrabold tracking-[-0.025em] text-ink">
+            {authMode === 'signin' ? (
+              <>
+                Welcome <span className="text-gradient">back</span>
+              </>
+            ) : (
+              <>
+                Create an <span className="text-gradient">owner account</span>
+              </>
+            )}
+          </h2>
+          <p className="mt-1 text-[13px] font-medium text-muted">
+            Sign in with Google or your email to access your PG dashboard.
+          </p>
         </div>
 
-        {/* Right Form Panel */}
-        <div className="p-6 sm:p-10 flex flex-col justify-between bg-white text-left">
-          <div>
-            {/* Top Navigation */}
-            <div className="flex items-center justify-between mb-8">
-              <Link
-                href="/"
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#64748B] hover:text-[#09090B] transition-colors"
-              >
-                <ArrowLeft className="h-3.5 w-3.5" />
-                <span>Back to Home</span>
-              </Link>
+        {/* Primary: 1-Tap Google Sign-In */}
+        <button
+          type="button"
+          onClick={handleGoogleSignIn}
+          disabled={googleLoading || loading}
+          className="btn-soft w-full !h-12 gap-2.5 text-sm disabled:opacity-60"
+        >
+          <svg className="h-[18px] w-[18px]" viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              fill="#4285F4"
+              d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+            />
+            <path
+              fill="#34A853"
+              d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+            />
+            <path
+              fill="#FBBC05"
+              d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+            />
+            <path
+              fill="#EA4335"
+              d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+            />
+          </svg>
+          <span>{googleLoading ? 'Connecting...' : 'Continue with Google'}</span>
+        </button>
 
-              <span className="text-[11px] font-semibold uppercase tracking-wider accent-soft-bg px-2.5 py-0.5 rounded-[6px]">
-                Owner & Staff Login
-              </span>
-            </div>
+        <div className="flex items-center gap-3" aria-hidden="true">
+          <span className="h-px flex-1 bg-line" />
+          <span className="text-xs font-semibold text-faint">or with email</span>
+          <span className="h-px flex-1 bg-line" />
+        </div>
 
-            {isExpired && (
-              <div className="mb-6 p-3 rounded-[8px] bg-[#FFFBEB] border border-[#FDE68A] text-xs text-[#92400E]">
-                Your session has expired. Please sign in to continue.
-              </div>
-            )}
+        {error && (
+          <div role="alert" className="flex items-center gap-2 rounded-2xl bg-danger-bg px-3.5 py-3 text-[13px] font-semibold text-danger-ink animate-shake">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
 
-            {wasKicked && (
-              <div className="mb-6 p-3 rounded-[8px] bg-[#FFFBEB] border border-[#FDE68A] text-xs text-[#92400E]">
-                You were signed out because this account was logged in on another device.
-              </div>
-            )}
+        {/* Fallback: Email & Password */}
+        <form onSubmit={handleEmailAuth} className="space-y-4">
+          <Input
+            type="email"
+            label="Email address"
+            placeholder="owner@example.com"
+            leading={<Mail />}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            disabled={loading || googleLoading}
+            required
+          />
 
-            {wasIdle && (
-              <div className="mb-6 p-3 rounded-[8px] bg-[#FFFBEB] border border-[#FDE68A] text-xs text-[#92400E]">
-                You were signed out automatically after a period of inactivity, for your security.
-              </div>
-            )}
+          <Input
+            type="password"
+            label="Password"
+            placeholder="••••••••"
+            leading={<Lock />}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            disabled={loading || googleLoading}
+            required
+          />
 
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-xl font-bold text-[#09090B] tracking-tight">
-                  {authMode === 'signin' ? 'Welcome back' : 'Create an owner account'}
-                </h2>
-                <p className="mt-1 text-xs text-[#64748B]">
-                  Sign in with Google or your email to access your PG dashboard.
-                </p>
-              </div>
+          <Button type="submit" size="full" loading={loading} variant="solid" className="!h-12 text-[15px]">
+            {authMode === 'signin' ? 'Sign In' : 'Create Account'}
+            {!loading && <ArrowRight className="h-4 w-4" />}
+          </Button>
+        </form>
 
-              {/* Primary: 1-Tap Google Sign-In */}
+        <div className="text-center text-[13px] font-medium text-muted">
+          {authMode === 'signin' ? (
+            <span>
+              Don&apos;t have an account?{' '}
               <button
                 type="button"
-                onClick={handleGoogleSignIn}
-                disabled={googleLoading || loading}
-                className="w-full flex items-center justify-center gap-2.5 h-11 px-4 border border-[#E2E8F0] hover:border-[#CBD5E1] bg-white hover:bg-[#F8FAFC] rounded-[8px] text-xs font-bold text-[#09090B] transition-colors shadow-2xs cursor-pointer disabled:opacity-60"
+                onClick={() => {
+                  setAuthMode('signup');
+                  setError('');
+                }}
+                className="font-bold text-brand-700 hover:underline cursor-pointer"
               >
-                <svg className="h-4 w-4" viewBox="0 0 24 24">
-                  <path
-                    fill="#4285F4"
-                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                  />
-                  <path
-                    fill="#34A853"
-                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                  />
-                  <path
-                    fill="#FBBC05"
-                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                  />
-                  <path
-                    fill="#EA4335"
-                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                  />
-                </svg>
-                <span>{googleLoading ? 'Connecting...' : 'Continue with Google'}</span>
+                Sign up
               </button>
-
-              <div className="relative flex items-center justify-center">
-                <div className="border-t border-[#E2E8F0] w-full" />
-                <span className="bg-white px-3 text-[11px] font-semibold text-[#94A3B8] uppercase tracking-wider absolute">
-                  Or with email
-                </span>
-              </div>
-
-              {error && (
-                <div className="p-3 rounded-[8px] bg-[#FEF2F2] border border-[#FEE2E2] flex items-center gap-2 text-xs font-semibold text-[#DC2626]">
-                  <AlertCircle className="h-4 w-4 shrink-0" />
-                  <span>{error}</span>
-                </div>
-              )}
-
-              {/* Fallback: Email & Password */}
-              <form onSubmit={handleEmailAuth} className="space-y-3.5">
-                <Input
-                  type="email"
-                  label="Email Address"
-                  placeholder="owner@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  disabled={loading || googleLoading}
-                  required
-                />
-
-                <Input
-                  type="password"
-                  label="Password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  disabled={loading || googleLoading}
-                  required
-                />
-
-                <Button
-                  type="submit"
-                  size="lg"
-                  loading={loading}
-                  variant="solid"
-                  className="w-full text-[13px] mt-2"
-                >
-                  {authMode === 'signin' ? 'Sign In' : 'Create Account'}
-                </Button>
-              </form>
-
-              <div className="pt-2 text-center text-xs text-[#64748B]">
-                {authMode === 'signin' ? (
-                  <span>
-                    Don&apos;t have an account?{' '}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAuthMode('signup');
-                        setError('');
-                      }}
-                      className="font-bold accent-text hover:underline cursor-pointer"
-                    >
-                      Sign up
-                    </button>
-                  </span>
-                ) : (
-                  <span>
-                    Already have an account?{' '}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAuthMode('signin');
-                        setError('');
-                      }}
-                      className="font-bold accent-text hover:underline cursor-pointer"
-                    >
-                      Sign in
-                    </button>
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-8 pt-4 border-t border-[#E2E8F0] flex items-center justify-center gap-1.5 text-[11px] text-[#94A3B8]">
-            <ShieldCheck className="h-3.5 w-3.5 text-[#10B981]" />
-            <span>Secure httpOnly session cookies</span>
-          </div>
+            </span>
+          ) : (
+            <span>
+              Already have an account?{' '}
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthMode('signin');
+                  setError('');
+                }}
+                className="font-bold text-brand-700 hover:underline cursor-pointer"
+              >
+                Sign in
+              </button>
+            </span>
+          )}
         </div>
+
+        <Link
+          href="/resident/login"
+          className="flex items-center gap-3 rounded-2xl tint-card tint-sky px-4 py-3 press"
+        >
+          <Icon3D name="home-blue" size={34} />
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-bold text-ink">Staying at a PG?</span>
+            <span className="block text-xs font-medium text-ink-2/75">Resident sign-in is over here</span>
+          </span>
+          <ArrowRight className="h-4 w-4 text-brand" />
+        </Link>
       </div>
-    </div>
+    </AuthShell>
   );
 }
 
 export default function LoginPage() {
   return (
     <Suspense
-      fallback={
-        <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">
-          <div className="h-8 w-8 rounded-full border-2 border-[var(--accent)] border-t-transparent animate-spin" />
-        </div>
-      }
+      fallback={<AuthLoader title="Loading…" subtitle="" />}
     >
       <LoginFormContent />
     </Suspense>

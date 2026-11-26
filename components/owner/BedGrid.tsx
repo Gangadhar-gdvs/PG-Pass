@@ -4,11 +4,15 @@ import React, { useState } from 'react';
 import { Bed, RentRecord } from '@/types';
 import { BedCard } from './BedCard';
 import { RoomCard, RoomData } from './RoomCard';
-import { Search, Layers, Building, LayoutGrid, Grid3X3 } from 'lucide-react';
+import { Layers, LayoutGrid, Grid3X3 } from 'lucide-react';
 import { TabBar } from '@/components/ui/tab-bar';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Button } from '@/components/ui/button';
 import { Dropdown } from '@/components/ui/dropdown';
+import { SearchInput } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { FilterChips, SectionHeader } from '@/components/ui/dashboard-kit';
+import { IconBubble } from '@/components/brand/Icon3D';
 
 interface BedGridProps {
   beds: Bed[];
@@ -22,6 +26,90 @@ interface BedGridProps {
   onVacate: (bed: Bed) => void;
   onSelectBed?: (bed: Bed) => void;
   onConfigureRooms?: () => void;
+}
+
+type StatusFilter = 'all' | 'paid' | 'pending' | 'verify' | 'vacant';
+
+const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
+  { value: 'all', label: 'All Statuses' },
+  { value: 'pending', label: 'Pending Rent' },
+  { value: 'verify', label: 'Proof Verification' },
+  { value: 'paid', label: 'Settled' },
+  { value: 'vacant', label: 'Available Beds' },
+];
+
+/** Rooms ⇄ Beds segmented toggle (pill track like TabBar, with glyphs). */
+function ViewToggle({
+  value,
+  onChange,
+}: {
+  value: 'rooms' | 'beds';
+  onChange: (v: 'rooms' | 'beds') => void;
+}) {
+  const options = [
+    { id: 'rooms' as const, label: 'Rooms', Icon: LayoutGrid },
+    { id: 'beds' as const, label: 'Beds', Icon: Grid3X3 },
+  ];
+  return (
+    <div role="group" aria-label="View mode" className="app-card flex shrink-0 items-center gap-1 rounded-full p-1">
+      {options.map(({ id, label, Icon }) => {
+        const active = value === id;
+        return (
+          <button
+            key={id}
+            type="button"
+            onClick={() => onChange(id)}
+            aria-pressed={active}
+            className={`inline-flex h-10 items-center justify-center gap-1.5 rounded-full px-3 text-[13px] font-bold transition-all press ${
+              active
+                ? 'bg-[image:var(--grad-brand)] text-white shadow-[0_8px_18px_-8px_rgba(106,43,234,0.6),inset_0_1px_0_rgba(255,255,255,0.3)]'
+                : 'text-muted hover:bg-brand-50 hover:text-brand-700'
+            }`}
+          >
+            <Icon className="h-4 w-4" />
+            <span className="sr-only min-[380px]:not-sr-only">{label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Floor group heading: 3D bubble, floor name, counts and occupancy badges. */
+function FloorHeader({
+  floor,
+  rooms,
+  beds,
+  vacant,
+  occupied,
+}: {
+  floor: number;
+  rooms: number;
+  beds: number;
+  vacant: number;
+  occupied: number;
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+      <div className="flex min-w-0 items-center gap-2.5">
+        <IconBubble icon="building" tint="violet" size={40} />
+        <div className="min-w-0">
+          <h3 className="text-base font-extrabold tracking-[-0.015em] text-ink">Floor {floor}</h3>
+          <p className="text-xs font-medium text-muted">
+            {rooms} Rooms · {beds} Beds
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center gap-1.5">
+        <Badge variant="vacant" dot>
+          {vacant} Vacant
+        </Badge>
+        <Badge variant="brand" dot>
+          {occupied} Occupied
+        </Badge>
+      </div>
+    </div>
+  );
 }
 
 export function BedGrid({
@@ -41,7 +129,7 @@ export function BedGrid({
   // Windowing: in the "all floors" view, render floors incrementally so a large
   // PG (100+ beds) doesn't mount every bed card at once on mobile.
   const [floorsShown, setFloorsShown] = useState(3);
-  const [activeFilter, setActiveFilter] = useState<'all' | 'paid' | 'pending' | 'verify' | 'vacant'>('all');
+  const [activeFilter, setActiveFilter] = useState<StatusFilter>('all');
   const [sharingFilter, setSharingFilter] = useState<string>('all');
   const [acFilter, setAcFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -120,142 +208,100 @@ export function BedGrid({
   const hasMoreFloors = selectedFloor === 'all' && allFloors.length > displayFloors.length;
 
   return (
-    <div className="space-y-4 text-left">
-      {/* Top Filter HUD Control Bar */}
-      <div className="bg-white border border-[#E2E8F0] rounded-[12px] p-3 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+    <section className="space-y-4 text-left" aria-label="Bed inventory">
+      <SectionHeader
+        title="Bed Inventory"
+        icon="bed"
+        action={<ViewToggle value={viewMode} onChange={setViewMode} />}
+      />
+
+      {/* Filters: search + sharing / climate, floor tabs, status chips */}
+      <div className="space-y-3">
+        <div className="flex flex-col gap-2.5 md:flex-row md:items-center">
+          <SearchInput
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search bed, room…"
+            aria-label="Search bed, room or resident"
+            containerClassName="md:flex-1"
+          />
+          <div className="grid grid-cols-2 gap-2.5 md:flex md:shrink-0">
+            {/* Sharing Format Filter */}
+            <Dropdown
+              aria-label="Filter by sharing format"
+              value={sharingFilter}
+              onChange={setSharingFilter}
+              containerClassName="w-full md:w-44"
+              options={[
+                { value: 'all', label: 'All Sharing' },
+                { value: '1', label: 'Single (1-Share)' },
+                { value: '2', label: '2-Sharing' },
+                { value: '3', label: '3-Sharing' },
+                { value: '4', label: '4-Sharing' },
+                { value: '5', label: '5-Sharing' },
+                { value: '6', label: '6-Sharing' },
+              ]}
+            />
+
+            {/* AC Filter */}
+            <Dropdown
+              aria-label="Filter by climate"
+              value={acFilter}
+              onChange={setAcFilter}
+              containerClassName="w-full md:w-40"
+              options={[
+                { value: 'all', label: 'All Climate' },
+                { value: 'ac', label: 'AC Only' },
+                { value: 'non-ac', label: 'Non-AC Only' },
+              ]}
+            />
+          </div>
+        </div>
+
         {/* Floor Pills */}
         <TabBar
           tabs={floorTabs}
           activeTab={selectedFloor}
           onChange={setSelectedFloor}
           variant="pill"
+          className="w-fit"
         />
 
-        {/* Filter Controls — on small screens the selects go in a 2-col grid,
-            the search spans full width, and the view toggle sits on its own row,
-            so nothing overflows the viewport. */}
-        <div className="grid grid-cols-2 sm:flex sm:flex-wrap sm:items-center gap-2">
-          {/* Status Filter */}
-          <Dropdown
-            aria-label="Filter by status"
-            value={activeFilter}
-            onChange={(v) => setActiveFilter(v as 'all' | 'paid' | 'pending' | 'verify' | 'vacant')}
-            containerClassName="w-full sm:w-40"
-            className="h-11 text-xs font-semibold"
-            options={[
-              { value: 'all', label: 'All Statuses' },
-              { value: 'pending', label: 'Pending Rent' },
-              { value: 'verify', label: 'Proof Verification' },
-              { value: 'paid', label: 'Settled' },
-              { value: 'vacant', label: 'Available Beds' },
-            ]}
-          />
-
-          {/* Sharing Format Filter */}
-          <Dropdown
-            aria-label="Filter by sharing format"
-            value={sharingFilter}
-            onChange={setSharingFilter}
-            containerClassName="w-full sm:w-40"
-            className="h-11 text-xs font-semibold"
-            options={[
-              { value: 'all', label: 'All Sharing' },
-              { value: '1', label: 'Single (1-Share)' },
-              { value: '2', label: '2-Sharing' },
-              { value: '3', label: '3-Sharing' },
-              { value: '4', label: '4-Sharing' },
-              { value: '5', label: '5-Sharing' },
-              { value: '6', label: '6-Sharing' },
-            ]}
-          />
-
-          {/* AC Filter */}
-          <Dropdown
-            aria-label="Filter by climate"
-            value={acFilter}
-            onChange={setAcFilter}
-            containerClassName="w-full sm:w-36"
-            className="h-11 text-xs font-semibold"
-            options={[
-              { value: 'all', label: 'All Climate' },
-              { value: 'ac', label: 'AC Only' },
-              { value: 'non-ac', label: 'Non-AC Only' },
-            ]}
-          />
-
-          <div className="relative col-span-1 sm:flex-1 sm:w-48">
-            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8]" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search bed, room…"
-              className="w-full h-11 pl-8 pr-3 rounded-[8px] border border-[#E2E8F0] text-xs text-[#09090B] placeholder:text-[#94A3B8] bg-white focus:border-[#D97706] focus:outline-none"
-            />
-          </div>
-
-          {/* View Mode Toggle: Room Grouping vs Flat Beds */}
-          <div className="col-span-2 sm:col-span-1 flex items-center justify-center bg-[#F1F5F9] p-0.5 rounded-[8px] border border-[#E2E8F0] shrink-0">
-            <button
-              type="button"
-              onClick={() => setViewMode('rooms')}
-              className={`px-2.5 py-1 text-xs font-semibold rounded-[6px] transition-all flex items-center gap-1.5 ${
-                viewMode === 'rooms'
-                  ? 'bg-white text-[#D97706] shadow-2xs font-bold'
-                  : 'text-[#64748B] hover:text-[#09090B]'
-              }`}
-            >
-              <LayoutGrid className="w-3.5 h-3.5" />
-              <span>Rooms</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('beds')}
-              className={`px-2.5 py-1 text-xs font-semibold rounded-[6px] transition-all flex items-center gap-1.5 ${
-                viewMode === 'beds'
-                  ? 'bg-white text-[#D97706] shadow-2xs font-bold'
-                  : 'text-[#64748B] hover:text-[#09090B]'
-              }`}
-            >
-              <Grid3X3 className="w-3.5 h-3.5" />
-              <span>Beds</span>
-            </button>
-          </div>
+        {/* Status Filter */}
+        <div role="group" aria-label="Filter by status">
+          <FilterChips options={STATUS_OPTIONS} value={activeFilter} onChange={setActiveFilter} />
         </div>
       </div>
 
-      {/* Bento Bed Layout Grid */}
+      {/* Bed layout */}
       {beds.length === 0 ? (
-        <div className="border border-dashed border-[#CBD5E1] rounded-[14px] p-8 sm:p-12 text-center bg-[#F8FAFC]">
-          <div className="w-12 h-12 rounded-full bg-[#FEF3C7] text-[#D97706] flex items-center justify-center mx-auto mb-3">
-            <Building className="w-6 h-6" />
-          </div>
-          <h3 className="text-sm font-bold text-[#09090B]">No Beds Configured in Inventory</h3>
-          <p className="text-xs text-[#64748B] mt-1 max-w-md mx-auto">
-            You haven&apos;t generated your room inventory yet. Configure your floor-by-floor sharing formats (Single, 2-share to 6-share) and pricing to generate your bed units.
-          </p>
-          {onConfigureRooms && (
-            <div className="mt-4">
-              <Button
-                size="sm"
-                variant="solid"
-                className="bg-[#D97706] hover:bg-[#B45309] text-white text-xs"
-                onClick={onConfigureRooms}
-              >
-                <Layers className="w-3.5 h-3.5 mr-1.5" />
-                <span>Configure Rooms & Generate Inventory</span>
-              </Button>
-            </div>
-          )}
+        <div className="app-card">
+          <EmptyState
+            illustration="clipboard"
+            title="No Beds Configured in Inventory"
+            description="You haven’t generated your room inventory yet. Configure your floor-by-floor sharing formats (Single, 2-share to 6-share) and pricing to generate your bed units."
+            action={
+              onConfigureRooms ? (
+                <Button onClick={onConfigureRooms}>
+                  <Layers className="h-4 w-4" />
+                  <span>
+                    Configure Rooms<span className="hidden min-[440px]:inline"> &amp; Generate Inventory</span>
+                  </span>
+                </Button>
+              ) : undefined
+            }
+          />
         </div>
       ) : filteredBeds.length === 0 ? (
-        <EmptyState
-          icon={<Layers className="w-6 h-6 text-[#64748B]" />}
-          title="No units match the filter"
-          description="Adjust the floor selection or search filter to see more beds."
-        />
+        <div className="app-card">
+          <EmptyState
+            icon3d="bed"
+            title="No units match the filter"
+            description="Adjust the floor selection or search filter to see more beds."
+          />
+        </div>
       ) : (
-        <div className="space-y-8">
+        <div className="space-y-6">
           {displayFloors.map((floorNum) => {
             const floorBeds = filteredBeds.filter((b) => b.floor === floorNum);
             if (floorBeds.length === 0) return null;
@@ -305,31 +351,18 @@ export function BedGrid({
             const floorOccupiedCount = floorBeds.length - floorVacantCount;
 
             return (
-              <div key={floorNum} className="space-y-3.5">
-                {/* Floor Header Bar with Telemetry */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-[#E2E8F0]">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-extrabold text-[#09090B] tracking-tight">
-                      Floor {floorNum}
-                    </h3>
-                    <span className="text-[11px] font-semibold text-[#64748B] bg-[#F1F5F9] px-2 py-0.5 rounded-[6px]">
-                      {roomsList.length} Rooms · {floorBeds.length} Beds
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#059669] bg-[#ECFDF5] px-2 py-0.5 rounded-[5px] border border-[#A7F3D0]">
-                      🟢 {floorVacantCount} Vacant
-                    </span>
-                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#64748B] bg-[#F8FAFC] px-2 py-0.5 rounded-[5px] border border-[#E2E8F0]">
-                      👥 {floorOccupiedCount} Occupied
-                    </span>
-                  </div>
-                </div>
+              <div key={floorNum} className="space-y-3">
+                <FloorHeader
+                  floor={floorNum}
+                  rooms={roomsList.length}
+                  beds={floorBeds.length}
+                  vacant={floorVacantCount}
+                  occupied={floorOccupiedCount}
+                />
 
                 {/* ROOM-CENTRIC VIEW */}
                 {viewMode === 'rooms' ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-2 2xl:grid-cols-3">
                     {roomsList.map((room) => (
                       <RoomCard
                         key={room.roomNumber}
@@ -348,7 +381,7 @@ export function BedGrid({
                   </div>
                 ) : (
                   /* RAW BEDS GRID */
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                     {floorBeds.map((bed) => (
                       <BedCard
                         key={bed.id}
@@ -371,16 +404,13 @@ export function BedGrid({
           })}
 
           {hasMoreFloors && (
-            <button
-              type="button"
-              onClick={() => setFloorsShown((n) => n + 3)}
-              className="w-full h-11 rounded-[8px] border border-[#CBD5E1] bg-white text-xs font-semibold text-[#334155] hover:bg-[#F8FAFC] transition-colors"
-            >
-              Show more floors ({allFloors.length - displayFloors.length} left) · or pick a floor above
-            </button>
+            <Button variant="outline" size="full" onClick={() => setFloorsShown((n) => n + 3)}>
+              Show more floors ({allFloors.length - displayFloors.length} left)
+              <span className="hidden sm:inline"> · or pick a floor above</span>
+            </Button>
           )}
         </div>
       )}
-    </div>
+    </section>
   );
 }

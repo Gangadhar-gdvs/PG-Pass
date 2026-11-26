@@ -9,20 +9,154 @@ import type { Owner } from '@/types';
 import { formatCurrency, errorMessage } from '@/lib/utils';
 import { generateQrDataUrl } from '@/lib/client/qrcode';
 import { buildUpiPayload } from '@/lib/client/upi';
-import {
-  CheckCircle2,
-  Users,
-  Layers,
-  Camera,
-} from 'lucide-react';
+import { Check, Camera, Sparkles, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input, fieldLabelClass } from '@/components/ui/input';
 import { Drawer } from '@/components/ui/drawer';
 import { ProgressBar } from '@/components/ui/progress-bar';
 import { HeaderSkeleton, CardListSkeleton, PanelSkeleton } from '@/components/ui/skeletons';
+import { PageHeader, SectionCard } from '@/components/ui/dashboard-kit';
+import { IconBubble, IconTile, type Icon3DName, type Tint } from '@/components/brand/Icon3D';
 import { OwnerOnlyGuard } from '@/components/owner/OwnerOnlyGuard';
 import toast from 'react-hot-toast';
 
 const ADMIN_BILLING_UPI = 'pgpass.billing@icici';
+
+/** Green gradient check used in plan feature lists. */
+function FeatureCheck() {
+  return (
+    <span
+      aria-hidden="true"
+      className="mt-px grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[linear-gradient(135deg,#4FD69C_0%,#17A06B_100%)] text-white shadow-[0_4px_8px_-4px_rgba(23,160,107,0.6)]"
+    >
+      <Check className="h-3 w-3" strokeWidth={3.2} />
+    </span>
+  );
+}
+
+/**
+ * Glass plan card. The owner's CURRENT plan gets a violet gradient border; the
+ * rest are plain glass with a hover lift.
+ */
+function PlanCard({
+  icon,
+  tint,
+  name,
+  price,
+  period,
+  blurb,
+  features,
+  current,
+  badge,
+  action,
+}: {
+  icon: Icon3DName;
+  tint: Tint;
+  name: string;
+  price: string;
+  period: string;
+  blurb: string;
+  features: string[];
+  current: boolean;
+  badge?: React.ReactNode;
+  action: React.ReactNode;
+}) {
+  const body = (
+    <div
+      className={`flex h-full flex-col justify-between p-5 sm:p-6 ${
+        current ? 'rounded-[20px] bg-[linear-gradient(180deg,#FFFFFF_0%,#F8F4FF_100%)]' : ''
+      }`}
+    >
+      <div className="space-y-4">
+        <div className="flex items-start justify-between gap-3">
+          <IconTile icon={icon} tint={tint} size={48} />
+          {badge}
+        </div>
+        <div>
+          <h3 className="text-[17px] font-extrabold tracking-[-0.015em] text-ink">{name}</h3>
+          <div className="mt-1.5 flex items-baseline gap-1">
+            <span className="font-mono-numbers text-[32px] font-extrabold leading-none tracking-[-0.03em] text-ink">
+              {price}
+            </span>
+            <span className="text-[13px] font-semibold text-muted">{period}</span>
+          </div>
+          <p className="mt-2 text-[13px] leading-relaxed text-muted">{blurb}</p>
+        </div>
+        <ul className="space-y-2.5 border-t border-line pt-4">
+          {features.map((f) => (
+            <li key={f} className="flex items-start gap-2.5 text-[13px] font-medium text-ink-2">
+              <FeatureCheck />
+              <span>{f}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div className="pt-6">{action}</div>
+    </div>
+  );
+
+  if (current) {
+    return (
+      <div className="h-full rounded-[22px] bg-[image:var(--grad-brand)] p-[2px] shadow-[0_24px_48px_-22px_rgba(106,43,234,0.6)]">
+        {body}
+      </div>
+    );
+  }
+  return <div className="app-card lift h-full">{body}</div>;
+}
+
+const ActiveBadge = () => (
+  <Badge variant="paid" dot className="shrink-0">
+    Active
+  </Badge>
+);
+
+/** Selectable billing-cycle option (radio-style card). */
+function CycleOption({
+  active,
+  onClick,
+  title,
+  price,
+  extra,
+}: {
+  active: boolean;
+  onClick: () => void;
+  title: string;
+  price: string;
+  extra?: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`relative flex min-h-[76px] flex-col justify-center rounded-2xl border-2 p-3.5 text-left transition-all press ${
+        active
+          ? 'border-brand bg-brand-50 shadow-[0_12px_24px_-16px_rgba(106,43,234,0.8)]'
+          : 'border-white bg-white/80 shadow-[0_8px_18px_-12px_rgba(70,40,160,0.35)] hover:border-brand-200'
+      }`}
+    >
+      <span className="flex items-center justify-between gap-2">
+        <span className="flex items-center gap-2">
+          <span
+            aria-hidden="true"
+            className={`grid h-4.5 w-4.5 place-items-center rounded-full border-2 ${
+              active ? 'border-brand bg-[image:var(--grad-brand)]' : 'border-line-strong bg-white'
+            }`}
+          >
+            {active && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
+          </span>
+          <span className={`text-[13px] font-bold ${active ? 'text-brand-700' : 'text-ink-2'}`}>{title}</span>
+        </span>
+        {extra}
+      </span>
+      <span className="mt-1.5 block font-mono-numbers text-[17px] font-extrabold tracking-[-0.02em] text-ink">
+        {price}
+      </span>
+    </button>
+  );
+}
 
 function BillingPageInner() {
   const { ownerId } = useOwnerSession();
@@ -131,264 +265,198 @@ function BillingPageInner() {
 
   if (loading) {
     return (
-      <div className="max-w-3xl mx-auto space-y-4">
+      <div className="max-w-5xl mx-auto space-y-5">
         <HeaderSkeleton action={false} />
-        <CardListSkeleton rows={3} height="h-28" cols={3} />
-        <PanelSkeleton height="h-40" />
+        <PanelSkeleton height="h-48" />
+        <CardListSkeleton rows={3} height="h-80" cols={3} />
       </div>
     );
   }
 
+  const bedSlotsLeft = currentLimits.maxBeds - totalBedsCount;
+
   return (
-    <div className="max-w-5xl mx-auto py-8 space-y-8 text-left">
+    <div className="max-w-5xl mx-auto space-y-5 text-left">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-4 border-b border-[#E2E8F0]">
-        <div>
-          <h1 className="text-xl font-bold text-[#09090B] tracking-tight">
-            Subscription & Platform Quotas
-          </h1>
-          <p className="text-xs text-[#64748B] mt-0.5">
-            Flat, zero-commission SaaS pricing. Never pay a percentage of your rent.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-[#64748B]">Active Tier:</span>
-          <span className="text-xs uppercase font-extrabold px-3 py-1 rounded-full accent-soft-bg">
-            {currentTier} Plan
+      <PageHeader
+        icon="rupee"
+        tint="mint"
+        title="Subscription &"
+        highlight="Platform Quotas"
+        subtitle="Flat, zero-commission SaaS pricing. Never pay a percentage of your rent."
+        actions={
+          <span className="inline-flex h-10 items-center gap-2 rounded-full border border-white bg-white/75 pl-4 pr-1.5 text-[13px] font-semibold text-muted shadow-[0_6px_16px_-10px_rgba(70,40,160,0.4)]">
+            Active Tier
+            <span className="inline-flex h-7 items-center rounded-full bg-[image:var(--grad-brand)] px-3 text-xs font-bold capitalize text-white shadow-[var(--shadow-brand)]">
+              {currentTier} Plan
+            </span>
           </span>
-        </div>
-      </div>
+        }
+      />
 
-      {/* Resource Quota Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {/* Bed Quota Card */}
-        <div className="app-card rounded-[16px] p-5 space-y-3">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-[#64748B] flex items-center gap-1.5 font-medium">
-              <Layers className="w-4 h-4 accent-text" />
-              <span>Bed Inventory</span>
-            </span>
-            <span className="font-bold text-[#09090B] font-mono-numbers">
-              {totalBedsCount} / {currentLimits.maxBeds}
-            </span>
+      {/* Resource Quotas */}
+      <SectionCard title="Your Quotas" icon="grid">
+        <div className="divide-y divide-line">
+          {/* Bed Quota */}
+          <div className="flex items-start gap-3 py-3 first:pt-0">
+            <IconBubble icon="bed" tint="sky" />
+            <div className="min-w-0 flex-1 space-y-2">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+                <span className="text-[14.5px] font-bold text-ink">Bed Inventory</span>
+                <span className="font-mono-numbers text-[14px] font-extrabold text-ink">
+                  {totalBedsCount} / {currentLimits.maxBeds}
+                </span>
+              </div>
+              <ProgressBar
+                value={bedUsagePercent}
+                color={bedUsagePercent > 85 ? 'amber' : 'emerald'}
+                height="md"
+              />
+              <span className="block text-[12.5px] font-medium text-muted">
+                {bedSlotsLeft > 0 ? `${bedSlotsLeft} slots available` : 'Bed quota limit reached'}
+              </span>
+            </div>
           </div>
-          <ProgressBar
-            value={bedUsagePercent}
-            color={bedUsagePercent > 85 ? 'amber' : 'emerald'}
-            height="sm"
-          />
-          <span className="text-[11px] text-[#94A3B8] block">
-            {currentLimits.maxBeds - totalBedsCount > 0
-              ? `${currentLimits.maxBeds - totalBedsCount} slots available`
-              : 'Bed quota limit reached'}
-          </span>
-        </div>
 
-        {/* Staff Allocation */}
-        <div className="app-card rounded-[16px] p-5 space-y-3">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-[#64748B] flex items-center gap-1.5 font-medium">
-              <Users className="w-4 h-4 text-[#10B981]" />
-              <span>Staff / Wardens</span>
-            </span>
-            <span className="font-bold text-[#09090B] font-mono-numbers">
-              {currentLimits.maxStaff} allowed
-            </span>
+          {/* Staff Allocation */}
+          <div className="flex items-start gap-3 py-3">
+            <IconBubble icon="staff" tint="indigo" />
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+                <span className="text-[14.5px] font-bold text-ink">Staff / Wardens</span>
+                <span className="font-mono-numbers text-[14px] font-extrabold text-ink">
+                  {currentLimits.maxStaff} allowed
+                </span>
+              </div>
+              <p className="mt-0.5 text-[12.5px] font-medium leading-relaxed text-muted">
+                {currentLimits.maxStaff === 0
+                  ? 'Upgrade to Growth or Pro to delegate warden check-ins.'
+                  : `Manage up to ${currentLimits.maxStaff} staff assistants with scoped access.`}
+              </p>
+            </div>
           </div>
-          <p className="text-[11px] text-[#64748B] leading-relaxed">
-            {currentLimits.maxStaff === 0
-              ? 'Upgrade to Growth or Pro to delegate warden check-ins.'
-              : `Manage up to ${currentLimits.maxStaff} staff assistants with scoped access.`}
-          </p>
-        </div>
 
-        {/* Photo Vault */}
-        <div className="app-card rounded-[16px] p-5 space-y-3">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-[#64748B] flex items-center gap-1.5 font-medium">
-              <Camera className="w-4 h-4 text-[#6366F1]" />
-              <span>Backblaze B2 Vault</span>
-            </span>
-            <span className="font-bold text-[#09090B] font-mono-numbers">
-              Up to {currentLimits.maxPhotos} photos
-            </span>
+          {/* Photo Vault */}
+          <div className="flex items-start gap-3 py-3 last:pb-0">
+            <IconBubble icon={<Camera className="h-5 w-5" />} tint="peach" />
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+                <span className="text-[14.5px] font-bold text-ink">Backblaze B2 Vault</span>
+                <span className="font-mono-numbers text-[14px] font-extrabold text-ink">
+                  Up to {currentLimits.maxPhotos} photos
+                </span>
+              </div>
+              <p className="mt-0.5 text-[12.5px] font-medium leading-relaxed text-muted">
+                Encrypted private condition photos and payment screenshot archives.
+              </p>
+            </div>
           </div>
-          <p className="text-[11px] text-[#64748B] leading-relaxed">
-            Encrypted private condition photos and payment screenshot archives.
-          </p>
         </div>
-      </div>
+      </SectionCard>
 
       {/* Tier Comparison & Upgrade Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 stagger">
         {/* FREE TIER */}
-        <div
-          className={`app-card rounded-[16px] p-6 flex flex-col justify-between ${
-            currentTier === PLAN_TIER.FREE ? 'ring-2' : ''
-          }`}
-          style={currentTier === PLAN_TIER.FREE ? { ['--tw-ring-color' as string]: 'var(--accent)' } : undefined}
-        >
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-bold text-[#09090B]">Free Tier</h3>
-              {currentTier === PLAN_TIER.FREE && (
-                <span className="text-[10px] font-bold accent-soft-bg px-2 py-0.5 rounded-full">
-                  Active
-                </span>
-              )}
-            </div>
-            <div className="flex items-baseline gap-1">
-              <span className="text-3xl font-extrabold text-[#09090B]">₹0</span>
-              <span className="text-xs text-[#64748B]">/ forever</span>
-            </div>
-            <p className="text-xs text-[#64748B]">
-              Perfect for single-owner small PGs starting out.
-            </p>
-            <ul className="text-xs text-[#475569] space-y-2 pt-2 border-t border-[#F1F5F9]">
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-[#10B981]" />
-                <span>Up to 20 beds inventory</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-[#10B981]" />
-                <span>0% direct UPI settlement</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-[#10B981]" />
-                <span>Sequential HRA tax receipts</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-[#10B981]" />
-                <span>Up to 40 B2 inspection photos</span>
-              </li>
-            </ul>
-          </div>
-
-          <div className="pt-6">
-            <Button
-              variant="outline"
-              disabled={currentTier === PLAN_TIER.FREE}
-              className="w-full text-xs"
-            >
+        <PlanCard
+          icon="home-blue"
+          tint="sky"
+          name="Free Tier"
+          price="₹0"
+          period="/ forever"
+          blurb="Perfect for single-owner small PGs starting out."
+          features={[
+            'Up to 20 beds inventory',
+            '0% direct UPI settlement',
+            'Sequential HRA tax receipts',
+            'Up to 40 B2 inspection photos',
+          ]}
+          current={currentTier === PLAN_TIER.FREE}
+          badge={currentTier === PLAN_TIER.FREE ? <ActiveBadge /> : undefined}
+          action={
+            <Button variant="outline" size="full" disabled={currentTier === PLAN_TIER.FREE}>
               {currentTier === PLAN_TIER.FREE ? 'Current Plan' : 'Free Tier'}
             </Button>
-          </div>
-        </div>
+          }
+        />
 
         {/* GROWTH TIER */}
-        <div
-          className={`app-card rounded-[16px] p-6 flex flex-col justify-between relative ${
-            currentTier === PLAN_TIER.GROWTH ? 'ring-2' : ''
-          }`}
-          style={currentTier === PLAN_TIER.GROWTH ? { ['--tw-ring-color' as string]: 'var(--accent)' } : undefined}
-        >
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-bold text-[#09090B]">Growth</h3>
-              {currentTier === PLAN_TIER.GROWTH ? (
-                <span className="text-[10px] font-bold accent-soft-bg px-2 py-0.5 rounded-full">
-                  Active
-                </span>
-              ) : (
-                <span className="text-[10px] font-bold text-[#10B981] bg-[#ECFDF5] px-2 py-0.5 rounded-[4px]">
-                  Most Popular
-                </span>
-              )}
-            </div>
-            <div className="flex items-baseline gap-1">
-              <span className="text-3xl font-extrabold text-[#09090B]">₹999</span>
-              <span className="text-xs text-[#64748B]">/ month</span>
-            </div>
-            <p className="text-xs text-[#64748B]">
-              For mid-size PGs managing up to 100 residents.
-            </p>
-            <ul className="text-xs text-[#475569] space-y-2 pt-2 border-t border-[#F1F5F9]">
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-[#10B981]" />
-                <span>Up to 100 beds inventory</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-[#10B981]" />
-                <span>1 Warden / Staff delegation seat</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-[#10B981]" />
-                <span>Up to 500 B2 encrypted photos</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-[#10B981]" />
-                <span>Priority WhatsApp reminder queues</span>
-              </li>
-            </ul>
-          </div>
-
-          <div className="pt-6">
+        <PlanCard
+          icon="building"
+          tint="violet"
+          name="Growth"
+          price="₹999"
+          period="/ month"
+          blurb="For mid-size PGs managing up to 100 residents."
+          features={[
+            'Up to 100 beds inventory',
+            '1 Warden / Staff delegation seat',
+            'Up to 500 B2 encrypted photos',
+            'Priority WhatsApp reminder queues',
+          ]}
+          current={currentTier === PLAN_TIER.GROWTH}
+          badge={
+            currentTier === PLAN_TIER.GROWTH ? (
+              <ActiveBadge />
+            ) : (
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[image:var(--grad-brand)] px-3 py-1 text-[11.5px] font-bold text-white shadow-[var(--shadow-brand)]">
+                <Sparkles className="h-3.5 w-3.5" />
+                Most Popular
+              </span>
+            )
+          }
+          action={
             <Button
               variant={currentTier === PLAN_TIER.GROWTH ? 'outline' : 'solid'}
+              size="full"
               disabled={currentTier === PLAN_TIER.GROWTH}
               onClick={() => setSelectedPlan(PLAN_TIER.GROWTH)}
-              className="w-full text-xs accent-bg hover:opacity-90 text-white"
             >
-              {currentTier === PLAN_TIER.GROWTH ? 'Current Plan' : 'Upgrade to Growth'}
+              {currentTier === PLAN_TIER.GROWTH ? (
+                'Current Plan'
+              ) : (
+                <>
+                  Upgrade to Growth
+                  <ArrowRight className="h-4 w-4" />
+                </>
+              )}
             </Button>
-          </div>
-        </div>
+          }
+        />
 
         {/* PRO TIER */}
-        <div
-          className={`app-card rounded-[16px] p-6 flex flex-col justify-between ${
-            currentTier === PLAN_TIER.PRO ? 'ring-2' : ''
-          }`}
-          style={currentTier === PLAN_TIER.PRO ? { ['--tw-ring-color' as string]: 'var(--accent)' } : undefined}
-        >
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-bold text-[#09090B]">Pro Enterprise</h3>
-              {currentTier === PLAN_TIER.PRO && (
-                <span className="text-[10px] font-bold accent-soft-bg px-2 py-0.5 rounded-full">
-                  Active
-                </span>
-              )}
-            </div>
-            <div className="flex items-baseline gap-1">
-              <span className="text-3xl font-extrabold text-[#09090B]">₹1,999</span>
-              <span className="text-xs text-[#64748B]">/ month</span>
-            </div>
-            <p className="text-xs text-[#64748B]">
-              For large coliving buildings with multiple wardens.
-            </p>
-            <ul className="text-xs text-[#475569] space-y-2 pt-2 border-t border-[#F1F5F9]">
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-[#10B981]" />
-                <span>Up to 500 beds inventory</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-[#10B981]" />
-                <span>5 Warden delegation seats</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-[#10B981]" />
-                <span>Up to 2,500 B2 photos archive</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-[#10B981]" />
-                <span>Audit logging & priority SLA</span>
-              </li>
-            </ul>
-          </div>
-
-          <div className="pt-6">
+        <PlanCard
+          icon="star"
+          tint="amber"
+          name="Pro Enterprise"
+          price="₹1,999"
+          period="/ month"
+          blurb="For large coliving buildings with multiple wardens."
+          features={[
+            'Up to 500 beds inventory',
+            '5 Warden delegation seats',
+            'Up to 2,500 B2 photos archive',
+            'Audit logging & priority SLA',
+          ]}
+          current={currentTier === PLAN_TIER.PRO}
+          badge={currentTier === PLAN_TIER.PRO ? <ActiveBadge /> : undefined}
+          action={
             <Button
               variant={currentTier === PLAN_TIER.PRO ? 'outline' : 'solid'}
+              size="full"
               disabled={currentTier === PLAN_TIER.PRO}
               onClick={() => setSelectedPlan(PLAN_TIER.PRO)}
-              className="w-full text-xs bg-[#0F172A] hover:bg-[#1E293B] text-white"
             >
-              {currentTier === PLAN_TIER.PRO ? 'Current Plan' : 'Upgrade to Pro'}
+              {currentTier === PLAN_TIER.PRO ? (
+                'Current Plan'
+              ) : (
+                <>
+                  Upgrade to Pro
+                  <ArrowRight className="h-4 w-4" />
+                </>
+              )}
             </Button>
-          </div>
-        </div>
+          }
+        />
       </div>
 
       {/* UPGRADE MODAL DRAWER */}
@@ -400,96 +468,69 @@ function BillingPageInner() {
           description="0% Gateway Fee settlement via Direct UPI to Platform"
           width="md"
         >
-          <form onSubmit={handleUpgradeSubmit} className="space-y-4 text-left">
+          <form onSubmit={handleUpgradeSubmit} className="space-y-5 text-left">
             {/* Billing Cycle Selector */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-[#09090B]">
-                Billing Cycle:
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
+            <div role="group" aria-labelledby="billing-cycle-label" className="space-y-2">
+              <span id="billing-cycle-label" className={fieldLabelClass}>
+                Billing Cycle
+              </span>
+              <div className="grid grid-cols-2 gap-2.5">
+                <CycleOption
+                  active={billingCycle === 'monthly'}
                   onClick={() => setBillingCycle('monthly')}
-                  className={`p-3 rounded-[10px] border text-left transition-all ${
-                    billingCycle === 'monthly'
-                      ? 'border-transparent accent-soft-bg'
-                      : 'border-[#E2E8F0] bg-white text-[#475569]'
-                  }`}
-                >
-                  <span className="text-xs font-bold block">Monthly</span>
-                  <span className="text-sm font-extrabold font-mono mt-0.5 block">
-                    {formatCurrency(getPlanPriceRupees(selectedPlan, 'monthly'))}
-                  </span>
-                </button>
-
-                <button
-                  type="button"
+                  title="Monthly"
+                  price={formatCurrency(getPlanPriceRupees(selectedPlan, 'monthly'))}
+                />
+                <CycleOption
+                  active={billingCycle === 'yearly'}
                   onClick={() => setBillingCycle('yearly')}
-                  className={`p-3 rounded-[10px] border text-left transition-all ${
-                    billingCycle === 'yearly'
-                      ? 'border-transparent accent-soft-bg'
-                      : 'border-[#E2E8F0] bg-white text-[#475569]'
-                  }`}
-                >
-                  <span className="text-xs font-bold flex items-center justify-between">
-                    <span>Yearly</span>
-                    <span className="text-[10px] text-[#10B981] font-bold">2 Mo Free</span>
-                  </span>
-                  <span className="text-sm font-extrabold font-mono mt-0.5 block">
-                    {formatCurrency(getPlanPriceRupees(selectedPlan, 'yearly'))}
-                  </span>
-                </button>
+                  title="Yearly"
+                  price={formatCurrency(getPlanPriceRupees(selectedPlan, 'yearly'))}
+                  extra={<Badge variant="paid">2 Mo Free</Badge>}
+                />
               </div>
             </div>
 
             {/* QR Code and Payment Details */}
-            <div className="p-4 rounded-[10px] bg-[#F8FAFC] border border-[#E2E8F0] flex flex-col items-center justify-center text-center space-y-2">
-              <span className="text-xs text-[#64748B]">
-                Scan to pay {formatCurrency(selectedAmountRupees)} via any UPI App:
+            <div className="well flex flex-col items-center gap-3 p-5 text-center">
+              <span className="text-[13px] font-medium text-ink-2">
+                Scan to pay{' '}
+                <span className="font-mono-numbers font-extrabold text-ink">
+                  {formatCurrency(selectedAmountRupees)}
+                </span>{' '}
+                via any UPI App:
               </span>
-              {qrDataUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element -- dynamic client-generated data-URL QR code; next/image can't optimize a runtime data URL
-                <img
-                  src={qrDataUrl}
-                  alt="Admin UPI QR"
-                  className="w-36 h-36 border border-[#E2E8F0] rounded-[8px] bg-white p-2"
-                />
-              ) : (
-                <div className="w-36 h-36 border border-[#E2E8F0] rounded-[8px] bg-white flex items-center justify-center text-xs text-[#94A3B8]">
-                  Loading QR...
-                </div>
-              )}
-              <span className="text-xs font-mono font-bold text-[#09090B]">
-                {ADMIN_BILLING_UPI}
-              </span>
+              <div className="rounded-[20px] border border-white bg-white p-2.5 shadow-[0_14px_30px_-16px_rgba(70,40,160,0.45)]">
+                {qrDataUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- dynamic client-generated data-URL QR code; next/image can't optimize a runtime data URL
+                  <img
+                    src={qrDataUrl}
+                    alt="Admin UPI QR"
+                    className="h-40 w-40 rounded-xl"
+                  />
+                ) : (
+                  <div className="flex h-40 w-40 items-center justify-center rounded-xl animate-shimmer text-xs font-semibold text-muted">
+                    Loading QR...
+                  </div>
+                )}
+              </div>
+              <span className="chip font-mono text-[12.5px]">{ADMIN_BILLING_UPI}</span>
             </div>
 
             {/* UTR Reference Input */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-[#09090B]">
-                Enter 12-digit UPI UTR Reference:
-              </label>
-              <input
-                type="text"
-                required
-                maxLength={32}
-                placeholder="e.g. 432198765432"
-                value={utrInput}
-                onChange={(e) => setUtrInput(e.target.value)}
-                className="w-full h-10 px-3 rounded-[8px] border border-[#CBD5E1] text-xs font-mono text-[#09090B] placeholder:text-[#94A3B8] focus:outline-none focus:border-[color:var(--accent)]"
-              />
-              <span className="text-[11px] text-[#64748B] block">
-                Found in your GPay, PhonePe, or Paytm payment details.
-              </span>
-            </div>
+            <Input
+              label="Enter 12-digit UPI UTR Reference"
+              type="text"
+              required
+              maxLength={32}
+              placeholder="e.g. 432198765432"
+              value={utrInput}
+              onChange={(e) => setUtrInput(e.target.value)}
+              helperText="Found in your GPay, PhonePe, or Paytm payment details."
+              className="font-mono tracking-wide"
+            />
 
-            <Button
-              type="submit"
-              size="lg"
-              variant="solid"
-              loading={submitting}
-              className="w-full bg-[#10B981] hover:bg-[#059669] text-white text-xs font-bold"
-            >
+            <Button type="submit" size="full" variant="success" loading={submitting}>
               <span>Submit Payment for Activation</span>
             </Button>
           </form>

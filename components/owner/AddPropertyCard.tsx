@@ -4,7 +4,9 @@ import React, { useState } from 'react';
 import { useOwnerSession } from '@/hooks/useOwner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Building2, Plus } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { IconBubble, IconTile } from '@/components/brand/Icon3D';
+import { Building2, MapPin, Plus } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { errorMessage } from '@/lib/utils';
 
@@ -50,50 +52,66 @@ export function AddPropertyCard() {
   };
 
   return (
-    <div className="bg-white border border-[#E2E8F0] rounded-[12px] p-4 sm:p-6 shadow-xs">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Building2 className="w-4 h-4 accent-text" />
-          <h2 className="text-sm font-bold text-[#09090B]">
-            Properties <span className="text-[#64748B] font-normal">· {properties.length}</span>
-          </h2>
+    <section className="app-card p-4 sm:p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <IconTile icon="building" tint="violet" size={48} />
+          <div className="min-w-0">
+            <h2 className="flex items-center gap-2 text-[17px] font-bold tracking-[-0.015em] text-ink">
+              Properties
+              <span className="chip font-mono-numbers">{properties.length}</span>
+            </h2>
+          </div>
         </div>
         {!open && (
-          <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
-            <Plus className="w-3.5 h-3.5 mr-1" /> Add Property
+          <Button variant="outline" onClick={() => setOpen(true)}>
+            <Plus className="h-4 w-4" /> Add Property
           </Button>
         )}
       </div>
 
       {properties.length > 0 && (
-        <ul className="mt-3 space-y-1.5">
+        <ul className="mt-3 divide-y divide-line stagger">
           {properties.map((p) => (
-            <li key={p.id} className="text-xs text-[#334155] flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full accent-bg" />
-              {p.pgName}
-              {p.isPrimary ? <span className="text-[#94A3B8]">(Main)</span> : null}
+            <li key={p.id} className="flex items-center gap-3 py-2.5">
+              <IconBubble icon={p.isPrimary ? 'house' : 'building'} tint={p.isPrimary ? 'violet' : 'sky'} size={40} />
+              <span className="min-w-0 flex-1 truncate text-[14px] font-bold text-ink">{p.pgName}</span>
+              {p.isPrimary ? <Badge variant="brand">Main</Badge> : null}
             </li>
           ))}
         </ul>
       )}
 
       {open && (
-        <form onSubmit={submit} className="mt-4 space-y-3">
-          <Input label="Property / PG Name" value={pgName} onChange={(e) => setPgName(e.target.value)} required disabled={saving} />
-          <Input label="Address (optional)" value={pgAddress} onChange={(e) => setPgAddress(e.target.value)} disabled={saving} />
-          <div className="flex items-center gap-2">
-            <Button type="submit" size="sm" variant="solid" loading={saving} className="flex-1">
+        <form onSubmit={submit} className="well mt-4 space-y-3.5 p-4 animate-pop">
+          <Input
+            label="Property / PG Name"
+            value={pgName}
+            onChange={(e) => setPgName(e.target.value)}
+            leading={<Building2 />}
+            required
+            disabled={saving}
+          />
+          <Input
+            label="Address (optional)"
+            value={pgAddress}
+            onChange={(e) => setPgAddress(e.target.value)}
+            leading={<MapPin />}
+            disabled={saving}
+          />
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <Button type="submit" variant="solid" loading={saving} className="w-full sm:w-auto sm:flex-1">
               Create Property
             </Button>
-            <Button type="button" size="sm" variant="outline" onClick={() => setOpen(false)} disabled={saving}>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={saving} className="w-full sm:w-auto">
               Cancel
             </Button>
           </div>
-          <p className="text-[11px] text-[#64748B]">
+          <p className="text-xs font-medium leading-relaxed text-muted">
             After creating, switch to the new property (top-left) and set up its beds from the dashboard.
           </p>
         </form>
       )}
-    </div>
+    </section>
   );
 }

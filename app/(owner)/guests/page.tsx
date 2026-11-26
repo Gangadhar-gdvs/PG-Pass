@@ -5,12 +5,14 @@ import { useOwnerSession } from '@/hooks/useOwner';
 import { useBeds } from '@/hooks/useBeds';
 import { formatCurrency, formatDateIN, errorMessage } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { CardListSkeleton } from '@/components/ui/skeletons';
+import { Avatar } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { ListSkeleton, StatGridSkeleton } from '@/components/ui/skeletons';
 import { EmptyState } from '@/components/ui/empty-state';
 import { TabBar } from '@/components/ui/tab-bar';
 import { CheckInGuestModal } from '@/components/owner/CheckInGuestModal';
-import { HeroHeader } from '@/components/ui/dashboard-kit';
-import { UserPlus, LogOut, Phone, BedDouble } from 'lucide-react';
+import { PageHeader, SectionCard, StatTile } from '@/components/ui/dashboard-kit';
+import { UserPlus, LogOut, Phone, BedDouble, CalendarDays, Moon } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { GuestStay, Bed } from '@/types';
 
@@ -64,25 +66,44 @@ export default function GuestsPage() {
     }
   };
 
+  // Display-only totals for the list currently shown (this tab).
+  const totalNights = guests.reduce((sum, g) => sum + (g.nights || 0), 0);
+  const totalBilledPaise = guests.reduce((sum, g) => sum + (g.totalAmountPaise || 0), 0);
+
   return (
-    <div className="max-w-3xl mx-auto space-y-5 pt-2">
-      <HeroHeader
-        eyebrow="Guests"
+    <div className="space-y-5">
+      <PageHeader
+        icon="bed-teal"
+        tint="mint"
         title="Guests"
         subtitle="Short stays — check in & out in seconds."
-        right={
-          <button
-            type="button"
+        actions={
+          <Button
             onClick={() => {
               if (vacantBeds.length === 0) return toast.error('No vacant bed available');
               setBedToCheckIn(vacantBeds[0]);
             }}
-            className="inline-flex items-center gap-1.5 h-10 px-4 rounded-full bg-white text-[color:var(--accent)] text-xs font-bold press shadow-sm"
           >
-            <UserPlus className="w-4 h-4" /> Check in
-          </button>
+            <UserPlus className="h-4 w-4" /> Check in
+          </Button>
         }
       />
+
+      {loading ? (
+        <StatGridSkeleton count={4} />
+      ) : (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 stagger">
+          <StatTile
+            icon="bed-teal"
+            tint="mint"
+            label={tab === 'active' ? 'Staying Now' : 'Past Guests'}
+            value={guests.length}
+          />
+          <StatTile icon="bed" tint="sky" label="Vacant Beds" value={vacantBeds.length} />
+          <StatTile icon="calendar" tint="violet" label="Guest Nights" value={totalNights} />
+          <StatTile icon="rupee" tint="peach" label="Total Billed" value={formatCurrency(totalBilledPaise / 100)} />
+        </div>
+      )}
 
       <TabBar
         tabs={[
@@ -92,14 +113,15 @@ export default function GuestsPage() {
         activeTab={tab}
         onChange={(id) => setTab(id as 'active' | 'completed')}
         variant="pill"
+        className="w-fit"
       />
 
       {loading ? (
-        <CardListSkeleton rows={3} height="h-24" />
+        <ListSkeleton rows={3} />
       ) : guests.length === 0 ? (
-        <div className="app-card p-6">
+        <div className="app-card">
           <EmptyState
-            icon={<BedDouble className="w-6 h-6 accent-text" />}
+            icon3d="bed-teal"
             title={tab === 'active' ? 'No guests staying' : 'No past guests'}
             description={
               tab === 'active'
@@ -109,51 +131,83 @@ export default function GuestsPage() {
           />
         </div>
       ) : (
-        <div className="space-y-3 stagger">
-          {guests.map((g) => (
-            <div key={g.id} className="app-card p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="font-extrabold text-[15px] text-slate-900">{g.name}</div>
-                  <div className="text-xs text-slate-500 mt-0.5">
-                    Bed {g.bedLabel} · {formatDateIN(g.checkInDate)} → {formatDateIN(g.checkOutDate)} · {g.nights}n
+        <SectionCard
+          title={tab === 'active' ? 'Staying now' : 'History'}
+          icon={tab === 'active' ? 'bed-teal' : 'clock'}
+          action={<span className="chip font-mono-numbers">{guests.length}</span>}
+        >
+          <ul className="divide-y divide-line stagger">
+            {guests.map((g) => {
+              const isActive = g.status === 'active';
+              return (
+                <li key={g.id} className="py-3.5 first:pt-1 last:pb-1">
+                  <div className="flex items-start gap-3">
+                    <Avatar name={g.name} size="lg" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="truncate text-[15px] font-bold text-ink">{g.name}</div>
+                          <div className="mt-0.5 flex items-center gap-1 text-[12.5px] font-medium text-muted">
+                            <BedDouble className="h-3.5 w-3.5 shrink-0" />
+                            <span className="truncate">Bed {g.bedLabel}</span>
+                          </div>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <div className="font-mono-numbers text-[15px] font-extrabold text-ink">
+                            {formatCurrency(g.totalAmountPaise / 100)}
+                          </div>
+                          <div className="font-mono-numbers text-[11.5px] font-medium text-muted">
+                            {g.billingMode === 'per_night' && g.nightlyRatePaise
+                              ? `${formatCurrency(g.nightlyRatePaise / 100)}/night`
+                              : 'flat'}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                        <span className="chip font-mono-numbers">
+                          <CalendarDays className="h-3.5 w-3.5" />
+                          {formatDateIN(g.checkInDate)} → {formatDateIN(g.checkOutDate)}
+                        </span>
+                        <span className="chip font-mono-numbers">
+                          <Moon className="h-3.5 w-3.5" />
+                          {g.nights}n
+                        </span>
+                        <Badge variant={isActive ? 'paid' : 'vacant'} dot>
+                          {isActive ? 'Staying' : 'Checked out'}
+                        </Badge>
+                      </div>
+
+                      {(g.phone || isActive) && (
+                        <div className="mt-3 flex items-center gap-2">
+                          {g.phone && (
+                            <a
+                              href={`tel:${g.phone}`}
+                              className="inline-grid h-11 w-11 shrink-0 place-items-center rounded-full bg-brand-50 text-brand-700 transition-colors hover:bg-brand-100 press"
+                              aria-label="Call guest"
+                            >
+                              <Phone className="h-4 w-4" />
+                            </a>
+                          )}
+                          {isActive && (
+                            <Button
+                              variant="outline"
+                              disabled={busyId === g.id}
+                              loading={busyId === g.id}
+                              onClick={() => checkout(g.id)}
+                            >
+                              <LogOut className="h-4 w-4" /> Check out
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-xs mt-1 font-mono-numbers">
-                    <span className="font-bold text-slate-900">{formatCurrency(g.totalAmountPaise / 100)}</span>
-                    <span className="text-slate-400">
-                      {' '}
-                      {g.billingMode === 'per_night' && g.nightlyRatePaise
-                        ? `· ${formatCurrency(g.nightlyRatePaise / 100)}/night`
-                        : '· flat'}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex flex-col items-end gap-2 shrink-0">
-                  {g.phone && (
-                    <a
-                      href={`tel:${g.phone}`}
-                      className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center press"
-                      aria-label="Call guest"
-                    >
-                      <Phone className="w-4 h-4 text-slate-600" />
-                    </a>
-                  )}
-                  {g.status === 'active' && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={busyId === g.id}
-                      loading={busyId === g.id}
-                      onClick={() => checkout(g.id)}
-                    >
-                      <LogOut className="w-3.5 h-3.5" /> Check out
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+                </li>
+              );
+            })}
+          </ul>
+        </SectionCard>
       )}
 
       {bedToCheckIn && (

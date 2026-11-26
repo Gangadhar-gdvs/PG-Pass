@@ -4,7 +4,7 @@ import React, { useEffect } from 'react';
 import { useOwnerSession } from '@/hooks/useOwner';
 import { SupportChat } from '@/components/support/SupportChat';
 import { SupportLink } from '@/components/ui/support-link';
-import { LifeBuoy } from 'lucide-react';
+import { PageHeader } from '@/components/ui/dashboard-kit';
 import toast from 'react-hot-toast';
 
 export default function OwnerSupportPage() {
@@ -32,25 +32,22 @@ export default function OwnerSupportPage() {
   };
 
   return (
-    // Full-bleed on mobile (negative margins cancel the shell's px/py so the chat
-    // uses the whole window between the sticky top bar and bottom tab bar); a
-    // comfortable centred card on desktop. Fixed height + inner min-h-0 means
-    // ONLY the chat message list scrolls — the page itself never scrolls.
-    // Height subtracts the sticky top bar (3.5rem), the floating bottom tab bar
-    // (~6rem), and the device's bottom safe-area inset so the chat input never
-    // hides under a home indicator on notched phones.
-    <div className="-mx-4 -my-4 md:mx-auto md:my-0 md:max-w-2xl md:px-4 md:py-5 flex flex-col h-[calc(100dvh-3.5rem-6rem-env(safe-area-inset-bottom))] md:h-[calc(100dvh-4rem)]">
-      <header className="flex items-center gap-3 px-4 py-3 md:px-0 md:pt-0 md:pb-4 shrink-0 border-b border-slate-100 md:border-0">
-        <div className="w-10 h-10 md:w-11 md:h-11 rounded-2xl accent-soft-bg flex items-center justify-center">
-          <LifeBuoy className="w-5 h-5 accent-text" />
-        </div>
-        <div>
-          <h1 className="text-lg md:text-xl font-bold text-slate-900">Support</h1>
-          <p className="text-xs text-slate-500">Chat directly with the PG-Pass team</p>
-        </div>
-      </header>
+    // Fixed height + inner min-h-0 means ONLY the chat message list scrolls —
+    // the page itself never scrolls. Height subtracts the sticky top bar
+    // (3.5rem), the floating bottom tab bar (~6rem), and the device's bottom
+    // safe-area inset so the chat input never hides under a home indicator on
+    // notched phones. Mobile cancels the shell's vertical padding (-my-4) so the
+    // chat card gets every pixel between the bars; desktop is a centred column.
+    <div className="-my-4 md:mx-auto md:my-0 md:max-w-2xl flex flex-col gap-3 md:gap-4 py-3 md:py-0 h-[calc(100dvh-3.5rem-6rem-env(safe-area-inset-bottom))] md:h-[calc(100dvh-4rem)]">
+      <PageHeader
+        icon="bell-purple"
+        tint="violet"
+        title="Support"
+        subtitle="Chat directly with the PG-Pass team"
+        className="shrink-0"
+      />
 
-      <div className="md:app-card flex-1 min-h-0 flex flex-col overflow-hidden p-0 bg-white">
+      <div className="app-card flex-1 min-h-0 flex flex-col overflow-hidden">
         <SupportChat
           threadOwnerId={ownerId}
           viewerSide="owner"
@@ -60,7 +57,7 @@ export default function OwnerSupportPage() {
         />
       </div>
 
-      <div className="py-2 md:mt-3 text-center shrink-0">
+      <div className="shrink-0 text-center">
         <SupportLink />
       </div>
     </div>

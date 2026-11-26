@@ -1,5 +1,5 @@
 import * as React from "react";
-import { ArrowUpDown, ChevronUp, ChevronDown } from "lucide-react";
+import { ArrowUpDown, ChevronUp, ChevronDown, ChevronRight } from "lucide-react";
 
 export interface Column<T> {
   key: string;
@@ -57,34 +57,48 @@ export function DataTable<T>({
   }, [data, sortKey, sortDirection]);
 
   return (
-    <div className={`w-full overflow-hidden rounded-[10px] border border-[#E2E8F0] bg-white shadow-xs ${className}`}>
+    <div className={`app-card w-full overflow-hidden ${className}`}>
       {/* Mobile (<sm): stacked cards — avoids the horizontal scroll a wide table
           forces on a 375px phone. */}
-      <div className="sm:hidden divide-y divide-[#E2E8F0]">
+      <div className="sm:hidden p-2 space-y-2">
         {sortedData.length === 0 ? (
-          <div className="px-4 py-8 text-center text-xs text-[#64748B]">{emptyText}</div>
+          <div className="px-4 py-10 text-center text-[13px] font-medium text-muted">{emptyText}</div>
         ) : (
           sortedData.map((row) => (
-            <button
+            <div
               key={keyExtractor(row)}
-              type="button"
-              onClick={() => onRowClick && onRowClick(row)}
-              disabled={!onRowClick}
-              className={`block w-full text-left px-4 py-3 space-y-1.5 ${
-                onRowClick ? "active:bg-[#F8FAFC] cursor-pointer" : "cursor-default"
+              role={onRowClick ? "button" : undefined}
+              tabIndex={onRowClick ? 0 : undefined}
+              onClick={onRowClick ? () => onRowClick(row) : undefined}
+              onKeyDown={
+                onRowClick
+                  ? (e) => {
+                      if (e.target !== e.currentTarget) return;
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        onRowClick(row);
+                      }
+                    }
+                  : undefined
+              }
+              className={`relative block w-full text-left rounded-2xl bg-white/80 border border-[#F0EBFD] px-4 py-3 space-y-1.5 shadow-[0_6px_14px_-10px_rgba(70,40,160,0.3)] ${
+                onRowClick ? "active:scale-[0.99] transition-transform cursor-pointer pr-9" : "cursor-default"
               }`}
             >
               {columns.map((col) => (
                 <div key={col.key} className="flex items-start justify-between gap-3 min-h-[24px]">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-[#64748B] shrink-0">
+                  <span className="text-xs font-semibold text-muted shrink-0">
                     {col.header}
                   </span>
-                  <span className="text-[13px] text-[#09090B] text-right">
+                  <span className="text-[13px] font-medium text-ink text-right">
                     {col.render ? col.render(row) : ((row as Record<string, unknown>)[col.key] as React.ReactNode)}
                   </span>
                 </div>
               ))}
-            </button>
+              {onRowClick && (
+                <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-brand-300" />
+              )}
+            </div>
           ))
         )}
       </div>
@@ -93,12 +107,12 @@ export function DataTable<T>({
       <div className="hidden sm:block overflow-x-auto">
         <table className="w-full text-left text-[13px] border-collapse">
           <thead>
-            <tr className="border-b border-[#E2E8F0] bg-[#F8FAFC] text-[11px] font-semibold uppercase tracking-wider text-[#64748B]">
+            <tr className="border-b border-line bg-brand-50/70 text-xs font-bold text-muted">
               {columns.map((col) => (
                 <th
                   key={col.key}
                   style={{ width: col.width }}
-                  className={`px-4 py-3 select-none ${
+                  className={`px-4 py-3.5 select-none first:pl-5 last:pr-5 ${
                     col.align === "right"
                       ? "text-right"
                       : col.align === "center"
@@ -110,17 +124,17 @@ export function DataTable<T>({
                     <button
                       type="button"
                       onClick={() => handleSort(col.key)}
-                      className="inline-flex items-center gap-1 hover:text-[#09090B] transition-colors focus:outline-none cursor-pointer"
+                      className="inline-flex items-center gap-1 hover:text-brand-700 transition-colors focus:outline-none cursor-pointer"
                     >
                       <span>{col.header}</span>
                       {sortKey === col.key ? (
                         sortDirection === "asc" ? (
-                          <ChevronUp className="h-3 w-3 text-[#D97706]" />
+                          <ChevronUp className="h-3.5 w-3.5 text-brand" />
                         ) : (
-                          <ChevronDown className="h-3 w-3 text-[#D97706]" />
+                          <ChevronDown className="h-3.5 w-3.5 text-brand" />
                         )
                       ) : (
-                        <ArrowUpDown className="h-2.5 w-2.5 text-[#94A3B8]" />
+                        <ArrowUpDown className="h-3 w-3 text-faint" />
                       )}
                     </button>
                   ) : (
@@ -130,12 +144,12 @@ export function DataTable<T>({
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#E2E8F0]">
+          <tbody className="divide-y divide-line">
             {sortedData.length === 0 ? (
               <tr>
                 <td
                   colSpan={columns.length}
-                  className="px-4 py-8 text-center text-xs text-[#64748B]"
+                  className="px-4 py-10 text-center text-[13px] font-medium text-muted"
                 >
                   {emptyText}
                 </td>
@@ -146,13 +160,13 @@ export function DataTable<T>({
                   key={keyExtractor(row)}
                   onClick={() => onRowClick && onRowClick(row)}
                   className={`transition-colors ${
-                    onRowClick ? "cursor-pointer hover:bg-[#F8FAFC]" : "hover:bg-[#F8FAFC]/50"
+                    onRowClick ? "cursor-pointer hover:bg-brand-50/60" : "hover:bg-brand-50/30"
                   }`}
                 >
                   {columns.map((col) => (
                     <td
                       key={col.key}
-                      className={`px-4 py-3 text-[#09090B] ${
+                      className={`px-4 py-3.5 first:pl-5 last:pr-5 text-ink font-medium ${
                         col.align === "right"
                           ? "text-right"
                           : col.align === "center"

@@ -1,13 +1,13 @@
 import * as React from "react";
+import { User } from "lucide-react";
 
 const PALETTE = [
-  { bg: "#F0FDFA", text: "#0F766E", border: "#99F6E4" }, // teal
-  { bg: "#EFF6FF", text: "#1D4ED8", border: "#BFDBFE" }, // blue
-  { bg: "#F5F3FF", text: "#6D28D9", border: "#DDD6FE" }, // purple
-  { bg: "#ECFDF5", text: "#047857", border: "#A7F3D0" }, // emerald
-  { bg: "#FFFBEB", text: "#B45309", border: "#FDE68A" }, // amber
-  { bg: "#FDF2F8", text: "#BE185D", border: "#FBCFE8" }, // pink
-  { bg: "#F8FAFC", text: "#334155", border: "#CBD5E1" }, // slate
+  { bg: "linear-gradient(145deg,#F3ECFF,#DCCBFF)", text: "#5814E6" }, // violet
+  { bg: "linear-gradient(145deg,#EEF3FF,#D4E0FF)", text: "#2347B8" }, // sky
+  { bg: "linear-gradient(145deg,#ECFAF4,#CDEEE0)", text: "#0E7A50" }, // mint
+  { bg: "linear-gradient(145deg,#FFF3EC,#FDD9C8)", text: "#B8520E" }, // peach
+  { bg: "linear-gradient(145deg,#FFF0F3,#F8D3DC)", text: "#B42335" }, // rose
+  { bg: "linear-gradient(145deg,#F1F0FF,#D8D5FD)", text: "#3B2FB8" }, // indigo
 ];
 
 function hashString(str: string): number {
@@ -37,23 +37,22 @@ export function Avatar({ name, size = "md", className = "", ...props }: AvatarPr
   const initials = getInitials(name);
 
   const sizes = {
-    sm: "h-7 w-7 text-[11px]",
-    md: "h-9 w-9 text-xs",
-    lg: "h-11 w-11 text-sm",
+    sm: "h-8 w-8 text-[11px]",
+    md: "h-10 w-10 text-xs",
+    lg: "h-12 w-12 text-sm",
   };
 
   return (
     <div
-      className={`inline-flex items-center justify-center rounded-full font-semibold border select-none shrink-0 ${sizes[size]} ${className}`}
+      className={`inline-flex items-center justify-center rounded-full font-extrabold ring-2 ring-white shadow-[0_6px_14px_-8px_rgba(70,40,160,0.5)] select-none shrink-0 ${sizes[size]} ${className}`}
       style={{
-        backgroundColor: color.bg,
+        background: color.bg,
         color: color.text,
-        borderColor: color.border,
       }}
       aria-label={name}
       {...props}
     >
-      {initials}
+      {/[a-zA-Z]/.test(name) ? initials : <User className="h-[55%] w-[55%]" strokeWidth={2.4} aria-hidden="true" />}
     </div>
   );
 }

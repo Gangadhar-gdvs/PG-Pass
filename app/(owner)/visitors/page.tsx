@@ -2,12 +2,14 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useOwnerSession } from '@/hooks/useOwner';
-import { HeroHeader } from '@/components/ui/dashboard-kit';
+import { PageHeader, SectionCard, StatTile } from '@/components/ui/dashboard-kit';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Avatar } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
-import { CardListSkeleton } from '@/components/ui/skeletons';
+import { ListSkeleton, StatGridSkeleton } from '@/components/ui/skeletons';
 import { EmptyState } from '@/components/ui/empty-state';
-import { DoorOpen, Plus, LogOut } from 'lucide-react';
+import { Plus, LogOut, LogIn, Phone, UserRound } from 'lucide-react';
 import type { Visitor } from '@/types';
 import { errorMessage, tsToDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -17,12 +19,18 @@ function timeLabel(v: unknown): string {
   return d ? d.toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true }) : '';
 }
 
+/** Local YYYY-MM-DD key (display only — powers the "Today" tile). */
+function dayKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 export default function OwnerVisitorsPage() {
   const { ownerId } = useOwnerSession();
   const [visitors, setVisitors] = useState<Visitor[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [today] = useState(() => dayKey(new Date()));
 
   const [name, setName] = useState('');
   const [purpose, setPurpose] = useState('');
@@ -100,90 +108,138 @@ export default function OwnerVisitorsPage() {
   };
 
   const inside = visitors.filter((v) => v.status === 'in');
+  // Display-only: check-ins whose date is today (local time).
+  const todayCount = visitors.filter((v) => {
+    const d = tsToDate(v.checkInAt);
+    return d ? dayKey(d) === today : false;
+  }).length;
 
   return (
-    <div className="space-y-4 text-left">
-      <div className="-mx-4 -mt-4 sm:-mx-6 md:mx-0 md:mt-0">
-        <HeroHeader
-          eyebrow={<><DoorOpen className="h-3 w-3" /> Visitors</>}
-          title="Visitor Log"
-          subtitle={`${inside.length} currently inside`}
-          right={
-            <button
-              type="button"
-              onClick={() => setShowForm((s) => !s)}
-              className="inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-2 text-xs font-bold accent-text shadow-sm press"
-            >
-              <Plus className="h-3.5 w-3.5" /> Check in
-            </button>
-          }
-        />
-      </div>
+    <div className="space-y-5 text-left">
+      <PageHeader
+        icon="user-add"
+        tint="sky"
+        title="Visitor"
+        highlight="Log"
+        subtitle={`${inside.length} currently inside`}
+        actions={
+          <Button onClick={() => setShowForm((s) => !s)} aria-expanded={showForm}>
+            <Plus className="h-4 w-4" /> Check in
+          </Button>
+        }
+      />
+
+      {loading ? (
+        <StatGridSkeleton count={4} />
+      ) : (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 stagger">
+          <StatTile icon="user-add" tint="sky" label="Inside Now" value={inside.length} />
+          <StatTile icon="calendar-clock" tint="violet" label="Today" value={todayCount} />
+          <StatTile icon="check" tint="mint" label="Checked Out" value={visitors.length - inside.length} />
+          <StatTile icon="users" tint="indigo" label="Total Logged" value={visitors.length} />
+        </div>
+      )}
 
       {showForm && (
-        <section className="app-card p-4 space-y-3">
-          <Input label="Visitor name" placeholder="Full name" value={name} onChange={(e) => setName(e.target.value)} disabled={posting} />
-          <div className="grid grid-cols-2 gap-2">
+        <SectionCard title="Check in a visitor" icon="user-add" className="animate-pop" bodyClassName="space-y-4">
+          <Input
+            label="Visitor name"
+            placeholder="Full name"
+            leading={<UserRound />}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            disabled={posting}
+          />
+          <div className="grid grid-cols-1 min-[380px]:grid-cols-2 gap-3">
             <Input label="Purpose (optional)" placeholder="e.g. Delivery" value={purpose} onChange={(e) => setPurpose(e.target.value)} disabled={posting} />
             <Input label="Visiting (optional)" placeholder="Resident name" value={visiting} onChange={(e) => setVisiting(e.target.value)} disabled={posting} />
           </div>
-          <Input label="Phone (optional)" type="tel" inputMode="numeric" placeholder="10-digit mobile" value={phone} onChange={(e) => setPhone(e.target.value)} disabled={posting} />
-          <Button size="sm" variant="solid" loading={posting} onClick={checkIn}>
-            <Plus className="h-3.5 w-3.5 mr-1" /> Check in visitor
-          </Button>
-        </section>
+          <Input
+            label="Phone (optional)"
+            type="tel"
+            inputMode="numeric"
+            placeholder="10-digit mobile"
+            leading={<Phone />}
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            disabled={posting}
+          />
+          <div className="flex justify-end">
+            <Button variant="solid" loading={posting} onClick={checkIn} className="w-full sm:w-auto">
+              <Plus className="h-4 w-4" /> Check in visitor
+            </Button>
+          </div>
+        </SectionCard>
       )}
 
       {loading ? (
-        <CardListSkeleton rows={3} height="h-16" />
+        <ListSkeleton rows={4} />
       ) : visitors.length === 0 ? (
-        <div className="app-card p-6">
+        <div className="app-card">
           <EmptyState
-            icon={<DoorOpen className="w-6 h-6 accent-text" />}
+            icon3d="user-add"
             title="No visitors logged"
             description="Record visitors at the gate — who they are and who they’re visiting."
-            action={<Button size="sm" variant="solid" onClick={() => setShowForm(true)}><Plus className="h-3.5 w-3.5 mr-1" /> Check in</Button>}
+            action={
+              <Button variant="solid" onClick={() => setShowForm(true)}>
+                <Plus className="h-4 w-4" /> Check in
+              </Button>
+            }
           />
         </div>
       ) : (
-        <div className="space-y-2">
-          {visitors.map((v) => {
-            const isIn = v.status === 'in';
-            return (
-              <div key={v.id} className={`app-card p-3.5 flex items-center gap-3 ${isIn ? '' : 'opacity-70'}`}>
-                <span className={`icon-chip ${isIn ? 'accent-text' : 'text-[#94A3B8]'}`}>
-                  <DoorOpen className="h-5 w-5" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-semibold text-[#0F172A] truncate">
-                    {v.name}
-                    {isIn ? (
-                      <span className="ml-2 text-[10px] font-bold text-[#0F766E] bg-[#E7F9F1] px-1.5 py-0.5 rounded">INSIDE</span>
-                    ) : (
-                      <span className="ml-2 text-[10px] font-bold text-[#94A3B8] bg-[#F1F5F9] px-1.5 py-0.5 rounded">LEFT</span>
+        <SectionCard
+          title="Visitor log"
+          icon="calendar-clock"
+          action={<span className="chip font-mono-numbers">{visitors.length}</span>}
+        >
+          <ul className="divide-y divide-line stagger">
+            {visitors.map((v) => {
+              const isIn = v.status === 'in';
+              return (
+                <li key={v.id} className="py-3.5 first:pt-1 last:pb-1">
+                  <div className={`flex items-center gap-3 ${isIn ? '' : 'opacity-75'}`}>
+                    <Avatar name={v.name} size="lg" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span className="truncate text-[15px] font-bold text-ink">{v.name}</span>
+                        <Badge variant={isIn ? 'paid' : 'vacant'} dot className="shrink-0">
+                          {isIn ? 'Inside' : 'Left'}
+                        </Badge>
+                      </div>
+                      <div className="truncate text-[12.5px] font-medium text-muted">
+                        {[v.purpose, v.visitingResident ? `visiting ${v.visitingResident}` : ''].filter(Boolean).join(' · ') || '—'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2">
+                    <div className={`flex flex-wrap items-center gap-1.5 ${isIn ? '' : 'opacity-75'}`}>
+                      <span className="chip font-mono-numbers">
+                        <LogIn className="h-3.5 w-3.5" /> In {timeLabel(v.checkInAt)}
+                      </span>
+                      {!isIn && v.checkOutAt ? (
+                        <span className="chip font-mono-numbers">
+                          <LogOut className="h-3.5 w-3.5" /> Out {timeLabel(v.checkOutAt)}
+                        </span>
+                      ) : null}
+                    </div>
+                    {isIn && (
+                      <Button
+                        variant="outline"
+                        onClick={() => checkOut(v.id)}
+                        disabled={busyId === v.id}
+                        className="ml-auto"
+                      >
+                        <LogOut className="h-4 w-4" /> Check out
+                      </Button>
                     )}
                   </div>
-                  <div className="text-[11px] text-[#64748B] truncate">
-                    {[v.purpose, v.visitingResident ? `visiting ${v.visitingResident}` : ''].filter(Boolean).join(' · ') || '—'}
-                  </div>
-                  <div className="text-[11px] text-[#94A3B8]">
-                    In {timeLabel(v.checkInAt)}{!isIn && v.checkOutAt ? ` · Out ${timeLabel(v.checkOutAt)}` : ''}
-                  </div>
-                </div>
-                {isIn && (
-                  <button
-                    type="button"
-                    onClick={() => checkOut(v.id)}
-                    disabled={busyId === v.id}
-                    className="shrink-0 inline-flex items-center gap-1 text-[11px] font-bold accent-text px-2.5 py-1.5 rounded-[8px] border border-[color:var(--accent)]"
-                  >
-                    <LogOut className="h-3.5 w-3.5" /> Out
-                  </button>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                </li>
+              );
+            })}
+          </ul>
+        </SectionCard>
       )}
     </div>
   );

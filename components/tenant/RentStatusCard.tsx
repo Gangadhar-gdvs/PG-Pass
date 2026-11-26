@@ -12,12 +12,14 @@ import {
   Copy,
   QrCode,
   Download,
-  ShieldCheck,
   ExternalLink,
   Send,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { StatusDot } from '@/components/ui/status-dot';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { InfoBanner, KeyValue } from '@/components/ui/dashboard-kit';
+import { Icon3D, IconTile } from '@/components/brand/Icon3D';
 import { ProofUploader } from './ProofUploader';
 import toast from 'react-hot-toast';
 
@@ -186,211 +188,196 @@ export function RentStatusCard({
     }
   };
 
+  const tone = isPaid ? 'success' : isVerify ? 'brand' : 'warning';
+  const statusLabel = isPaid ? 'Paid' : isVerify ? 'Under Verification' : 'Payment Due';
+
   return (
     <div className="space-y-4 text-left">
       {/* Primary Rent Status Ticket */}
-      <div className="bg-white border border-[#E2E8F0] rounded-[12px] p-5 shadow-xs text-left">
-        <div className="flex items-center justify-between pb-3 border-b border-[#E2E8F0]">
-          <span className="text-xs font-semibold text-[#64748B]">
-            Billing Cycle · {period}
-          </span>
-          <StatusDot
-            status={isPaid ? 'paid' : isVerify ? 'verify' : 'pending'}
-            label={isPaid ? 'Paid' : isVerify ? 'Under Verification' : 'Payment Due'}
-          />
-        </div>
-
-        {/* Large Amount Display */}
-        <div className="py-4">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-[#94A3B8] block">
-            {isPaid ? 'Amount Settled' : 'Total Due'}
-          </span>
-          <div className="mt-1 flex items-baseline justify-between">
-            <span className="text-3xl font-extrabold font-mono-numbers text-[#09090B] tracking-tight">
-              {amountRupees != null ? formatCurrency(amountRupees) : '—'}
-            </span>
-            {isPaid && rentRecord?.receiptNumber && (
-              <span className="text-xs font-mono font-bold text-[#10B981] bg-[#ECFDF5] px-2 py-0.5 rounded-[4px]">
-                REC-#{String(rentRecord.receiptNumber).padStart(5, '0')}
+      <InfoBanner
+        tone={tone}
+        icon={<Icon3D name={isPaid ? 'check' : isVerify ? 'calendar-clock' : 'alert'} size={56} />}
+        title={
+          <>
+            <span className="block text-[12.5px] font-bold opacity-75">Billing Cycle · {period}</span>
+            <span className="block text-[19px] leading-tight tracking-[-0.015em]">{statusLabel}</span>
+          </>
+        }
+        className="animate-pop"
+      >
+        <div className="px-4 py-3.5">
+          {/* Large Amount Display */}
+          <div className="flex flex-wrap items-end justify-between gap-2">
+            <div className="min-w-0">
+              <span className="block text-[12.5px] font-semibold text-muted">
+                {isPaid ? 'Amount Settled' : 'Total Due'}
               </span>
+              <span className="mt-1 block text-[32px] font-extrabold font-mono-numbers leading-none tracking-[-0.03em] text-ink">
+                {amountRupees != null ? formatCurrency(amountRupees) : '—'}
+              </span>
+            </div>
+            {isPaid && rentRecord?.receiptNumber && (
+              <Badge variant="paid" className="font-mono !text-[12px]">
+                REC-#{String(rentRecord.receiptNumber).padStart(5, '0')}
+              </Badge>
             )}
           </div>
-        </div>
 
-        {isVerify && (
-          <div className="p-3.5 rounded-[8px] bg-[#EEF2FF] border border-[#C7D2FE] text-xs text-[#4338CA] space-y-1">
-            <div className="flex items-center gap-1.5 font-bold">
-              <Clock className="w-4 h-4 text-[#6366F1]" />
-              <span>Payment Verification Pending</span>
+          {isVerify && (
+            <div className="mt-3 space-y-1 rounded-2xl border border-brand-200 bg-brand-50 p-3.5">
+              <div className="flex items-center gap-1.5 text-[13px] font-bold text-brand-700">
+                <Clock className="w-4 h-4 shrink-0 text-brand" />
+                <span>Payment Verification Pending</span>
+              </div>
+              <p className="text-[12.5px] leading-relaxed text-ink-2">
+                Submitted UTR: <strong className="font-mono text-ink break-all">{rentRecord?.paymentReference || 'On File'}</strong>.
+                Your official numbered receipt will become available here once confirmed by your PG manager.
+              </p>
             </div>
-            <p className="text-[11px] text-[#475569]">
-              Submitted UTR: <strong className="font-mono text-[#1E1B4B]">{rentRecord?.paymentReference || 'On File'}</strong>.
-              Your official numbered receipt will become available here once confirmed by your PG manager.
-            </p>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      </InfoBanner>
 
       {/* If Paid -> Numbered Receipt Box */}
       {isPaid ? (
-        <div className="bg-white border border-[#E2E8F0] rounded-[12px] p-5 shadow-xs space-y-4 text-left">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-[6px] bg-[#ECFDF5] text-[#10B981] flex items-center justify-center">
-              <ShieldCheck className="w-4 h-4" />
-            </div>
-            <div>
-              <h3 className="text-sm font-bold text-[#09090B]">
+        <section className="app-card p-4 sm:p-5 space-y-4 text-left">
+          <div className="flex items-start gap-3">
+            <IconTile icon="doc-green" tint="mint" size={48} />
+            <div className="min-w-0">
+              <h3 className="text-[15.5px] font-bold leading-snug text-ink">
                 Official Digital Rent Receipt
               </h3>
-              <p className="text-[11px] text-[#64748B]">
+              <p className="mt-0.5 text-[12.5px] leading-relaxed text-muted">
                 Sequential, tamper-evident HRA & tax-deductible receipt
               </p>
             </div>
           </div>
 
-          <div className="p-3.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-[8px] space-y-2 text-xs">
-            <div className="flex items-center justify-between">
-              <span className="text-[#64748B]">Receipt Number:</span>
-              <span className="font-mono font-bold text-[#09090B]">
-                REC-{String(rentRecord?.receiptNumber || 0).padStart(5, '0')}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-[#64748B]">Settled For:</span>
-              <span className="font-semibold text-[#09090B]">{period}</span>
-            </div>
+          <div className="well divide-y divide-line px-3.5">
+            <KeyValue
+              label="Receipt Number"
+              value={<span className="font-mono">REC-{String(rentRecord?.receiptNumber || 0).padStart(5, '0')}</span>}
+            />
+            <KeyValue label="Settled For" value={period} />
             {rentRecord?.paymentReference && (
-              <div className="flex items-center justify-between">
-                <span className="text-[#64748B]">Bank UTR:</span>
-                <span className="font-mono text-[#09090B]">{rentRecord.paymentReference}</span>
-              </div>
+              <KeyValue
+                label="Bank UTR"
+                value={<span className="font-mono break-all">{rentRecord.paymentReference}</span>}
+              />
             )}
           </div>
 
           <Button
-            size="lg"
+            size="full"
             variant="solid"
             onClick={handleDownloadReceipt}
             loading={generatingPdf}
-            className="w-full bg-[#10B981] hover:bg-[#059669] text-white"
+            className="!h-auto min-h-12 py-3 !whitespace-normal text-center leading-tight"
           >
-            <Download className="w-4 h-4 mr-2" />
+            <Download className="w-4 h-4 shrink-0" />
             <span>Download Official PDF Receipt</span>
           </Button>
-        </div>
+        </section>
       ) : (
         /* If Pending/Overdue -> UPI Settlement & Claim Flow */
-        <div className="bg-white border border-[#E2E8F0] rounded-[12px] p-5 shadow-xs space-y-4 text-left">
-          <div>
-            <h3 className="text-sm font-bold text-[#09090B]">
-              Direct Bank Settlement via UPI (0% Fee)
-            </h3>
-            <p className="text-[11px] text-[#64748B] mt-0.5">
-              Instant transfer directly to your landlord without any gateway commission.
-            </p>
+        <section className="app-card p-4 sm:p-5 space-y-4 text-left">
+          <div className="flex items-start gap-3">
+            <IconTile icon="wallet" tint="violet" size={48} />
+            <div className="min-w-0">
+              <h3 className="text-[15.5px] font-bold leading-snug text-ink">
+                Direct Bank Settlement via UPI (0% Fee)
+              </h3>
+              <p className="mt-0.5 text-[12.5px] leading-relaxed text-muted">
+                Instant transfer directly to your landlord without any gateway commission.
+              </p>
+            </div>
           </div>
 
           {pg.upiId ? (
             <div className="space-y-3">
-              <div className="flex items-center justify-between p-3 rounded-[8px] bg-[#F8FAFC] border border-[#E2E8F0]">
-                <div className="flex flex-col">
-                  <span className="text-[10px] uppercase font-semibold text-[#64748B]">
+              <div className="well flex items-center justify-between gap-3 p-3.5">
+                <div className="flex min-w-0 flex-col">
+                  <span className="text-[12px] font-semibold text-muted">
                     Landlord UPI ID
                   </span>
-                  <span className="font-mono-numbers text-xs font-bold text-[#09090B] select-all">
+                  <span className="truncate font-mono-numbers text-[14px] font-bold text-ink select-all">
                     {pg.upiId}
                   </span>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleCopyUpi}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-[6px] border border-[#E2E8F0] bg-white text-[#D97706] hover:bg-[#FEF3C7] transition-colors cursor-pointer"
-                >
+                <Button type="button" variant="outline" size="md" onClick={handleCopyUpi} className="shrink-0 !px-4">
                   {copiedUpi ? (
-                    <CheckCircle2 className="w-3.5 h-3.5 text-[#10B981]" />
+                    <CheckCircle2 className="w-4 h-4 text-success" />
                   ) : (
-                    <Copy className="w-3.5 h-3.5 text-[#D97706]" />
+                    <Copy className="w-4 h-4 text-brand" />
                   )}
                   <span>{copiedUpi ? 'Copied' : 'Copy'}</span>
-                </button>
+                </Button>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <a
-                  href={upiPayUrl}
-                  className="flex items-center justify-center gap-1.5 h-10 rounded-[8px] bg-[#D97706] hover:bg-[#B45309] text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
+              <div className="grid grid-cols-1 gap-2 min-[380px]:grid-cols-2">
+                <a href={upiPayUrl} className="btn-pill !px-4 text-[13px] cursor-pointer">
+                  <ExternalLink className="w-4 h-4" />
                   <span>Open UPI App</span>
                 </a>
-                <button
+                <Button
                   type="button"
+                  variant="outline"
+                  size="lg"
                   onClick={() => setShowQr(!showQr)}
-                  className="flex items-center justify-center gap-1.5 h-10 rounded-[8px] border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] text-[#09090B] text-xs font-semibold transition-colors cursor-pointer"
+                  className="!px-4 !text-[13px]"
                 >
-                  <QrCode className="w-3.5 h-3.5 text-[#64748B]" />
+                  <QrCode className="w-4 h-4 text-brand" />
                   <span>{showQr ? 'Hide QR' : 'Show QR'}</span>
-                </button>
+                </Button>
               </div>
 
               {showQr && (
-                <div className="p-4 bg-[#F8FAFC] border border-[#E2E8F0] rounded-[8px] flex flex-col items-center justify-center text-center">
-                  {qrDataUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- dynamic client-generated data-URL QR code; next/image can't optimize a runtime data URL
-                    <img
-                      src={qrDataUrl}
-                      alt="UPI QR Code"
-                      className="w-36 h-36 border border-[#E2E8F0] rounded-[6px] bg-white p-2"
-                    />
-                  ) : (
-                    <div className="w-36 h-36 border border-[#E2E8F0] rounded-[6px] bg-white p-2 flex items-center justify-center text-xs text-[#64748B]">
-                      Generating QR...
-                    </div>
-                  )}
-                  <span className="text-xs font-bold text-[#09090B] mt-2">
+                <div className="well flex flex-col items-center justify-center p-5 text-center animate-pop">
+                  <div className="rounded-2xl border border-white bg-white p-3 shadow-[0_14px_30px_-14px_rgba(70,40,160,0.45)]">
+                    {qrDataUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- dynamic client-generated data-URL QR code; next/image can't optimize a runtime data URL
+                      <img src={qrDataUrl} alt="UPI QR Code" className="h-44 w-44" />
+                    ) : (
+                      <div className="flex h-44 w-44 items-center justify-center text-xs font-medium text-muted">
+                        Generating QR...
+                      </div>
+                    )}
+                  </div>
+                  <span className="mt-3 text-[14px] font-bold text-ink">
                     Scan to pay {amountRupees != null ? formatCurrency(amountRupees) : '—'}
                   </span>
-                  <span className="text-[11px] text-[#64748B]">{pg.upiId}</span>
+                  <span className="font-mono-numbers text-[12px] text-muted">{pg.upiId}</span>
                 </div>
               )}
 
               {/* UTR Claim & Payment Notification Button */}
               {!isVerify && (
-                <div className="pt-2 border-t border-[#E2E8F0]">
+                <div className="border-t border-line pt-3">
                   {!showClaimForm ? (
                     <Button
-                      size="md"
-                      variant="solid"
+                      size="full"
+                      variant="soft"
                       onClick={() => setShowClaimForm(true)}
-                      className="w-full bg-[#0F172A] hover:bg-[#1E293B] text-white text-xs"
+                      className="!h-auto min-h-12 py-3 !whitespace-normal text-center leading-tight"
                     >
-                      <CheckCircle2 className="w-4 h-4 mr-1.5 text-[#10B981]" />
+                      <CheckCircle2 className="w-4 h-4 shrink-0 text-success" />
                       <span>I Have Transferred Rent (Submit UTR)</span>
                     </Button>
                   ) : (
-                    <form
-                      onSubmit={handleSubmitClaim}
-                      className="p-3.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-[8px] space-y-3"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-[#09090B]">
+                    <form onSubmit={handleSubmitClaim} className="well space-y-3 p-3.5 animate-pop">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[14px] font-bold text-ink">
                           Submit UPI Reference (UTR)
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => setShowClaimForm(false)}
-                          className="text-[11px] text-[#64748B] hover:text-[#09090B]"
-                        >
+                        <Button type="button" variant="ghost" size="md" onClick={() => setShowClaimForm(false)} className="!px-3">
                           Cancel
-                        </button>
+                        </Button>
                       </div>
 
                       <div>
-                        <label htmlFor="utr-input" className="text-[11px] font-semibold text-[#64748B] block mb-1">
-                          12-digit UTR / UPI Transaction ID:
-                        </label>
-                        <input
+                        <Input
                           id="utr-input"
+                          label="12-digit UTR / UPI Transaction ID"
                           type="text"
                           inputMode="numeric"
                           required
@@ -398,13 +385,13 @@ export function RentStatusCard({
                           placeholder="e.g. 432198765432"
                           value={utrInput}
                           onChange={(e) => setUtrInput(e.target.value)}
-                          className="w-full h-11 px-3 rounded-[6px] border border-[#CBD5E1] bg-white text-xs font-mono text-[#09090B] placeholder:text-[#94A3B8] focus:outline-none focus:border-[#D97706]"
+                          className="font-mono"
                         />
-                        <details className="mt-1.5">
-                          <summary className="text-[11px] text-[#D97706] cursor-pointer select-none">
+                        <details className="mt-2">
+                          <summary className="inline-flex min-h-[36px] cursor-pointer select-none items-center text-[12.5px] font-semibold text-brand-700">
                             Where do I find my UTR?
                           </summary>
-                          <div className="mt-1.5 text-[11px] text-[#64748B] leading-relaxed space-y-1 pl-1">
+                          <div className="mt-1 space-y-1 rounded-2xl bg-white/80 p-3 text-[12px] leading-relaxed text-ink-2">
                             <p>Open your UPI app (GPay / PhonePe / Paytm) → tap the payment you just made → look for <strong>UTR</strong>, <strong>UPI Ref No.</strong>, or <strong>Transaction ID</strong>. It is a 12-digit number.</p>
                             <p>Attach a screenshot below so your manager can verify faster.</p>
                           </div>
@@ -419,13 +406,12 @@ export function RentStatusCard({
                       />
 
                       <Button
-                        size="md"
-                        variant="solid"
+                        size="full"
+                        variant="success"
                         type="submit"
                         loading={submittingClaim}
-                        className="w-full bg-[#10B981] hover:bg-[#059669] text-white text-xs"
                       >
-                        <Send className="w-3.5 h-3.5 mr-1.5" />
+                        <Send className="w-4 h-4" />
                         <span>Confirm & Submit Reference</span>
                       </Button>
                     </form>
@@ -434,11 +420,13 @@ export function RentStatusCard({
               )}
             </div>
           ) : (
-            <p className="text-xs text-[#64748B] italic">
-              Landlord UPI details are not registered. Please contact your PG manager directly.
-            </p>
+            <InfoBanner
+              tone="info"
+              title="Landlord UPI details are not registered."
+              description="Please contact your PG manager directly."
+            />
           )}
-        </div>
+        </section>
       )}
     </div>
   );

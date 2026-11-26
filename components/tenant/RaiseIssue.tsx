@@ -3,7 +3,9 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dropdown } from '@/components/ui/dropdown';
-import { Wrench } from 'lucide-react';
+import { CheckCircle2 } from 'lucide-react';
+import { Textarea } from '@/components/ui/input';
+import { IconTile } from '@/components/brand/Icon3D';
 import toast from 'react-hot-toast';
 import { errorMessage } from '@/lib/utils';
 
@@ -59,27 +61,28 @@ export function RaiseIssue({ portalAuth }: { portalAuth: { token: string; pin: s
   };
 
   return (
-    <div className="bg-white border border-[#E2E8F0] rounded-[12px] p-4 shadow-xs">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Wrench className="w-4 h-4 text-[#D97706]" />
-          <span className="text-sm font-bold text-[#09090B]">Report a Problem</span>
+    <section className="app-card p-4 sm:p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <IconTile icon="wrench" tint="sky" size={48} />
+          <span className="text-[15.5px] font-bold leading-snug text-ink">Report a Problem</span>
         </div>
         {!open && (
-          <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+          <Button size="md" variant="soft" onClick={() => setOpen(true)} className="max-[379px]:w-full">
             Raise Issue
           </Button>
         )}
       </div>
 
       {submitted && !open && (
-        <p className="text-[11px] text-[#10B981] mt-2 font-semibold">
-          Your last issue was sent. Raise another if needed.
+        <p className="mt-3 flex items-center gap-1.5 text-[12.5px] font-semibold text-success-ink">
+          <CheckCircle2 className="h-4 w-4 shrink-0 text-success" />
+          <span>Your last issue was sent. Raise another if needed.</span>
         </p>
       )}
 
       {open && (
-        <form onSubmit={submit} className="mt-3 space-y-3">
+        <form onSubmit={submit} className="mt-4 space-y-3 animate-pop">
           <Dropdown
             label="Category"
             id="issue-cat"
@@ -87,30 +90,25 @@ export function RaiseIssue({ portalAuth }: { portalAuth: { token: string; pin: s
             onChange={setCategory}
             options={CATEGORIES.map((c) => ({ value: c.value, label: c.label }))}
           />
-          <div>
-            <label htmlFor="issue-desc" className="text-[11px] font-semibold text-[#64748B] block mb-1">
-              What&apos;s the problem?
-            </label>
-            <textarea
-              id="issue-desc"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={3}
-              maxLength={1000}
-              placeholder="e.g. Tap in the bathroom is leaking continuously"
-              className="w-full px-3 py-2 rounded-[8px] border border-[#CBD5E1] bg-white text-sm text-[#09090B] placeholder:text-[#94A3B8] focus:border-[#D97706] focus:outline-none resize-none"
-            />
-          </div>
+          <Textarea
+            id="issue-desc"
+            label="What's the problem?"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={3}
+            maxLength={1000}
+            placeholder="e.g. Tap in the bathroom is leaking continuously"
+          />
           <div className="flex items-center gap-2">
-            <Button type="submit" size="sm" variant="solid" loading={submitting} className="flex-1">
+            <Button type="submit" size="md" variant="solid" loading={submitting} className="flex-1">
               Submit Issue
             </Button>
-            <Button type="button" size="sm" variant="outline" onClick={() => setOpen(false)} disabled={submitting}>
+            <Button type="button" size="md" variant="outline" onClick={() => setOpen(false)} disabled={submitting}>
               Cancel
             </Button>
           </div>
         </form>
       )}
-    </div>
+    </section>
   );
 }

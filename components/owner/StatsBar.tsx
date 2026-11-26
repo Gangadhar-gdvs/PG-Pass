@@ -3,8 +3,10 @@
 import React from 'react';
 import { Bed, RentRecord } from '@/types';
 import { formatCurrency } from '@/lib/utils';
-import { Send, CheckCircle2, Mail } from 'lucide-react';
-import { DonutChart, StatTile } from '@/components/ui/dashboard-kit';
+import { Send, Mail, CalendarDays } from 'lucide-react';
+import { DonutChart, SectionCard, StatTile } from '@/components/ui/dashboard-kit';
+import { IconBubble, type Icon3DName, type Tint } from '@/components/brand/Icon3D';
+import { Button } from '@/components/ui/button';
 
 export interface DashboardSummary {
   totalBeds: number;
@@ -26,9 +28,33 @@ interface StatsBarProps {
   // the occupancy/potential figures come from here instead of the live bed
   // window, so they're correct for PGs larger than the 100-row cap.
   summary?: DashboardSummary | null;
+  /** Label for the selected billing period chip ("This Month", "Oct 2026"). */
+  periodLabel?: string;
 }
 
-export function StatsBar({ beds, rentRecords, onRemindAll, onEmailReminders, emailReminding, summary }: StatsBarProps) {
+export interface DashboardStats {
+  totalBeds: number;
+  occupiedBeds: number;
+  vacantBeds: number;
+  occupancyRate: number;
+  totalCollected: number;
+  totalPending: number;
+  paidCount: number;
+  pendingCount: number;
+  verifyCount: number;
+  collectRate: number;
+}
+
+/**
+ * Occupancy + rent-collection figures for the dashboard. Pure derivation from
+ * the live beds window, the selected month's rent records and (when loaded) the
+ * server summary — shared by the stat row and the Overview card.
+ */
+export function computeDashboardStats(
+  beds: Bed[],
+  rentRecords: RentRecord[],
+  summary?: DashboardSummary | null
+): DashboardStats {
   // Prefer the server summary for whole-PG totals; fall back to the live window
   // (correct for PGs ≤100 beds, and used while the summary is still loading).
   const totalBeds = summary?.totalBeds ?? beds.length;
@@ -85,76 +111,182 @@ export function StatsBar({ beds, rentRecords, onRemindAll, onEmailReminders, ema
 
   const collectRate = totalProjected > 0 ? Math.round((totalCollected / totalProjected) * 100) : 0;
 
-  return (
-    <div className="space-y-3.5 text-left">
-      {/* Overview card: donut occupancy + collected / pending (matches design ref) */}
-      <section className="app-card p-4">
-        <h2 className="mb-3 text-sm font-bold text-[#0F172A]">Overview</h2>
-        <div className="flex items-center gap-3 sm:gap-4">
-          <div className="shrink-0">
-            <DonutChart percent={occupancyRate} size={112} stroke={12} sublabel="Occupancy" />
-          </div>
-          <div className="min-w-0 flex-1 space-y-2.5">
-            <div className="flex items-center justify-between rounded-[12px] bg-[#E7F9F1] px-3 py-2">
-              <span className="text-xs font-semibold text-[#0F766E]">Occupied</span>
-              <span className="font-mono-numbers text-sm font-extrabold text-[#0F766E]">
-                {occupiedBeds}<span className="text-[#5EC7A8]"> / {totalBeds}</span>
-              </span>
-            </div>
-            <div className="flex items-center justify-between rounded-[12px] bg-[#F1EDFF] px-3 py-2">
-              <span className="text-xs font-semibold text-[#6D28D9]">Vacant</span>
-              <span className="font-mono-numbers text-sm font-extrabold text-[#6D28D9]">{vacantBeds}</span>
-            </div>
-            {verifyCount > 0 && (
-              <div className="flex items-center justify-between rounded-[12px] bg-[#E8F1FF] px-3 py-2">
-                <span className="text-xs font-semibold text-[#1D4ED8]">Proofs to verify</span>
-                <span className="font-mono-numbers text-sm font-extrabold text-[#1D4ED8]">{verifyCount}</span>
-              </div>
-            )}
-          </div>
-        </div>
-      </section>
+  return {
+    totalBeds,
+    occupiedBeds,
+    vacantBeds,
+    occupancyRate,
+    totalCollected,
+    totalPending,
+    paidCount,
+    pendingCount,
+    verifyCount,
+    collectRate,
+  };
+}
 
-      {/* Collected / pending pastel stat tiles */}
-      <div className="grid grid-cols-2 gap-3">
-        <StatTile
-          icon={<CheckCircle2 className="h-5 w-5 text-[#0F766E]" />}
-          tint="mint"
-          label={`Collected · ${paidCount} paid`}
-          value={formatCurrency(totalCollected)}
-          delta={`${collectRate}%`}
-        />
-        <StatTile
-          icon={<Send className="h-5 w-5 text-[#C2410C]" />}
-          tint="peach"
-          label={`Pending · ${pendingCount} due`}
-          value={formatCurrency(totalPending)}
-        />
+/**
+ * Stat row under the hero (ref: Total Rooms · Total Beds · Residents · This
+ * Month). Every figure is derived from data the dashboard already holds.
+ */
+export function StatsRow({
+  beds,
+  rentRecords,
+  summary,
+  residentCount,
+  collectionLabel = 'This Month',
+  inventoryHref,
+  residentsHref,
+  collectionHref,
+}: {
+  beds: Bed[];
+  rentRecords: RentRecord[];
+  summary?: DashboardSummary | null;
+  residentCount: React.ReactNode;
+  collectionLabel?: string;
+  inventoryHref?: string;
+  residentsHref?: string;
+  collectionHref?: string;
+}) {
+  const { totalBeds, totalCollected } = computeDashboardStats(beds, rentRecords, summary);
+  // Rooms are counted from the live bed window; mark the figure as a floor
+  // ("12+") when the window doesn't hold every bed of a large PG.
+  const windowed = (summary?.totalBeds ?? 0) > beds.length;
+  const roomCount = new Set(beds.map((b) => `${b.propertyId ?? ''}|${b.floor}|${b.roomNumber}`)).size;
+
+  return (
+    <div className="stagger grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <StatTile
+        icon="house"
+        tint="violet"
+        label="Total Rooms"
+        value={`${roomCount}${windowed ? '+' : ''}`}
+        href={inventoryHref}
+      />
+      <StatTile icon="bed-teal" tint="sky" label="Total Beds" value={totalBeds} href={inventoryHref} />
+      <StatTile icon="users" tint="indigo" label="Residents" value={residentCount} href={residentsHref} />
+      <StatTile
+        icon="rupee"
+        tint="mint"
+        label={collectionLabel}
+        value={formatCurrency(totalCollected)}
+        href={collectionHref}
+      />
+    </div>
+  );
+}
+
+/** One figure in the Overview card: 3D icon bubble, label, value, optional note. */
+function OverviewRow({
+  icon,
+  tint,
+  label,
+  value,
+  sub,
+}: {
+  icon: Icon3DName;
+  tint: Tint;
+  label: string;
+  value: React.ReactNode;
+  sub?: string;
+}) {
+  return (
+    <div className="flex items-center gap-3 py-1.5">
+      <IconBubble icon={icon} tint={tint} size={38} />
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-2">
+          <span className="text-[13px] font-semibold text-ink-2">{label}</span>
+          <span className="font-mono-numbers text-[15px] font-extrabold tracking-[-0.01em] text-ink">{value}</span>
+        </div>
+        {sub && <div className="text-[11.5px] font-medium text-muted">{sub}</div>}
+      </div>
+    </div>
+  );
+}
+
+export function StatsBar({
+  beds,
+  rentRecords,
+  onRemindAll,
+  onEmailReminders,
+  emailReminding,
+  summary,
+  periodLabel = 'This Month',
+}: StatsBarProps) {
+  const {
+    totalBeds,
+    occupiedBeds,
+    vacantBeds,
+    occupancyRate,
+    totalCollected,
+    totalPending,
+    paidCount,
+    pendingCount,
+    verifyCount,
+    collectRate,
+  } = computeDashboardStats(beds, rentRecords, summary);
+
+  return (
+    <SectionCard
+      title="Overview"
+      icon="chart"
+      action={
+        <span className="chip shrink-0 gap-1.5 py-1.5 text-[12.5px] font-bold">
+          <CalendarDays className="h-3.5 w-3.5" />
+          {periodLabel}
+        </span>
+      }
+      bodyClassName="@container"
+    >
+      {/* Donut occupancy + collected / pending figures (matches design ref) */}
+      <div className="flex flex-col items-center gap-4 @xs:flex-row">
+        <div className="flex shrink-0 flex-col items-center gap-2.5">
+          <DonutChart percent={occupancyRate} size={120} stroke={14} sublabel="Occupancy" />
+          <span className="chip font-mono-numbers font-bold">
+            {occupiedBeds} / {totalBeds} occupied
+          </span>
+        </div>
+        <div className="w-full min-w-0 flex-1 @xs:border-l @xs:border-line @xs:pl-4">
+          <OverviewRow
+            icon="wallet-sm"
+            tint="violet"
+            label="Total Collection"
+            value={formatCurrency(totalCollected)}
+            sub={`${paidCount} paid · ${collectRate}% collected`}
+          />
+          <OverviewRow
+            icon="alert"
+            tint="peach"
+            label="Pending Dues"
+            value={formatCurrency(totalPending)}
+            sub={`${pendingCount} due`}
+          />
+          <OverviewRow icon="bed" tint="sky" label="Vacant Beds" value={vacantBeds} />
+          {verifyCount > 0 && (
+            <OverviewRow icon="doc" tint="violet" label="Proofs to verify" value={verifyCount} />
+          )}
+        </div>
       </div>
 
       {pendingCount > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={onRemindAll}
-            className="flex w-full items-center justify-center gap-1.5 rounded-[14px] accent-bg py-2.5 text-xs font-bold text-white shadow-[var(--shadow-sm)] press"
-          >
-            <Send className="h-3.5 w-3.5" />
+        <div className="mt-4 grid grid-cols-1 gap-2.5 border-t border-line pt-4 @md:grid-cols-2">
+          <Button className="w-full" onClick={onRemindAll}>
+            <Send className="h-4 w-4" />
             <span>WhatsApp Reminders</span>
-          </button>
+          </Button>
           {onEmailReminders && (
-            <button
-              type="button"
+            <Button
+              variant="outline"
+              className="w-full"
               onClick={onEmailReminders}
               disabled={emailReminding}
-              className="flex w-full items-center justify-center gap-1.5 rounded-[14px] border-2 border-[color:var(--accent)] accent-text py-2.5 text-xs font-bold shadow-[var(--shadow-sm)] press disabled:opacity-60"
             >
-              <Mail className="h-3.5 w-3.5" />
+              <Mail className="h-4 w-4" />
               <span>{emailReminding ? 'Sending…' : 'Email from my Gmail'}</span>
-            </button>
+            </Button>
           )}
         </div>
       )}
-    </div>
+    </SectionCard>
   );
 }

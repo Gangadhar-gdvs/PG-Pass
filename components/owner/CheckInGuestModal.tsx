@@ -5,6 +5,9 @@ import { Bed } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Drawer } from '@/components/ui/drawer';
+import { InfoBanner, KeyValue } from '@/components/ui/dashboard-kit';
+import { IconBubble, type Icon3DName, type Tint } from '@/components/brand/Icon3D';
+import { CalendarDays, Moon, UserRound, Wallet } from 'lucide-react';
 import { formatCurrency, errorMessage } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
@@ -13,6 +16,29 @@ function nightsBetween(a: string, b: string): number {
   const d2 = Date.parse(`${b}T00:00:00Z`);
   if (isNaN(d1) || isNaN(d2)) return 1;
   return Math.max(1, Math.round((d2 - d1) / 86400000));
+}
+
+/** Glass form section with a small 3D icon header (local to this drawer). */
+function FormSection({
+  icon,
+  tint,
+  title,
+  children,
+}: {
+  icon: Icon3DName;
+  tint: Tint;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="app-card space-y-3.5 p-4">
+      <div className="flex items-center gap-2.5">
+        <IconBubble icon={icon} tint={tint} size={36} />
+        <h4 className="text-[14.5px] font-bold leading-tight tracking-[-0.01em] text-ink">{title}</h4>
+      </div>
+      {children}
+    </section>
+  );
 }
 
 export function CheckInGuestModal({
@@ -88,11 +114,11 @@ export function CheckInGuestModal({
       description={`Room ${bed.roomNumber} · short stay`}
       width="md"
       footer={
-        <div className="flex items-center justify-between gap-3 w-full">
-          <div className="text-sm">
-            <span className="text-slate-500">Total </span>
-            <span className="font-extrabold font-mono-numbers">{formatCurrency(total)}</span>
-            {mode === 'per_night' && <span className="text-xs text-slate-400"> · {nights}n</span>}
+        <div className="flex w-full items-center justify-between gap-3">
+          <div className="min-w-0 leading-tight">
+            <span className="block text-xs font-semibold text-muted">Total</span>
+            <span className="text-lg font-extrabold font-mono-numbers text-ink">{formatCurrency(total)}</span>
+            {mode === 'per_night' && <span className="text-xs font-semibold text-faint"> · {nights}n</span>}
           </div>
           <Button type="button" onClick={() => submit()} loading={loading} variant="solid">
             Check In Guest
@@ -100,43 +126,66 @@ export function CheckInGuestModal({
         </div>
       }
     >
-      <form id="guest-form" onSubmit={submit} className="space-y-4">
-        <Input label="Guest Name" value={name} onChange={(e) => setName(e.target.value)} required disabled={loading} />
-        <Input label="Phone (optional)" type="tel" inputMode="numeric" value={phone} onChange={(e) => setPhone(e.target.value)} disabled={loading} />
+      <form id="guest-form" onSubmit={submit} className="space-y-3.5 stagger">
+        <FormSection icon="user-add" tint="sky" title="Guest">
+          <Input label="Guest Name" value={name} onChange={(e) => setName(e.target.value)} leading={<UserRound />} required disabled={loading} />
+          <Input label="Phone (optional)" type="tel" inputMode="numeric" value={phone} onChange={(e) => setPhone(e.target.value)} className="font-mono-numbers" disabled={loading} />
+        </FormSection>
 
-        <div className="grid grid-cols-2 gap-3">
-          <Input label="Check-in" type="date" value={checkIn} min={today} onChange={(e) => setCheckIn(e.target.value)} disabled={loading} />
-          <Input label="Check-out" type="date" value={checkOut} min={checkIn} onChange={(e) => setCheckOut(e.target.value)} disabled={loading} />
-        </div>
+        <FormSection icon="calendar" tint="violet" title="Stay dates">
+          <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2">
+            <Input label="Check-in" type="date" value={checkIn} min={today} onChange={(e) => setCheckIn(e.target.value)} disabled={loading} />
+            <Input label="Check-out" type="date" value={checkOut} min={checkIn} onChange={(e) => setCheckOut(e.target.value)} disabled={loading} />
+          </div>
+        </FormSection>
 
-        {/* Billing mode toggle */}
-        <div className="space-y-2">
-          <span className="text-xs font-semibold text-slate-600">Billing</span>
-          <div className="flex items-center gap-2 p-1 rounded-[12px] bg-slate-100">
+        <FormSection icon="rupee" tint="mint" title="Billing">
+          {/* Billing mode toggle */}
+          <div role="group" aria-label="Billing" className="flex items-center gap-1 rounded-full bg-lilac-2 p-1 shadow-[inset_0_1px_2px_rgba(70,40,160,0.08)]">
             {(['per_night', 'flat'] as const).map((m) => (
               <button
                 key={m}
                 type="button"
                 onClick={() => setMode(m)}
-                className="flex-1 h-10 rounded-[10px] text-xs font-bold transition-all press"
-                style={mode === m ? { background: '#fff', color: 'var(--accent)', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' } : { color: '#64748B' }}
+                aria-pressed={mode === m}
+                className={`inline-flex h-11 flex-1 items-center justify-center gap-1.5 rounded-full text-[13px] font-bold transition-all press ${
+                  mode === m
+                    ? 'bg-[image:var(--grad-brand)] text-white shadow-[var(--shadow-brand)]'
+                    : 'text-muted hover:text-brand-700'
+                }`}
               >
+                {m === 'per_night' ? <Moon className="h-4 w-4" /> : <Wallet className="h-4 w-4" />}
                 {m === 'per_night' ? 'Per Night' : 'Flat Total'}
               </button>
             ))}
           </div>
-        </div>
 
-        {mode === 'per_night' ? (
-          <Input label="Rate per night (₹)" type="number" value={rate} onChange={(e) => setRate(e.target.value)} disabled={loading} />
-        ) : (
-          <Input label="Total amount (₹)" type="number" value={flat} onChange={(e) => setFlat(e.target.value)} disabled={loading} />
-        )}
+          {mode === 'per_night' ? (
+            <Input label="Rate per night (₹)" type="number" value={rate} onChange={(e) => setRate(e.target.value)} className="font-mono-numbers font-semibold" disabled={loading} />
+          ) : (
+            <Input label="Total amount (₹)" type="number" value={flat} onChange={(e) => setFlat(e.target.value)} className="font-mono-numbers font-semibold" disabled={loading} />
+          )}
 
-        <div className="p-3.5 rounded-[12px] accent-soft-bg text-xs leading-relaxed">
-          Guest check-in is quick: no monthly rent cycle, no deposit, no portal. The bed frees
-          automatically when you check them out.
-        </div>
+          <div className="well divide-y divide-line px-3.5 py-1">
+            <KeyValue
+              label={
+                <span className="inline-flex items-center gap-1.5">
+                  <CalendarDays className="h-3.5 w-3.5 text-faint" /> Nights
+                </span>
+              }
+              value={nights}
+            />
+            <KeyValue label="Billing" value={mode === 'per_night' ? 'Per Night' : 'Flat Total'} />
+            <KeyValue label="Total" value={<span className="text-[15px] text-brand-700">{formatCurrency(total)}</span>} />
+          </div>
+        </FormSection>
+
+        <InfoBanner
+          tone="brand"
+          icon="bed-teal"
+          title="Guest check-in is quick"
+          description="No monthly rent cycle, no deposit, no portal. The bed frees automatically when you check them out."
+        />
       </form>
     </Drawer>
   );

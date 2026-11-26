@@ -2,7 +2,8 @@
 
 import React, { useEffect, useState } from 'react';
 import { getPhotoViewUrl } from '@/lib/client/uploader';
-import { ImageIcon } from 'lucide-react';
+import { ImageIcon, Images, X } from 'lucide-react';
+import { IconBubble } from '@/components/brand/Icon3D';
 import type { Timestampish } from '@/types';
 
 interface PhotoMeta {
@@ -37,7 +38,7 @@ function Thumb({ photo, onOpen }: { photo: PhotoMeta; onOpen: (url: string) => v
     <button
       type="button"
       onClick={() => url && onOpen(url)}
-      className="relative aspect-square rounded-[8px] overflow-hidden border border-[#E2E8F0] bg-[#F8FAFC] group"
+      className="group relative aspect-square overflow-hidden rounded-2xl bg-lilac-2 ring-2 ring-white shadow-[var(--shadow-tile)] press"
     >
       {url ? (
         // eslint-disable-next-line @next/next/no-img-element
@@ -46,14 +47,14 @@ function Thumb({ photo, onOpen }: { photo: PhotoMeta; onOpen: (url: string) => v
           alt={TYPE_LABELS[photo.photoType] || 'Photo'}
           loading="lazy"
           decoding="async"
-          className="w-full h-full object-cover group-active:opacity-80"
+          className="h-full w-full object-cover transition-opacity group-active:opacity-80"
         />
       ) : (
-        <div className="w-full h-full flex items-center justify-center">
-          <ImageIcon className={`w-5 h-5 ${failed ? 'text-[#EF4444]' : 'text-[#CBD5E1] animate-pulse'}`} />
+        <div className={`flex h-full w-full items-center justify-center ${failed ? 'bg-danger-bg' : 'animate-shimmer'}`}>
+          <ImageIcon className={`h-5 w-5 ${failed ? 'text-danger' : 'text-faint'}`} />
         </div>
       )}
-      <span className="absolute bottom-0 inset-x-0 bg-black/55 text-white text-[9px] font-semibold py-0.5 text-center">
+      <span className="absolute inset-x-1 bottom-1 truncate rounded-full bg-white/90 px-1.5 py-0.5 text-center text-[10px] font-bold leading-tight text-ink shadow-[var(--shadow-tile)]">
         {TYPE_LABELS[photo.photoType] || 'Photo'}
       </span>
     </button>
@@ -87,9 +88,9 @@ export function TenantPhotoGallery({ tenantId }: { tenantId: string }) {
 
   if (loading) {
     return (
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-4 gap-2.5" role="status" aria-label="Loading photos">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="aspect-square rounded-[8px] bg-[#F1F5F9] animate-pulse" />
+          <div key={i} className="aspect-square rounded-2xl ring-2 ring-white animate-shimmer" />
         ))}
       </div>
     );
@@ -97,13 +98,16 @@ export function TenantPhotoGallery({ tenantId }: { tenantId: string }) {
 
   if (photos.length === 0) {
     return (
-      <p className="text-[11px] text-[#94A3B8]">No photos uploaded for this resident yet.</p>
+      <div className="well flex items-center gap-3 p-3">
+        <IconBubble icon={<Images className="h-5 w-5" />} tint="slate" size={40} />
+        <p className="text-[12.5px] font-medium text-muted">No photos uploaded for this resident yet.</p>
+      </div>
     );
   }
 
   return (
     <>
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-4 gap-2.5 stagger">
         {photos.map((p) => (
           <Thumb key={p.id} photo={p} onOpen={setPreview} />
         ))}
@@ -111,11 +115,23 @@ export function TenantPhotoGallery({ tenantId }: { tenantId: string }) {
 
       {preview && (
         <div
-          className="fixed inset-0 z-[70] bg-black/80 flex items-center justify-center p-4"
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-ink/80 p-4 backdrop-blur-sm animate-fade"
           onClick={() => setPreview(null)}
         >
+          <button
+            type="button"
+            aria-label="Close preview"
+            className="absolute right-4 top-4 grid h-11 w-11 place-items-center rounded-full border border-white bg-white/90 text-ink-2 shadow-[var(--shadow-float)] press"
+            style={{ marginTop: 'env(safe-area-inset-top)' }}
+          >
+            <X className="h-5 w-5" />
+          </button>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={preview} alt="Photo" className="max-h-[85vh] max-w-full rounded-[8px] object-contain" />
+          <img
+            src={preview}
+            alt="Photo"
+            className="max-h-[85vh] max-w-full rounded-[22px] object-contain ring-4 ring-white/80 shadow-[var(--shadow-float)] animate-pop"
+          />
         </div>
       )}
     </>

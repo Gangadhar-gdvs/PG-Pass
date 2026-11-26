@@ -11,14 +11,9 @@ import { SupportLink } from '@/components/ui/support-link';
 import { Input } from '@/components/ui/input';
 import { HeaderSkeleton, FormSkeleton } from '@/components/ui/skeletons';
 import { Button } from '@/components/ui/button';
+import { PageHeader, SectionCard, InfoBanner } from '@/components/ui/dashboard-kit';
 import { validateUpi, sanitizeText } from '@/lib/security';
-import {
-  Settings,
-  Building,
-  CreditCard,
-  ShieldCheck,
-  Save,
-} from 'lucide-react';
+import { Save } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 function SettingsPageInner() {
@@ -110,7 +105,7 @@ function SettingsPageInner() {
 
   if (loading) {
     return (
-      <div className="max-w-2xl mx-auto py-8 space-y-4">
+      <div className="max-w-3xl mx-auto space-y-5">
         <HeaderSkeleton action={false} />
         <FormSkeleton fields={5} />
       </div>
@@ -118,134 +113,113 @@ function SettingsPageInner() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto py-8 space-y-5">
+    <div className="max-w-3xl mx-auto space-y-5">
+      <PageHeader
+        icon="tools-purple"
+        tint="slate"
+        title="Property & Banking"
+        highlight="Settings"
+        subtitle="Configure payment endpoints and official details for compliant rent receipts."
+      />
+
       <AddPropertyCard />
 
-      <div className="app-card rounded-[16px] p-6 sm:p-8">
-        <div className="flex items-center gap-3 pb-5 mb-6 border-b border-[#E2E8F0]">
-          <div className="icon-chip accent-text shrink-0">
-            <Settings className="w-5 h-5" />
-          </div>
-          <div>
-            <h1 className="text-lg font-bold text-[#09090B]">Property & Banking Settings</h1>
-            <p className="text-xs text-[#64748B]">
-              Configure payment endpoints and official details for compliant rent receipts.
-            </p>
-          </div>
-        </div>
+      <form onSubmit={handleSave} className="space-y-5">
+        <SectionCard title="Property Information" icon="building" bodyClassName="space-y-4">
+          <Input
+            label="PG Business Name"
+            placeholder="e.g. Skyline Luxury Coliving"
+            value={pgName}
+            onChange={(e) => setPgName(e.target.value)}
+            required
+            disabled={saving}
+          />
 
-        <form onSubmit={handleSave} className="space-y-5">
-          <div className="space-y-4">
-            <h2 className="text-xs font-bold uppercase tracking-wider text-[#94A3B8] flex items-center gap-1.5">
-              <Building className="w-3.5 h-3.5 accent-text" />
-              <span>Property Information</span>
-            </h2>
+          <Input
+            label="Proprietor / Landlord Full Name"
+            placeholder="e.g. Property Manager Name"
+            value={ownerName}
+            onChange={(e) => setOwnerName(e.target.value)}
+            required
+            disabled={saving}
+          />
 
+          <Input
+            label="Complete Property Address"
+            placeholder="e.g. #42, 5th Cross, Koramangala 4th Block, Bengaluru - 560034"
+            value={pgAddress}
+            onChange={(e) => setPgAddress(e.target.value)}
+            required
+            disabled={saving}
+          />
+        </SectionCard>
+
+        <SectionCard
+          title="Banking & Tax Details"
+          icon="wallet"
+          action={<span className="chip shrink-0">0% gateway</span>}
+          bodyClassName="space-y-4"
+        >
+          <Input
+            label="Landlord UPI ID (0% Gateway Settlement)"
+            placeholder="e.g. ramesh@okaxis or 9876543210@paytm"
+            value={upiId}
+            onChange={(e) => setUpiId(e.target.value)}
+            required
+            disabled={saving}
+          />
+        </SectionCard>
+
+        <SectionCard title="Rent Collection" icon="calendar-clock" bodyClassName="space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 items-end gap-3">
             <Input
-              label="PG Business Name"
-              placeholder="e.g. Skyline Luxury Coliving"
-              value={pgName}
-              onChange={(e) => setPgName(e.target.value)}
-              required
+              id="rent-due-day"
+              label="Rent Due Day (of month)"
+              type="number"
+              min={1}
+              max={28}
+              value={rentDueDay}
+              onChange={(e) => setRentDueDay(e.target.value)}
               disabled={saving}
             />
-
             <Input
-              label="Proprietor / Landlord Full Name"
-              placeholder="e.g. Property Manager Name"
-              value={ownerName}
-              onChange={(e) => setOwnerName(e.target.value)}
-              required
+              id="late-fee"
+              label="Late Fee / day (₹)"
+              type="number"
+              min={0}
+              value={lateFeePerDay}
+              onChange={(e) => setLateFeePerDay(e.target.value)}
               disabled={saving}
             />
-
             <Input
-              label="Complete Property Address"
-              placeholder="e.g. #42, 5th Cross, Koramangala 4th Block, Bengaluru - 560034"
-              value={pgAddress}
-              onChange={(e) => setPgAddress(e.target.value)}
-              required
-              disabled={saving}
-            />
-          </div>
-
-          <div className="space-y-4 pt-4 border-t border-[#E2E8F0]">
-            <h2 className="text-xs font-bold uppercase tracking-wider text-[#94A3B8] flex items-center gap-1.5">
-              <CreditCard className="w-3.5 h-3.5 text-[#10B981]" />
-              <span>Banking & Tax Details</span>
-            </h2>
-
-            <Input
-              label="Landlord UPI ID (0% Gateway Settlement)"
-              placeholder="e.g. ramesh@okaxis or 9876543210@paytm"
-              value={upiId}
-              onChange={(e) => setUpiId(e.target.value)}
-              required
+              id="late-grace"
+              label="Grace Days"
+              type="number"
+              min={0}
+              max={28}
+              value={lateFeeGraceDays}
+              onChange={(e) => setLateFeeGraceDays(e.target.value)}
               disabled={saving}
             />
           </div>
+          <p className="text-xs font-medium leading-relaxed text-muted">
+            Due day applies to newly generated rent records. Set late fee to ₹0 to disable penalties.
+          </p>
+        </SectionCard>
 
-          <div className="space-y-4 pt-4 border-t border-[#E2E8F0]">
-            <h2 className="text-xs font-bold uppercase tracking-wider text-[#94A3B8] flex items-center gap-1.5">
-              <CreditCard className="w-3.5 h-3.5 accent-text" />
-              <span>Rent Collection</span>
-            </h2>
+        <InfoBanner
+          tone="success"
+          title="Secure, zero-commission payments"
+          description="Your UPI ID and PAN are securely used to generate real-time QR codes and sequential PDF receipts. Zero gateway commissions apply."
+        />
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <Input
-                id="rent-due-day"
-                label="Rent Due Day (of month)"
-                type="number"
-                min={1}
-                max={28}
-                value={rentDueDay}
-                onChange={(e) => setRentDueDay(e.target.value)}
-                disabled={saving}
-              />
-              <Input
-                id="late-fee"
-                label="Late Fee / day (₹)"
-                type="number"
-                min={0}
-                value={lateFeePerDay}
-                onChange={(e) => setLateFeePerDay(e.target.value)}
-                disabled={saving}
-              />
-              <Input
-                id="late-grace"
-                label="Grace Days"
-                type="number"
-                min={0}
-                max={28}
-                value={lateFeeGraceDays}
-                onChange={(e) => setLateFeeGraceDays(e.target.value)}
-                disabled={saving}
-              />
-            </div>
-            <p className="text-[11px] text-[#64748B]">
-              Due day applies to newly generated rent records. Set late fee to ₹0 to disable penalties.
-            </p>
-          </div>
-
-          <div className="p-4 rounded-[8px] bg-[#ECFDF5] border border-[#A7F3D0] flex items-start gap-2.5">
-            <ShieldCheck className="w-4 h-4 text-[#10B981] shrink-0 mt-0.5" />
-            <p className="text-xs text-[#065F46] leading-relaxed">
-              Your UPI ID and PAN are securely used to generate real-time QR codes and sequential PDF receipts. Zero gateway commissions apply.
-            </p>
-          </div>
-
-          <Button
-            type="submit"
-            size="lg"
-            variant="solid"
-            loading={saving}
-            className="w-full accent-bg hover:opacity-90 text-white"
-          >
-            <Save className="w-4 h-4 mr-2" />
+        <div className="flex justify-end">
+          <Button type="submit" size="lg" variant="solid" loading={saving} className="w-full sm:w-auto">
+            <Save className="h-4 w-4" />
             <span>Save Configuration</span>
           </Button>
-        </form>
-      </div>
+        </div>
+      </form>
 
       <GmailConnectCard />
 

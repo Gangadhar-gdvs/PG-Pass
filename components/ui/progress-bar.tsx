@@ -2,13 +2,13 @@ import * as React from "react";
 
 export interface ProgressBarProps extends React.HTMLAttributes<HTMLDivElement> {
   value: number; // 0 to 100
-  color?: "amber" | "emerald" | "coral" | "indigo";
+  color?: "brand" | "amber" | "emerald" | "coral" | "indigo";
   height?: "sm" | "md" | "lg";
 }
 
 export function ProgressBar({
   value,
-  color = "amber",
+  color = "brand",
   height = "md",
   className = "",
   ...props
@@ -16,25 +16,26 @@ export function ProgressBar({
   const clamped = Math.min(100, Math.max(0, value));
 
   const colors = {
-    amber: "bg-[#D97706]",
-    emerald: "bg-[#10B981]",
-    coral: "bg-[#F43F5E]",
-    indigo: "bg-[#6366F1]",
+    brand: "bg-[image:var(--grad-brand)]",
+    amber: "bg-[linear-gradient(90deg,#FFB070,#F2791C)]",
+    emerald: "bg-[linear-gradient(90deg,#4FD69C,#17A06B)]",
+    coral: "bg-[linear-gradient(90deg,#FF8FA3,#E5484D)]",
+    indigo: "bg-[image:var(--grad-brand)]",
   };
 
   const heights = {
-    sm: "h-1",
-    md: "h-1.5",
-    lg: "h-2.5",
+    sm: "h-1.5",
+    md: "h-2",
+    lg: "h-3",
   };
 
   return (
     <div
-      className={`w-full overflow-hidden rounded-full bg-[#E2E8F0] ${heights[height]} ${className}`}
+      className={`w-full overflow-hidden rounded-full bg-brand-100 shadow-[inset_0_1px_2px_rgba(70,40,160,0.12)] ${heights[height]} ${className}`}
       {...props}
     >
       <div
-        className={`h-full transition-all duration-300 ease-out ${colors[color]}`}
+        className={`h-full rounded-full transition-all duration-500 ease-out ${colors[color]}`}
         style={{ width: `${clamped}%` }}
       />
     </div>

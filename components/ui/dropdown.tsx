@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Check } from 'lucide-react';
+import { fieldLabelClass, fieldBaseClass, fieldStateClass } from './input';
 
 export interface DropdownOption {
   value: string;
@@ -150,10 +151,7 @@ export function Dropdown({
   return (
     <div className={`flex flex-col gap-1.5 text-left ${containerClassName}`} ref={rootRef}>
       {label && (
-        <label
-          htmlFor={triggerId}
-          className="text-[11px] font-semibold uppercase tracking-wider text-[#475569]"
-        >
+        <label htmlFor={triggerId} className={fieldLabelClass}>
           {label}
         </label>
       )}
@@ -168,18 +166,16 @@ export function Dropdown({
         aria-label={ariaLabel}
         onClick={() => !disabled && setOpen((o) => !o)}
         onKeyDown={onKeyDown}
-        className={`h-11 w-full flex items-center justify-between gap-2 rounded-[8px] border bg-white pl-3.5 pr-3 py-2 text-[13px] text-left transition-colors focus-visible:outline-none focus-visible:ring-1 disabled:cursor-not-allowed disabled:bg-[#F1F5F9] disabled:text-[#94A3B8] shadow-xs cursor-pointer ${
-          error
-            ? 'border-[#EF4444] focus-visible:border-[#EF4444] focus-visible:ring-[#EF4444]'
-            : 'border-[#E2E8F0] hover:border-[#CBD5E1] focus-visible:border-[#D97706] focus-visible:ring-[#D97706]'
+        className={`h-12 flex items-center justify-between gap-2 pl-4 pr-3 text-left cursor-pointer ${fieldBaseClass} ${fieldStateClass(error)} ${
+          open ? 'border-brand shadow-[0_0_0_4px_rgba(123,63,242,0.14)]' : ''
         } ${className}`}
       >
-        <span className={`truncate ${selected ? 'text-[#09090B]' : 'text-[#94A3B8]'}`}>
+        <span className={`truncate ${selected ? 'text-ink font-medium' : 'text-faint'}`}>
           {selected ? selected.label : placeholder}
         </span>
-        <ChevronDown
-          className={`w-4 h-4 text-[#94A3B8] shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
-        />
+        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-brand-50 text-brand">
+          <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+        </span>
       </button>
 
       {open && mounted && rect &&
@@ -188,7 +184,7 @@ export function Dropdown({
             ref={panelRef}
             role="listbox"
             tabIndex={-1}
-            className="fixed z-[70] max-h-60 overflow-y-auto rounded-[12px] border border-[#E2E8F0] bg-white p-1 shadow-[0_12px_32px_-8px_rgba(15,23,42,0.22)] animate-pop"
+            className="fixed z-[70] max-h-64 overflow-y-auto rounded-2xl border border-white bg-white/97 p-1.5 shadow-[0_22px_48px_-16px_rgba(70,40,160,0.4)] ring-1 ring-line animate-pop"
             style={{ left: rect.left, top: rect.top, width: rect.width }}
           >
             {options.map((opt, i) => {
@@ -200,13 +196,16 @@ export function Dropdown({
                     type="button"
                     onMouseEnter={() => setActiveIndex(i)}
                     onClick={() => commit(opt.value)}
-                    className={`w-full flex items-center justify-between gap-2 rounded-[8px] px-2.5 py-2.5 text-[13px] text-left transition-colors ${
-                      isActive ? 'bg-[#F8FAFC]' : ''
-                    } ${isSelected ? 'font-bold' : 'font-medium'}`}
-                    style={isSelected ? { color: 'var(--accent)' } : { color: '#334155' }}
+                    className={`w-full flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-[13px] text-left transition-colors ${
+                      isActive ? 'bg-brand-50' : ''
+                    } ${isSelected ? 'font-bold text-brand-700' : 'font-medium text-ink-2'}`}
                   >
                     <span className="truncate">{opt.label}</span>
-                    {isSelected && <Check className="w-4 h-4 shrink-0" />}
+                    {isSelected && (
+                      <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[image:var(--grad-brand)] text-white">
+                        <Check className="w-3 h-3" strokeWidth={3} />
+                      </span>
+                    )}
                   </button>
                 </li>
               );
@@ -215,8 +214,8 @@ export function Dropdown({
           document.body
         )}
 
-      {error && <p className="text-xs font-medium text-[#EF4444]">{error}</p>}
-      {!error && helperText && <p className="text-xs text-[#64748B]">{helperText}</p>}
+      {error && <p className="text-xs font-semibold text-danger">{error}</p>}
+      {!error && helperText && <p className="text-xs text-muted">{helperText}</p>}
     </div>
   );
 }

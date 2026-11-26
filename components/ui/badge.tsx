@@ -1,10 +1,14 @@
 import * as React from "react";
 
 export interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
-  variant?: "default" | "paid" | "pending" | "verify" | "vacant" | "danger" | "neutral" | "amber" | "cyan";
+  variant?: "default" | "paid" | "pending" | "verify" | "vacant" | "danger" | "neutral" | "amber" | "cyan" | "brand";
   dot?: boolean;
 }
 
+/**
+ * Soft status pill (ref: "In Progress", "Upcoming", "Owner", "28 Nov").
+ * Sentence-case, rounded-full, pastel fill with a deeper ink of the same hue.
+ */
 export function Badge({
   className = "",
   variant = "default",
@@ -13,32 +17,34 @@ export function Badge({
   ...props
 }: BadgeProps) {
   const variants = {
-    default: "bg-[#F1F5F9] text-[#475569] border-[#E2E8F0]",
-    neutral: "bg-[#F1F5F9] text-[#475569] border-[#E2E8F0]",
-    amber: "bg-[#FEF3C7] text-[#92400E] border-[#FDE68A]",
-    paid: "bg-[#ECFDF5] text-[#065F46] border-[#A7F3D0]",
-    pending: "bg-[#FFFBEB] text-[#B45309] border-[#FDE68A]",
-    verify: "bg-[#EEF2FF] text-[#4338CA] border-[#C7D2FE]",
-    vacant: "bg-[#F8FAFC] text-[#64748B] border-[#E2E8F0]",
-    danger: "bg-[#FEF2F2] text-[#991B1B] border-[#FECACA]",
-    cyan: "bg-[#ECFEFF] text-[#0E7490] border-[#A5F3FC]",
+    default: "bg-lilac-2 text-ink-2",
+    neutral: "bg-lilac-2 text-ink-2",
+    brand: "bg-brand-100 text-brand-700",
+    amber: "bg-brand-100 text-brand-700",
+    verify: "bg-brand-100 text-brand-700",
+    paid: "bg-success-bg text-success-ink",
+    pending: "bg-warning-bg text-warning-ink",
+    vacant: "bg-lilac text-muted ring-1 ring-inset ring-line",
+    danger: "bg-danger-bg text-danger-ink",
+    cyan: "bg-info-bg text-info-ink",
   };
 
   const dots = {
-    default: "bg-[#64748B]",
-    neutral: "bg-[#64748B]",
-    amber: "bg-[#D97706]",
-    paid: "bg-[#10B981]",
-    pending: "bg-[#F59E0B]",
-    verify: "bg-[#6366F1]",
-    vacant: "bg-[#94A3B8]",
-    danger: "bg-[#EF4444]",
-    cyan: "bg-[#06B6D4]",
+    default: "bg-muted",
+    neutral: "bg-muted",
+    brand: "bg-brand",
+    amber: "bg-brand",
+    verify: "bg-brand",
+    paid: "bg-success",
+    pending: "bg-warning",
+    vacant: "bg-faint",
+    danger: "bg-danger",
+    cyan: "bg-info",
   };
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-[6px] border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider select-none ${variants[variant]} ${className}`}
+      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-[3px] text-[11px] font-semibold leading-[1.35] select-none ${variants[variant]} ${className}`}
       {...props}
     >
       {dot && (

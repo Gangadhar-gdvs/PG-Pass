@@ -6,7 +6,11 @@ import { PROPERTY_PHOTO_CATEGORIES } from '@/lib/constants/storage';
 import { PROPERTY_PHOTO_MAX } from '@/lib/constants/limits';
 import { Button } from '@/components/ui/button';
 import { Dropdown } from '@/components/ui/dropdown';
-import { Camera, Trash2, ImagePlus, Loader2 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { EmptyState } from '@/components/ui/empty-state';
+import { ProgressBar } from '@/components/ui/progress-bar';
+import { GlyphTile, IconBubble } from '@/components/brand/Icon3D';
+import { Camera, Trash2, ImagePlus } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { errorMessage } from '@/lib/utils';
 
@@ -112,100 +116,129 @@ export function PgPhotoGallery({ propertyId }: { propertyId?: string }) {
     }
   };
 
+  const full = photos.length >= PROPERTY_PHOTO_MAX;
+
   return (
-    <div className="bg-white border border-[#E2E8F0] rounded-[12px] p-6 sm:p-8 shadow-xs space-y-5">
-      <div className="flex items-center gap-3 pb-4 border-b border-[#E2E8F0]">
-        <div className="w-10 h-10 rounded-[8px] accent-soft-bg accent-text flex items-center justify-center shrink-0">
-          <Camera className="w-5 h-5" />
-        </div>
-        <div>
-          <h2 className="text-lg font-bold text-[#09090B]">PG Photo Gallery</h2>
-          <p className="text-xs text-[#64748B]">
+    <section className="app-card space-y-5 p-4 sm:p-6">
+      <div className="flex items-start gap-3.5">
+        <GlyphTile icon={Camera} tone="brand" size={48} />
+        <div className="min-w-0">
+          <h2 className="text-[17px] font-bold tracking-[-0.015em] text-ink">PG Photo Gallery</h2>
+          <p className="mt-0.5 text-[13px] font-medium leading-relaxed text-muted">
             Public photos shown to prospective residents. Show rooms, bathrooms, common areas, food and
-            amenities — good photos attract more residents. ({photos.length}/{PROPERTY_PHOTO_MAX})
+            amenities — good photos attract more residents.
           </p>
         </div>
       </div>
 
       {/* Upload controls */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <Dropdown
-          label="Category"
-          value={category}
-          onChange={setCategory}
-          options={PROPERTY_PHOTO_CATEGORIES.map((c) => ({ value: c, label: CATEGORY_LABELS[c] }))}
-        />
-        {category === 'room' && (
+      <div className="well space-y-3.5 p-3.5 sm:p-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Dropdown
-            label="Sharing (optional)"
-            value={sharingType}
-            onChange={setSharingType}
-            options={[
-              { value: '', label: 'Any' },
-              ...['1', '2', '3', '4', '5', '6'].map((s) => ({ value: s, label: `${s}-sharing` })),
-            ]}
+            label="Category"
+            value={category}
+            onChange={setCategory}
+            options={PROPERTY_PHOTO_CATEGORIES.map((c) => ({ value: c, label: CATEGORY_LABELS[c] }))}
           />
-        )}
-        <div className="space-y-1.5 sm:col-span-2">
-          <label className="text-xs font-semibold text-[#334155]">Caption (optional)</label>
-          <input
-            value={caption}
-            onChange={(e) => setCaption(e.target.value)}
-            placeholder='e.g. "Spacious 2-sharing AC room, 1st floor"'
-            maxLength={120}
-            className="w-full h-11 px-3 rounded-[8px] border-2 border-slate-200 text-sm focus:border-[color:var(--accent)] focus:outline-none"
-          />
+          {category === 'room' && (
+            <Dropdown
+              label="Sharing (optional)"
+              value={sharingType}
+              onChange={setSharingType}
+              options={[
+                { value: '', label: 'Any' },
+                ...['1', '2', '3', '4', '5', '6'].map((s) => ({ value: s, label: `${s}-sharing` })),
+              ]}
+            />
+          )}
+          <div className="sm:col-span-2">
+            <Input
+              label="Caption (optional)"
+              value={caption}
+              onChange={(e) => setCaption(e.target.value)}
+              placeholder='e.g. "Spacious 2-sharing AC room, 1st floor"'
+              maxLength={120}
+            />
+          </div>
+        </div>
+
+        <input ref={fileRef} type="file" accept="image/jpeg,image/webp,image/png" hidden onChange={onPick} />
+
+        {/* Add-photo zone */}
+        <div className="flex flex-col gap-4 rounded-[22px] border-2 border-dashed border-brand-200 bg-white/60 p-3.5 sm:flex-row sm:items-center">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <IconBubble icon={<ImagePlus className="h-5 w-5" />} tint="violet" size={46} />
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-2 text-[13px] font-bold text-ink">
+                <span>Photos</span>
+                <span className={`font-mono-numbers ${full ? 'text-warning-ink' : 'text-brand-700'}`}>
+                  {photos.length}/{PROPERTY_PHOTO_MAX}
+                </span>
+              </div>
+              <ProgressBar value={(photos.length / PROPERTY_PHOTO_MAX) * 100} height="sm" className="mt-2" />
+              {full && (
+                <p className="mt-1.5 text-xs font-semibold text-warning-ink">
+                  Gallery limit reached ({PROPERTY_PHOTO_MAX} photos).
+                </p>
+              )}
+            </div>
+          </div>
+          <Button
+            variant="solid"
+            size="md"
+            loading={uploading}
+            disabled={photos.length >= PROPERTY_PHOTO_MAX}
+            onClick={() => fileRef.current?.click()}
+            className="w-full sm:w-auto"
+          >
+            {!uploading && <ImagePlus className="h-4 w-4" />}
+            {uploading ? 'Uploading…' : 'Add Photo'}
+          </Button>
         </div>
       </div>
 
-      <input ref={fileRef} type="file" accept="image/jpeg,image/webp,image/png" hidden onChange={onPick} />
-      <Button
-        variant="solid"
-        size="md"
-        loading={uploading}
-        disabled={photos.length >= PROPERTY_PHOTO_MAX}
-        onClick={() => fileRef.current?.click()}
-        style={{ background: 'var(--accent)' }}
-        className="text-white"
-      >
-        <ImagePlus className="w-4 h-4 mr-1.5" />
-        {uploading ? 'Uploading…' : 'Add Photo'}
-      </Button>
-
       {/* Grid */}
       {loading ? (
-        <div className="flex items-center gap-2 text-xs text-[#94A3B8]">
-          <Loader2 className="w-4 h-4 animate-spin" /> Loading gallery…
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3" role="status" aria-label="Loading gallery…">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="h-32 rounded-2xl ring-2 ring-white animate-shimmer" />
+          ))}
         </div>
       ) : photos.length === 0 ? (
-        <p className="text-xs text-[#94A3B8] py-4 text-center">
-          No photos yet. Add a few to make your PG stand out in search.
-        </p>
+        <EmptyState
+          icon3d="home-blue"
+          title="No photos yet"
+          description="Add a few to make your PG stand out in search."
+          className="py-6"
+        />
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 stagger">
           {photos.map((p) => (
-            <div key={p.id} className="relative group rounded-[10px] overflow-hidden border border-[#E2E8F0]">
+            <div
+              key={p.id}
+              className="group relative overflow-hidden rounded-2xl bg-lilac-2 ring-2 ring-white shadow-[var(--shadow-tile)]"
+            >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={p.publicUrl} alt={p.caption || p.category} className="w-full h-32 object-cover" />
-              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-2">
-                <span className="text-[10px] font-bold text-white uppercase tracking-wide">
+              <img src={p.publicUrl} alt={p.caption || p.category} className="h-32 w-full object-cover" />
+              <div className="absolute inset-x-0 bottom-0 bg-linear-to-t from-ink/75 via-ink/35 to-transparent px-2.5 pb-2 pt-6">
+                <span className="block text-[11px] font-bold leading-tight text-white">
                   {CATEGORY_LABELS[p.category] || p.category}
                   {p.sharingType ? ` · ${p.sharingType}-sharing` : ''}
                 </span>
-                {p.caption && <p className="text-[10px] text-white/90 truncate">{p.caption}</p>}
+                {p.caption && <p className="truncate text-[10.5px] font-medium text-white/85">{p.caption}</p>}
               </div>
               <button
                 type="button"
                 onClick={() => remove(p.id)}
-                className="absolute top-1.5 right-1.5 p-1.5 rounded-full bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                className="absolute right-1.5 top-1.5 grid h-11 w-11 place-items-center rounded-full border border-white bg-white/90 text-danger shadow-[var(--shadow-tile)] press pointer-fine:opacity-0 pointer-fine:group-hover:opacity-100 focus-visible:opacity-100"
                 aria-label="Remove photo"
               >
-                <Trash2 className="w-3.5 h-3.5" />
+                <Trash2 className="h-4 w-4" />
               </button>
             </div>
           ))}
         </div>
       )}
-    </div>
+    </section>
   );
 }

@@ -2,8 +2,10 @@
 
 import React, { useEffect, useState } from 'react';
 import { ALL_PG_FEATURES, PG_FEATURE_LABELS, PgFeature } from '@/lib/constants/permissions';
-import { SlidersHorizontal, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { SectionCard } from '@/components/ui/dashboard-kit';
+import { Skeleton } from '@/components/ui/skeleton';
 
 /**
  * Admin-only per-PG feature control. The admin enables/disables whole features
@@ -45,49 +47,71 @@ export function AdminPgFeatures({ ownerId }: { ownerId: string }) {
     }
   };
 
+  const enabledCount = features ? ALL_PG_FEATURES.filter((f) => features[f] !== false).length : 0;
+
   return (
-    <div className="bg-white border border-[#E2E8F0] rounded-[12px] p-4.5 space-y-2.5 shadow-xs">
-      <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#64748B] flex items-center gap-1.5">
-        <SlidersHorizontal className="w-3.5 h-3.5" />
-        Feature Access (per-PG, server-enforced)
-      </span>
+    <SectionCard
+      title="Feature access"
+      icon="grid"
+      action={
+        features !== null ? (
+          <span className="chip shrink-0 font-mono-numbers">
+            {enabledCount}/{ALL_PG_FEATURES.length} on
+          </span>
+        ) : undefined
+      }
+    >
+      <p className="-mt-1 mb-3 text-[12.5px] font-medium text-muted">
+        Per-PG and enforced on the server. The owner can&apos;t override these.
+      </p>
       {features === null ? (
-        <div className="flex items-center gap-2 text-xs text-[#94A3B8] py-2">
-          <Loader2 className="w-4 h-4 animate-spin" /> Loading…
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2" aria-label="Loading features">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-12 rounded-2xl" />
+          ))}
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {ALL_PG_FEATURES.map((f) => {
             const on = features[f] !== false;
+            const saving = savingKey === f;
             return (
               <button
                 key={f}
                 type="button"
-                disabled={savingKey === f}
+                role="switch"
+                aria-checked={on}
+                disabled={saving}
                 onClick={() => toggle(f, !on)}
-                className={`flex items-center justify-between gap-2 px-3 py-2 rounded-[8px] border text-left text-xs transition-colors cursor-pointer disabled:opacity-60 ${
+                className={`flex min-h-12 items-center justify-between gap-3 rounded-2xl px-3.5 py-2.5 text-left transition-colors press disabled:opacity-60 ${
                   on
-                    ? 'border-[#4F46E5] bg-[#EEF2FF] text-[#3730A3]'
-                    : 'border-[#E2E8F0] bg-white text-[#64748B] hover:bg-[#F8FAFC]'
+                    ? 'bg-brand-50 ring-1 ring-inset ring-brand-200'
+                    : 'bg-lilac ring-1 ring-inset ring-line hover:bg-brand-50/60'
                 }`}
               >
-                <span className="min-w-0 truncate">{PG_FEATURE_LABELS[f]}</span>
-                <span
-                  className={`w-8 rounded-full relative shrink-0 transition-colors ${
-                    on ? 'bg-[#4F46E5]' : 'bg-[#CBD5E1]'
-                  }`}
-                  style={{ height: 18 }}
-                >
+                <span className={`min-w-0 truncate text-[13px] font-semibold ${on ? 'text-ink' : 'text-muted'}`}>
+                  {PG_FEATURE_LABELS[f]}
+                </span>
+                <span className="flex shrink-0 items-center gap-2">
+                  {saving && <Loader2 className="h-3.5 w-3.5 animate-spin text-brand" aria-hidden="true" />}
                   <span
-                    className="absolute top-0.5 w-3.5 h-3.5 rounded-full bg-white transition-all"
-                    style={{ left: on ? 16 : 2 }}
-                  />
+                    aria-hidden="true"
+                    className={`relative h-6 w-10 rounded-full transition-colors ${
+                      on ? 'bg-[image:var(--grad-brand)]' : 'bg-line-strong'
+                    }`}
+                  >
+                    <span
+                      className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-[0_2px_6px_rgba(70,40,160,0.3)] transition-transform ${
+                        on ? 'translate-x-4' : 'translate-x-0'
+                      }`}
+                    />
+                  </span>
                 </span>
               </button>
             );
           })}
         </div>
       )}
-    </div>
+    </SectionCard>
   );
 }

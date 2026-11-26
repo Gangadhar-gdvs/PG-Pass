@@ -3,11 +3,18 @@ import { Loader2 } from "lucide-react";
 
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "solid" | "default" | "outline" | "ghost" | "destructive" | "success" | "amber";
-  size?: "sm" | "md" | "lg" | "full";
+  variant?: "solid" | "default" | "outline" | "ghost" | "destructive" | "success" | "amber" | "soft";
+  size?: "sm" | "md" | "lg" | "full" | "icon" | "icon-sm";
   loading?: boolean;
 }
 
+/**
+ * Pill buttons from the reference design:
+ *  - solid/default/amber → violet gradient pill with a brand glow (primary CTA)
+ *  - outline/soft        → white glass pill with lavender depth (secondary)
+ *  - ghost               → violet text, lilac hover (tertiary / inline)
+ *  - destructive/success → rose / green gradient pills
+ */
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   (
     {
@@ -21,39 +28,39 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     },
     ref
   ) => {
-    // Bold mobile-app: rounded-full pills, generous tap targets, springy press.
     const base =
-      "inline-flex items-center justify-center font-bold tracking-tight transition-all duration-150 rounded-full accent-ring disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-[0.96] select-none";
+      "relative inline-flex items-center justify-center font-bold tracking-[-0.005em] rounded-full select-none transition-[transform,filter,box-shadow,background-color,color] duration-150 active:scale-[0.97] accent-ring disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 cursor-pointer whitespace-nowrap";
 
     const sizes = {
-      sm: "h-9 px-4 text-xs gap-1.5",
+      sm: "h-10 px-4 text-xs gap-1.5",
       md: "h-11 px-5 text-sm gap-2",
       lg: "h-12 px-6 text-[15px] gap-2.5",
       full: "h-12 w-full px-5 text-sm gap-2",
+      icon: "h-11 w-11 p-0 text-sm [&>svg]:h-[18px] [&>svg]:w-[18px]",
+      "icon-sm": "h-10 w-10 p-0 text-xs [&>svg]:h-4 [&>svg]:w-4",
     };
 
-    // `accent` variants pull the panel theme color (var(--accent)) so buttons
-    // match whichever panel (resident/owner/admin) they render in.
-    const accentSolid =
-      "text-white shadow-[0_6px_18px_-6px_color-mix(in_srgb,var(--accent)_55%,transparent)] hover:brightness-105";
-    const variants: Record<string, string> = {
-      solid: accentSolid,
-      default: accentSolid,
-      amber: accentSolid,
+    const brand =
+      "text-white bg-[image:var(--grad-brand)] shadow-[0_12px_24px_-10px_rgba(106,43,234,0.6),inset_0_1px_0_rgba(255,255,255,0.35)] hover:brightness-[1.06]";
+    const variants: Record<NonNullable<ButtonProps["variant"]>, string> = {
+      solid: brand,
+      default: brand,
+      amber: brand,
       outline:
-        "bg-white border-2 border-slate-200 text-slate-900 hover:border-slate-300 hover:bg-slate-50",
-      ghost: "bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900",
-      destructive: "bg-[#EF4444] text-white hover:bg-[#DC2626] shadow-[0_6px_18px_-6px_rgba(239,68,68,0.5)]",
-      success: "bg-[#10B981] text-white hover:bg-[#059669] shadow-[0_6px_18px_-6px_rgba(16,185,129,0.5)]",
+        "text-ink bg-[linear-gradient(180deg,#FFFFFF_0%,#F7F3FF_100%)] border border-[#E9E2FC] shadow-[inset_0_1px_0_#fff,0_8px_18px_-10px_rgba(70,40,160,0.3)] hover:border-brand-200 hover:text-brand-700",
+      soft:
+        "text-brand-700 bg-brand-100 hover:bg-brand-200/70",
+      ghost: "bg-transparent text-brand-700 hover:bg-brand-50",
+      destructive:
+        "text-white bg-[linear-gradient(135deg,#FF7C93_0%,#EE5270_50%,#D63557_100%)] shadow-[0_12px_24px_-10px_rgba(214,53,87,0.55),inset_0_1px_0_rgba(255,255,255,0.3)] hover:brightness-105",
+      success:
+        "text-white bg-[linear-gradient(135deg,#4FD69C_0%,#1FAE76_50%,#128A5B_100%)] shadow-[0_12px_24px_-10px_rgba(18,138,91,0.5),inset_0_1px_0_rgba(255,255,255,0.3)] hover:brightness-105",
     };
-
-    const useAccent = variant === "solid" || variant === "default" || variant === "amber";
 
     return (
       <button
         ref={ref}
         disabled={disabled || loading}
-        style={useAccent ? { background: "var(--accent)" } : undefined}
         className={`${base} ${sizes[size]} ${variants[variant]} ${className}`}
         {...props}
       >

@@ -2,13 +2,14 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useOwnerSession } from '@/hooks/useOwner';
-import { HeroHeader } from '@/components/ui/dashboard-kit';
+import { PageHeader, SectionCard, StatTile } from '@/components/ui/dashboard-kit';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Dropdown } from '@/components/ui/dropdown';
-import { CardListSkeleton } from '@/components/ui/skeletons';
+import { ListSkeleton, StatGridSkeleton } from '@/components/ui/skeletons';
 import { EmptyState } from '@/components/ui/empty-state';
-import { ClipboardList, Plus, Check, Trash2, CircleDashed } from 'lucide-react';
+import { Plus, Check, Trash2, CalendarDays, UserRound } from 'lucide-react';
 import type { StaffTask } from '@/types';
 import { formatDateIN, errorMessage, tsToDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -16,6 +17,12 @@ import toast from 'react-hot-toast';
 interface StaffLite {
   id: string;
   name: string;
+}
+
+/** Local YYYY-MM-DD (display only — used to flag overdue / due-today chips). */
+function localToday(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 export default function OwnerTasksPage() {
@@ -26,6 +33,7 @@ export default function OwnerTasksPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [today] = useState(localToday);
 
   const [title, setTitle] = useState('');
   const [note, setNote] = useState('');
@@ -127,33 +135,52 @@ export default function OwnerTasksPage() {
 
   const open = tasks.filter((t) => t.status !== 'done');
   const done = tasks.filter((t) => t.status === 'done');
+  const overdueCount = open.filter((t) => t.dueDate && t.dueDate < today).length;
 
   return (
-    <div className="space-y-4 text-left">
-      <div className="-mx-4 -mt-4 sm:-mx-6 md:mx-0 md:mt-0">
-        <HeroHeader
-          eyebrow={<><ClipboardList className="h-3 w-3" /> Tasks</>}
-          title={isStaff ? 'My Tasks' : 'Staff Tasks'}
-          subtitle={isStaff ? 'Your assigned and general tasks' : 'Assign and track work for your staff'}
-          right={
-            !isStaff ? (
-              <button
-                type="button"
-                onClick={() => setShowForm((s) => !s)}
-                className="inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-2 text-xs font-bold accent-text shadow-sm press"
-              >
-                <Plus className="h-3.5 w-3.5" /> New
-              </button>
-            ) : undefined
-          }
-        />
-      </div>
+    <div className="space-y-5 text-left">
+      <PageHeader
+        icon="doc-green"
+        tint="mint"
+        title={isStaff ? 'My Tasks' : 'Staff Tasks'}
+        subtitle={isStaff ? 'Your assigned and general tasks' : 'Assign and track work for your staff'}
+        actions={
+          !isStaff ? (
+            <Button onClick={() => setShowForm((s) => !s)} aria-expanded={showForm}>
+              <Plus className="h-4 w-4" /> New task
+            </Button>
+          ) : undefined
+        }
+      />
+
+      {loading ? (
+        <StatGridSkeleton count={4} />
+      ) : (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 stagger">
+          <StatTile icon="clock" tint="violet" label="To Do" value={open.length} />
+          <StatTile icon="alert" tint="peach" label="Overdue" value={overdueCount} />
+          <StatTile icon="check" tint="mint" label="Completed" value={done.length} />
+          <StatTile icon="doc-green" tint="sky" label="Total Tasks" value={tasks.length} />
+        </div>
+      )}
 
       {showForm && !isStaff && (
-        <section className="app-card p-4 space-y-3">
-          <Input label="Task" placeholder="e.g. Clean 2nd floor common area" value={title} onChange={(e) => setTitle(e.target.value)} disabled={posting} />
-          <Input label="Note (optional)" placeholder="Any detail" value={note} onChange={(e) => setNote(e.target.value)} disabled={posting} />
-          <div className="grid grid-cols-2 gap-2">
+        <SectionCard title="New task" icon="doc-green" className="animate-pop" bodyClassName="space-y-4">
+          <Input
+            label="Task"
+            placeholder="e.g. Clean 2nd floor common area"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            disabled={posting}
+          />
+          <Input
+            label="Note (optional)"
+            placeholder="Any detail"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            disabled={posting}
+          />
+          <div className="grid grid-cols-1 min-[380px]:grid-cols-2 gap-3">
             <Dropdown
               label="Assign to"
               id="task-assignee"
@@ -163,39 +190,58 @@ export default function OwnerTasksPage() {
             />
             <Input label="Due date" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} disabled={posting} />
           </div>
-          <Button size="sm" variant="solid" loading={posting} onClick={addTask}>
-            <Plus className="h-3.5 w-3.5 mr-1" /> Add task
-          </Button>
-        </section>
+          <div className="flex justify-end">
+            <Button variant="solid" loading={posting} onClick={addTask} className="w-full sm:w-auto">
+              <Plus className="h-4 w-4" /> Add task
+            </Button>
+          </div>
+        </SectionCard>
       )}
 
       {loading ? (
-        <CardListSkeleton rows={3} height="h-16" />
+        <ListSkeleton rows={4} />
       ) : tasks.length === 0 ? (
-        <div className="app-card p-6">
+        <div className="app-card">
           <EmptyState
-            icon={<ClipboardList className="w-6 h-6 accent-text" />}
+            icon3d="doc-green"
             title={isStaff ? 'No tasks assigned' : 'No tasks yet'}
             description={isStaff ? 'Tasks your owner assigns will appear here.' : 'Add a task to assign work to your staff.'}
-            action={!isStaff ? <Button size="sm" variant="solid" onClick={() => setShowForm(true)}><Plus className="h-3.5 w-3.5 mr-1" /> New task</Button> : undefined}
+            action={
+              !isStaff ? (
+                <Button variant="solid" onClick={() => setShowForm(true)}>
+                  <Plus className="h-4 w-4" /> New task
+                </Button>
+              ) : undefined
+            }
           />
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-5">
           {open.length > 0 && (
-            <div className="space-y-2">
-              {open.map((t) => (
-                <TaskRow key={t.id} t={t} busy={busyId === t.id} onToggle={() => toggle(t)} onRemove={!isStaff ? () => remove(t.id) : undefined} />
-              ))}
-            </div>
+            <SectionCard
+              title="To do"
+              icon="clock"
+              action={<span className="chip font-mono-numbers">{open.length}</span>}
+            >
+              <ul className="divide-y divide-line stagger">
+                {open.map((t) => (
+                  <TaskRow key={t.id} t={t} today={today} busy={busyId === t.id} onToggle={() => toggle(t)} onRemove={!isStaff ? () => remove(t.id) : undefined} />
+                ))}
+              </ul>
+            </SectionCard>
           )}
           {done.length > 0 && (
-            <div className="space-y-2">
-              <h2 className="text-[11px] font-bold uppercase tracking-wide text-[#94A3B8] px-1">Completed</h2>
-              {done.map((t) => (
-                <TaskRow key={t.id} t={t} busy={busyId === t.id} onToggle={() => toggle(t)} onRemove={!isStaff ? () => remove(t.id) : undefined} />
-              ))}
-            </div>
+            <SectionCard
+              title="Completed"
+              icon="check"
+              action={<span className="chip font-mono-numbers">{done.length}</span>}
+            >
+              <ul className="divide-y divide-line stagger">
+                {done.map((t) => (
+                  <TaskRow key={t.id} t={t} today={today} busy={busyId === t.id} onToggle={() => toggle(t)} onRemove={!isStaff ? () => remove(t.id) : undefined} />
+                ))}
+              </ul>
+            </SectionCard>
           )}
         </div>
       )}
@@ -205,43 +251,87 @@ export default function OwnerTasksPage() {
 
 function TaskRow({
   t,
+  today,
   busy,
   onToggle,
   onRemove,
 }: {
   t: StaffTask;
+  today: string;
   busy: boolean;
   onToggle: () => void;
   onRemove?: () => void;
 }) {
   const done = t.status === 'done';
+  const overdue = !done && t.dueDate ? t.dueDate < today : false;
+  const dueToday = !done && t.dueDate === today;
   return (
-    <div className={`app-card p-3.5 flex items-center gap-3 ${done ? 'opacity-70' : ''}`}>
+    <li className="flex items-center gap-2 py-2.5 first:pt-0.5 last:pb-0.5">
+      {/* Round checkbox — 44px hit area around a 28px violet circle. */}
       <button
         type="button"
         onClick={onToggle}
         disabled={busy}
-        className={`shrink-0 h-7 w-7 rounded-full flex items-center justify-center border-2 ${
-          done ? 'accent-bg border-transparent text-white' : 'border-[#CBD5E1] text-transparent'
-        }`}
+        className="group -ml-1.5 grid h-11 w-11 shrink-0 place-items-center rounded-full disabled:opacity-50 press"
         aria-label={done ? 'Mark open' : 'Mark done'}
       >
-        {done ? <Check className="h-4 w-4" /> : <CircleDashed className="h-4 w-4 text-[#CBD5E1]" />}
+        <span
+          className={`grid h-7 w-7 place-items-center rounded-full transition-all ${
+            done
+              ? 'bg-[image:var(--grad-brand)] text-white shadow-[var(--shadow-brand)]'
+              : 'border-2 border-brand-300 bg-white text-transparent group-hover:border-brand group-hover:text-brand-300'
+          }`}
+        >
+          <Check className="h-4 w-4" strokeWidth={3} />
+        </span>
       </button>
+
       <div className="min-w-0 flex-1">
-        <div className={`text-sm font-semibold text-[#0F172A] ${done ? 'line-through' : ''}`}>{t.title}</div>
-        {t.note && <div className="text-[11px] text-[#64748B] truncate">{t.note}</div>}
-        <div className="text-[11px] text-[#94A3B8] mt-0.5">
-          {t.assignedToName ? `${t.assignedToName}` : 'Any staff'}
-          {t.dueDate ? ` · due ${formatDateIN(t.dueDate)}` : ''}
-          {done && t.completedAt ? ` · done ${formatDateIN(tsToDate(t.completedAt))}` : ''}
+        <div
+          className={`text-[14.5px] font-bold leading-snug break-words ${
+            done ? 'text-muted line-through decoration-brand-300' : 'text-ink'
+          }`}
+        >
+          {t.title}
+        </div>
+        {t.note && <div className="truncate text-[12.5px] font-medium text-muted">{t.note}</div>}
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          <Badge variant="neutral">
+            <UserRound className="h-3 w-3" />
+            {t.assignedToName ? `${t.assignedToName}` : 'Any staff'}
+          </Badge>
+          {t.dueDate &&
+            (overdue ? (
+              <Badge variant="danger" className="font-mono-numbers">
+                <CalendarDays className="h-3 w-3" /> Overdue · {formatDateIN(t.dueDate)}
+              </Badge>
+            ) : dueToday ? (
+              <Badge variant="pending" className="font-mono-numbers">
+                <CalendarDays className="h-3 w-3" /> Due today
+              </Badge>
+            ) : (
+              <span className="chip font-mono-numbers">
+                <CalendarDays className="h-3.5 w-3.5" /> Due {formatDateIN(t.dueDate)}
+              </span>
+            ))}
+          {done && t.completedAt ? (
+            <Badge variant="paid" className="font-mono-numbers">
+              <Check className="h-3 w-3" strokeWidth={3} /> Done {formatDateIN(tsToDate(t.completedAt))}
+            </Badge>
+          ) : null}
         </div>
       </div>
+
       {onRemove && (
-        <button type="button" onClick={onRemove} className="shrink-0 text-[#DC2626] hover:bg-[#FEF2F2] rounded-[8px] p-2" aria-label="Delete task">
+        <button
+          type="button"
+          onClick={onRemove}
+          className="inline-grid h-11 w-11 shrink-0 place-items-center rounded-full text-faint transition-colors hover:bg-danger-bg hover:text-danger press"
+          aria-label="Delete task"
+        >
           <Trash2 className="h-4 w-4" />
         </button>
       )}
-    </div>
+    </li>
   );
 }

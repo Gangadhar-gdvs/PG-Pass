@@ -3,31 +3,34 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Menu, Plus, X } from 'lucide-react';
+import { LayoutGrid, Plus, X } from 'lucide-react';
+import { IconTile, type Icon3DName, type Tint } from '@/components/brand/Icon3D';
 
 export interface TabItem {
   href: string;
   label: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number; fill?: string; fillOpacity?: number }>;
+  /** 3D icon used for this destination inside the More / quick sheets. */
+  icon3d?: Icon3DName;
+  tint?: Tint;
+  /** Short helper line in sheets. */
+  description?: string;
 }
 
 export interface CenterAction {
   label: string;
-  icon?: React.ComponentType<{ className?: string }>;
-  onClick: () => void;
+  icon?: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+  /** Either run a callback… */
+  onClick?: () => void;
+  /** …or open a quick-actions sheet with these destinations. */
+  items?: TabItem[];
 }
 
 /**
- * Bottom tab bar (bold mobile-app style), flush to the screen edge with a
- * rounded top. Shows a few ESSENTIAL tabs plus a "More" button that opens a
- * full-menu sheet. The theme accent is inherited from the panel's `theme-*`
- * class.
- *
- * - `primary`: the 2–4 essential tabs shown directly in the bar. The ACTIVE one
- *   renders as an icon-only circular accent pill (no label).
- * - `center`: optional prominent "+" action (e.g. resident "Find a PG").
- * - `more`: everything else, revealed in the full-menu sheet. The "More" button
- *   itself shows as active when the current route is one of these items.
+ * Bottom navigation from the reference screens: a frosted white bar with
+ * rounded top, icon + label tabs (active = violet with an underline marker),
+ * and a raised violet gradient FAB in the middle wrapped in a white halo.
+ * Overflow destinations live in a "More" sheet of 3D tiles.
  */
 export function BottomTabBar({
   primary,
@@ -42,159 +45,191 @@ export function BottomTabBar({
 }) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [quickOpen, setQuickOpen] = useState(false);
   // Optimistic navigation feedback: the tapped tab lights up IMMEDIATELY (before
-  // the route commits) so on a slow network the owner sees the tap registered
-  // and doesn't tap repeatedly thinking it's "stuck".
+  // the route commits) so on a slow network the user sees the tap registered.
   const [pendingHref, setPendingHref] = useState<string | null>(null);
   // Clear the optimistic highlight DURING render once the real route has caught
-  // up (React's "adjust state while rendering" pattern — preferred over an effect
-  // that calls setState, which causes cascading renders). `matchesPath` mirrors
-  // the active-route test so a pending tab is dropped as soon as its route lands.
+  // up (React's "adjust state while rendering" pattern).
   const matchesPath = (href: string) => pathname === href || pathname.startsWith(href + '/');
   if (pendingHref && matchesPath(pendingHref)) {
     setPendingHref(null);
   }
   const isActive = (href: string) => (pendingHref ? pendingHref === href : matchesPath(href));
 
-  // "More" is active when the current route lives in the more-menu AND no
-  // primary tab already owns it (primary takes precedence, so a route can never
-  // light up both a primary tab and the More button at once).
   const primaryActive = primary.some((p) => isActive(p.href));
   const moreActive = !primaryActive && more.some((m) => isActive(m.href));
 
-  // Active tab = icon only, inside a filled circular accent pill (no text).
-  // Inactive tabs = icon + small label in muted grey.
-  const Tab = ({ item }: { item: TabItem }) => {
+  const tabShell = (active: boolean, label: string, children: React.ReactNode) => (
+    <span className="relative flex min-w-[56px] flex-col items-center justify-center gap-1 pt-1 pb-2">
+      <span className={active ? 'text-brand' : 'text-faint'}>{children}</span>
+      <span className={`text-[11px] leading-none ${active ? 'font-bold text-brand-700' : 'font-semibold text-muted'}`}>
+        {label}
+      </span>
+      <span
+        aria-hidden
+        className={`absolute -bottom-0.5 h-[3px] rounded-full bg-[image:var(--grad-brand)] transition-all duration-300 ${
+          active ? 'w-9 opacity-100' : 'w-0 opacity-0'
+        }`}
+      />
+    </span>
+  );
+
+  const renderTab = (item: TabItem) => {
     const Icon = item.icon;
     const active = isActive(item.href);
-    if (active) {
-      return (
-        <Link
-          href={item.href}
-          onClick={() => setPendingHref(item.href)}
-          aria-current="page"
-          aria-label={item.label}
-          className="flex items-center justify-center min-w-[52px]"
-        >
-          <span className="accent-bg w-12 h-12 rounded-full flex items-center justify-center shadow-[0_6px_16px_-4px_rgba(15,23,42,0.35)] press">
-            <Icon className="w-[22px] h-[22px]" />
-          </span>
-        </Link>
-      );
-    }
     return (
       <Link
+        key={item.href}
         href={item.href}
         onClick={() => setPendingHref(item.href)}
-        className="flex flex-col items-center justify-center gap-0.5 min-w-[52px] min-h-[48px] press text-slate-400"
+        aria-current={active ? 'page' : undefined}
+        className="flex flex-1 justify-center press"
       >
-        <Icon className="w-[22px] h-[22px]" />
-        <span className="text-[10px] font-semibold">{item.label}</span>
+        {tabShell(
+          active,
+          item.label,
+          <Icon
+            className="h-6 w-6"
+            strokeWidth={active ? 2.3 : 2}
+            fill={active ? 'currentColor' : 'none'}
+            fillOpacity={active ? 0.16 : 0}
+          />
+        )}
       </Link>
     );
   };
 
+  const leftCount = center ? Math.ceil(Math.min(primary.length, 4) / 2) : 0;
+  const leftTabs = center ? primary.slice(0, leftCount) : primary.slice(0, 4);
+  const rightTabs = center ? primary.slice(leftCount, 4) : [];
+
+  const onCenter = () => {
+    if (!center) return;
+    if (center.onClick) center.onClick();
+    else if (center.items?.length) setQuickOpen(true);
+  };
+  const CenterIcon = center?.icon || Plus;
+
+  const sheetGrid = (items: TabItem[], onPick: () => void) => (
+    <div className="grid grid-cols-3 gap-2.5">
+      {items.map((item) => {
+        const Icon = item.icon;
+        const active = isActive(item.href);
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            onClick={() => {
+              setPendingHref(item.href);
+              onPick();
+            }}
+            className={`tint-card tint-${item.tint || 'violet'} flex flex-col items-center justify-center gap-2 px-1.5 py-3.5 text-center press ${
+              active ? 'ring-2 ring-brand/60' : ''
+            }`}
+          >
+            {item.icon3d ? (
+              <IconTile icon={item.icon3d} tint={item.tint || 'violet'} size={44} className="!bg-white/70 !shadow-none" />
+            ) : (
+              <span className="grid h-11 w-11 place-items-center rounded-2xl bg-white/70 text-brand">
+                <Icon className="h-6 w-6" />
+              </span>
+            )}
+            <span className="text-[12px] font-bold leading-tight text-ink">{item.label}</span>
+          </Link>
+        );
+      })}
+    </div>
+  );
+
+  const sheet = (title: string, onClose: () => void, children: React.ReactNode) => (
+    <div className="md:hidden fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label={title}>
+      <div className="absolute inset-0 bg-[#1A1458]/35 backdrop-blur-[3px] animate-fade" onClick={onClose} />
+      <div
+        className="absolute inset-x-0 bottom-0 overflow-hidden rounded-t-[30px] border border-white bg-[linear-gradient(180deg,#F9F6FF_0%,#F0EAFF_100%)] px-4 pt-2.5 shadow-[0_-20px_60px_-20px_rgba(40,20,120,0.5)] animate-sheet"
+        style={{ paddingBottom: 'calc(1.25rem + env(safe-area-inset-bottom))' }}
+      >
+        <div aria-hidden className="pointer-events-none absolute -top-16 -right-10 h-44 w-44 rounded-full bg-[#C9B0FF]/40 blur-3xl" />
+        <div className="relative flex justify-center pb-2">
+          <span className="h-1.5 w-11 rounded-full bg-[#D5CBF5]" />
+        </div>
+        <div className="relative mb-4 flex items-center justify-between">
+          <span className="text-[17px] font-extrabold tracking-[-0.015em] text-ink">{title}</span>
+          <button
+            type="button"
+            onClick={onClose}
+            className="grid h-10 w-10 place-items-center rounded-full bg-white text-ink-2 shadow-[0_6px_14px_-8px_rgba(70,40,160,0.4)] press"
+            aria-label="Close menu"
+          >
+            <X className="h-4.5 w-4.5" />
+          </button>
+        </div>
+        <div className="relative">{children}</div>
+      </div>
+    </div>
+  );
+
   return (
     <>
-      {/* Bottom bar — flush to the edge, rounded top corners only */}
-      <nav className="md:hidden fixed inset-x-0 bottom-0 z-40">
+      <nav className="md:hidden fixed inset-x-0 bottom-0 z-40" aria-label="Primary">
         <div
-          className="flex items-center justify-around bg-white rounded-t-[24px] px-2 pt-2 border-t border-slate-100 shadow-[0_-8px_30px_-12px_rgba(15,23,42,0.18)]"
-          style={{ paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom))' }}
+          className="relative flex items-end justify-around rounded-t-[30px] border-t border-white bg-[rgba(252,250,255,0.86)] px-1.5 pt-2.5 shadow-[0_-12px_34px_-14px_rgba(70,40,160,0.32)] backdrop-blur-xl"
+          style={{ paddingBottom: 'calc(0.35rem + env(safe-area-inset-bottom))' }}
         >
-          {/* With a center action, split the primary tabs EVENLY around it so the
-              bar stays balanced regardless of tab count; otherwise render all
-              four inline. */}
-          {center
-            ? primary.slice(0, Math.ceil(primary.length / 2)).map((t) => <Tab key={t.href} item={t} />)
-            : primary.slice(0, 4).map((t) => <Tab key={t.href} item={t} />)}
+          {leftTabs.map(renderTab)}
 
           {center && (
-            <button
-              type="button"
-              onClick={center.onClick}
-              aria-label={center.label}
-              className="accent-bg -mt-6 w-14 h-14 rounded-full flex items-center justify-center shadow-[0_8px_24px_-6px_rgba(15,23,42,0.4)] press"
-            >
-              {center.icon ? <center.icon className="w-6 h-6" /> : <Plus className="w-6 h-6" />}
-            </button>
+            <div className="flex flex-1 justify-center">
+              <button
+                type="button"
+                onClick={onCenter}
+                aria-label={center.label}
+                className="relative -mt-9 grid h-[66px] w-[66px] place-items-center rounded-full bg-[image:var(--grad-brand)] text-white ring-[7px] ring-white/90 shadow-[0_14px_30px_-8px_rgba(106,43,234,0.7),0_0_0_12px_rgba(206,186,255,0.35)] press"
+              >
+                <span aria-hidden className="absolute inset-x-3 top-1.5 h-1/3 rounded-full bg-white/25 blur-[2px]" />
+                <CenterIcon className="relative h-7 w-7" strokeWidth={2.6} />
+              </button>
+            </div>
           )}
 
-          {center && primary.slice(Math.ceil(primary.length / 2)).map((t) => <Tab key={t.href} item={t} />)}
+          {rightTabs.map(renderTab)}
 
           {more.length > 0 && (
             <button
               type="button"
               onClick={() => setMenuOpen(true)}
               aria-label="More"
-              className={`flex flex-col items-center justify-center gap-0.5 min-w-[52px] min-h-[48px] press ${
-                moreActive ? '' : 'text-slate-400'
-              }`}
+              aria-expanded={menuOpen}
+              className="flex flex-1 justify-center press"
             >
-              {moreActive ? (
-                <span className="accent-bg w-12 h-12 rounded-full flex items-center justify-center shadow-[0_6px_16px_-4px_rgba(15,23,42,0.35)]">
-                  <Menu className="w-[22px] h-[22px]" />
-                </span>
-              ) : (
-                <>
-                  <Menu className="w-[22px] h-[22px]" />
-                  <span className="text-[10px] font-semibold">More</span>
-                </>
+              {tabShell(
+                moreActive,
+                'More',
+                <LayoutGrid
+                  className="h-6 w-6"
+                  strokeWidth={moreActive ? 2.3 : 2}
+                  fill={moreActive ? 'currentColor' : 'none'}
+                  fillOpacity={moreActive ? 0.16 : 0}
+                />
               )}
             </button>
           )}
         </div>
       </nav>
 
-      {/* Full-menu sheet — lists ONLY the overflow (more) items, never the ones
-          already present in the primary bottom tabs. */}
-      {menuOpen && (
-        <div className="md:hidden fixed inset-0 z-50" role="dialog" aria-modal="true">
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setMenuOpen(false)} />
-          <div
-            className="absolute inset-x-0 bottom-0 bg-white rounded-t-[24px] p-5 animate-pop"
-            style={{ paddingBottom: 'calc(1.25rem + env(safe-area-inset-bottom))' }}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-sm font-bold text-slate-900">Menu</span>
-              <button
-                type="button"
-                onClick={() => setMenuOpen(false)}
-                className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center press"
-                aria-label="Close menu"
-              >
-                <X className="w-4 h-4 text-slate-600" />
-              </button>
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              {more.map((item) => {
-                const Icon = item.icon;
-                const active = isActive(item.href);
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={() => {
-                      setPendingHref(item.href);
-                      setMenuOpen(false);
-                    }}
-                    className="flex flex-col items-center justify-center gap-2 py-4 rounded-[16px] press"
-                    style={
-                      active
-                        ? { background: 'var(--accent-tint)', color: 'var(--accent)' }
-                        : { background: '#F8FAFC', color: '#334155' }
-                    }
-                  >
-                    <Icon className="w-6 h-6" />
-                    <span className="text-[11px] font-semibold text-center leading-tight">{item.label}</span>
-                  </Link>
-                );
-              })}
-            </div>
-            {footer && <div className="mt-4 pt-4 border-t border-slate-100">{footer}</div>}
-          </div>
-        </div>
-      )}
+      {menuOpen &&
+        sheet(
+          'Menu',
+          () => setMenuOpen(false),
+          <>
+            {sheetGrid(more, () => setMenuOpen(false))}
+            {footer && <div className="mt-4 border-t border-white/80 pt-4">{footer}</div>}
+          </>
+        )}
+
+      {quickOpen &&
+        center?.items &&
+        sheet(center.label, () => setQuickOpen(false), sheetGrid(center.items, () => setQuickOpen(false)))}
     </>
   );
 }

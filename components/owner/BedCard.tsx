@@ -3,14 +3,17 @@
 import React from 'react';
 import { Bed, RentRecord } from '@/types';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { formatCurrency, getWhatsAppLink } from '@/lib/utils';
 import { Avatar } from '@/components/ui/avatar';
+import { Icon3D, type Tint } from '@/components/brand/Icon3D';
 import {
   UserPlus,
   Send,
   Check,
   Eye,
   ChevronRight,
+  Snowflake,
 } from 'lucide-react';
 
 interface BedCardProps {
@@ -24,6 +27,34 @@ interface BedCardProps {
   onVerifyProof: (bed: Bed, record: RentRecord) => void;
   onVacate: (bed: Bed) => void;
   onSelectBed?: (bed: Bed) => void;
+}
+
+/**
+ * Round white 44px icon button used on pastel bed tiles / rows (the kit has no
+ * icon-only button). `title` doubles as the accessible name.
+ */
+export function TileIconButton({
+  title,
+  onClick,
+  className = '',
+  children,
+}: {
+  title: string;
+  onClick: (e: React.MouseEvent) => void;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      title={title}
+      aria-label={title}
+      onClick={onClick}
+      className={`grid h-11 w-11 shrink-0 place-items-center rounded-full border border-white bg-white/85 shadow-[0_6px_14px_-8px_rgba(70,40,160,0.45)] transition-colors hover:bg-white press [&>svg]:h-4 [&>svg]:w-4 ${className}`}
+    >
+      {children}
+    </button>
+  );
 }
 
 export function BedCard({
@@ -48,18 +79,19 @@ export function BedCard({
   const isVerify = rentRecord?.status === 'verify';
   const noBill = !isVacant && !isGuest && !rentRecord;
 
-  // Left status bar color (guest = violet, distinct from monthly tenants)
-  const statusColor = isVacant
-    ? 'bg-[#CBD5E1]'
+  // Tile tint encodes the status (guest = sky, distinct from monthly tenants):
+  // paid → mint · due → peach · verify → violet · vacant / no bill → slate.
+  const tint: Tint = isVacant
+    ? 'slate'
     : isGuest
-    ? 'bg-[#8B5CF6]'
+    ? 'sky'
     : isPaid
-    ? 'bg-[#10B981]'
+    ? 'mint'
     : isVerify
-    ? 'bg-[#6366F1]'
+    ? 'violet'
     : noBill
-    ? 'bg-[#CBD5E1]'
-    : 'bg-[#F59E0B]';
+    ? 'slate'
+    : 'peach';
 
   const handleSendReminder = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -76,132 +108,126 @@ export function BedCard({
   return (
     <div
       onClick={() => onSelectBed ? onSelectBed(bed) : isVacant ? onAddTenant(bed) : undefined}
-      className="group relative bg-white border border-[#E2E8F0] hover:border-[#D97706] rounded-[10px] p-3.5 shadow-xs hover:shadow-[0_4px_16px_rgba(217,119,6,0.08)] transition-all duration-150 flex flex-col justify-between cursor-pointer overflow-hidden text-left"
+      className={`tint-card tint-${tint} @container group relative flex h-full cursor-pointer flex-col gap-2.5 p-3 text-left press lift ${
+        isVacant ? 'border-dashed border-line-strong' : ''
+      }`}
     >
-      {/* 3.5px Left Status Bar Indicator */}
-      <div className={`absolute top-0 bottom-0 left-0 w-1 ${statusColor}`} />
-
-      {/* Top Details */}
-      <div>
-        <div className="flex items-center justify-between pl-1">
-          <div className="flex items-center gap-1.5">
-            <span className="font-mono-numbers font-bold text-xs text-[#09090B] tracking-tight">
-              {bed.bedLabel}
-            </span>
-            {bed.sharingType && (
-              <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded-[4px] bg-[#F1F5F9] text-[#475569] border border-[#E2E8F0]">
-                {bed.sharingType === '1' ? 'Single' : `${bed.sharingType}-Share`}
-              </span>
-            )}
-            {bed.acType === 'ac' && (
-              <span className="text-[9px] font-extrabold uppercase px-1 py-0.5 rounded-[3px] bg-[#E0F2FE] text-[#0369A1]">
-                AC
-              </span>
-            )}
-          </div>
-          {isVacant ? (
-            <Badge variant="vacant">Vacant</Badge>
-          ) : isGuest ? (
-            <span className="inline-flex items-center gap-1 text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-[#F5F3FF] text-[#6D28D9] border border-[#DDD6FE]">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#8B5CF6]" />
-              Guest
-            </span>
-          ) : isPaid ? (
-            <Badge variant="paid" dot>Paid</Badge>
-          ) : isVerify ? (
-            <Badge variant="verify" dot>Verify</Badge>
-          ) : noBill ? (
-            <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#F1F5F9] text-[#64748B] border border-[#E2E8F0]">
-              No bill
-            </span>
-          ) : (
-            <Badge variant="amber" dot>Due</Badge>
-          )}
-        </div>
-
-        {/* Middle: Resident or Vacant Info */}
-        <div className="mt-2.5 mb-2 pl-1">
-          {isVacant ? (
-            <div className="py-1.5">
-              <span className="text-[11px] text-[#94A3B8] block">Available Unit</span>
-              <span className="text-xs font-bold font-mono-numbers text-[#09090B]">
-                {formatCurrency(bed.monthlyRent)}/mo
-              </span>
-            </div>
-          ) : (
-            <div className="space-y-1">
-              <div className="flex items-center gap-1.5">
-                <Avatar name={bed.tenantName || 'R'} size="sm" />
-                <span className="text-xs font-semibold text-[#09090B] truncate max-w-[110px]">
-                  {bed.tenantName}
-                </span>
-              </div>
-              <div className="text-[11px] font-mono-numbers text-[#64748B]">
-                {formatCurrency(bed.monthlyRent)}/mo
-              </div>
-            </div>
-          )}
-        </div>
+      {/* Bed label + status */}
+      <div className="flex flex-wrap items-center justify-between gap-1.5">
+        <span className="flex min-w-0 items-center gap-1.5">
+          <Icon3D name="bed" size={24} />
+          <span className="truncate font-mono-numbers text-[15px] font-extrabold tracking-[-0.01em] text-ink">
+            {bed.bedLabel}
+          </span>
+        </span>
+        {isVacant ? (
+          <Badge variant="vacant">Vacant</Badge>
+        ) : isGuest ? (
+          <Badge variant="cyan" dot>Guest</Badge>
+        ) : isPaid ? (
+          <Badge variant="paid" dot>Paid</Badge>
+        ) : isVerify ? (
+          <Badge variant="verify" dot>Verify</Badge>
+        ) : noBill ? (
+          <Badge variant="default">No bill</Badge>
+        ) : (
+          <Badge variant="pending" dot>Due</Badge>
+        )}
       </div>
 
-      {/* Action Footer */}
-      <div className="pt-2 border-t border-[#E2E8F0] pl-1 flex items-center justify-between">
+      {(bed.sharingType || bed.acType === 'ac') && (
+        <div className="flex flex-wrap gap-1">
+          {bed.sharingType && (
+            <span className="rounded-full bg-white/75 px-2 py-0.5 text-[11px] font-semibold text-ink-2">
+              {bed.sharingType === '1' ? 'Single' : `${bed.sharingType}-Share`}
+            </span>
+          )}
+          {bed.acType === 'ac' && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-info-bg px-2 py-0.5 text-[11px] font-semibold text-info-ink">
+              <Snowflake className="h-3 w-3" />
+              AC
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Resident or vacant info */}
+      <div className="min-w-0 flex-1">
         {isVacant ? (
-          <button
-            type="button"
+          <div>
+            <span className="block text-xs font-medium text-muted">Available Unit</span>
+            <span className="font-mono-numbers text-sm font-extrabold text-ink">
+              {formatCurrency(bed.monthlyRent)}/mo
+            </span>
+          </div>
+        ) : (
+          <div className="flex min-w-0 items-center gap-2">
+            <Avatar name={bed.tenantName || 'R'} size="sm" />
+            <div className="min-w-0">
+              <span className="block truncate text-[13px] font-bold text-ink">{bed.tenantName}</span>
+              <span className="block font-mono-numbers text-[11.5px] font-medium text-muted">
+                {formatCurrency(bed.monthlyRent)}/mo
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Actions */}
+      <div className="flex flex-wrap items-center gap-1.5 border-t border-white/80 pt-2.5">
+        {isVacant ? (
+          <Button
+            variant="outline"
+            className="w-full"
             onClick={(e) => {
               e.stopPropagation();
               onAddTenant(bed);
             }}
-            className="w-full flex items-center justify-center gap-1 py-1 rounded-[6px] bg-[#F8FAFC] hover:bg-[#FEF3C7] text-[#D97706] text-[11px] font-semibold transition-colors cursor-pointer"
           >
-            <UserPlus className="w-3 h-3" />
-            <span>Assign Resident</span>
-          </button>
+            <UserPlus className="h-4 w-4" />
+            <span>
+              Assign<span className="sr-only @[11rem]:not-sr-only"> Resident</span>
+            </span>
+          </Button>
         ) : (
-          <div className="w-full flex items-center justify-between text-xs">
-            <div className="flex items-center gap-1">
-              {isVerify && rentRecord && (
-                <button
-                  type="button"
-                  title="Verify Proof"
+          <>
+            {isVerify && rentRecord && (
+              <TileIconButton
+                title="Verify Proof"
+                className="text-brand-700"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onVerifyProof(bed, rentRecord);
+                }}
+              >
+                <Eye />
+              </TileIconButton>
+            )}
+
+            {!isPaid && (
+              <>
+                <TileIconButton
+                  title="Send WhatsApp Reminder"
+                  className="text-success-ink"
+                  onClick={handleSendReminder}
+                >
+                  <Send />
+                </TileIconButton>
+                <TileIconButton
+                  title="Mark Rent as Paid"
+                  className="text-brand-700"
                   onClick={(e) => {
                     e.stopPropagation();
-                    onVerifyProof(bed, rentRecord);
+                    onMarkPaid(bed, rentRecord);
                   }}
-                  className="p-1 rounded-[4px] text-[#6366F1] hover:bg-[#EEF2FF] transition-colors cursor-pointer"
                 >
-                  <Eye className="w-3.5 h-3.5" />
-                </button>
-              )}
+                  <Check strokeWidth={2.6} />
+                </TileIconButton>
+              </>
+            )}
 
-              {!isPaid && (
-                <>
-                  <button
-                    type="button"
-                    title="Send WhatsApp Reminder"
-                    onClick={handleSendReminder}
-                    className="p-1 rounded-[4px] text-[#10B981] hover:bg-[#ECFDF5] transition-colors cursor-pointer"
-                  >
-                    <Send className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    title="Mark Rent as Paid"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onMarkPaid(bed, rentRecord);
-                    }}
-                    className="p-1 rounded-[4px] text-[#D97706] hover:bg-[#FEF3C7] transition-colors cursor-pointer"
-                  >
-                    <Check className="w-3.5 h-3.5" />
-                  </button>
-                </>
-              )}
-            </div>
-
-            <ChevronRight className="w-3.5 h-3.5 text-[#94A3B8] group-hover:text-[#D97706] transition-colors" />
-          </div>
+            <ChevronRight className="ml-auto h-4 w-4 shrink-0 text-ink-2/50 transition-colors group-hover:text-brand" />
+          </>
         )}
       </div>
     </div>

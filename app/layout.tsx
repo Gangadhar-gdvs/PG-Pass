@@ -1,23 +1,26 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
 import { Toaster } from "react-hot-toast";
 import "./globals.css";
 
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
+// One friendly geometric sans for the whole product (matches the reference
+// screens' rounded, bold headings). Mono is reserved for tokens/IDs only.
+const jakarta = Plus_Jakarta_Sans({
+  subsets: ["latin", "latin-ext"],
+  variable: "--font-jakarta",
   display: "swap",
 });
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
-  variable: "--font-mono",
+  variable: "--font-mono-face",
   display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "PGPass — Luxury PG Inventory & Instant Rent Settlement",
-  description: "Bento-grade PG bed inventory management, 1-tap WhatsApp rent settlement, and compliant HRA tax receipts.",
+  title: "PGPass — Smart PG Management, Made Easy",
+  description:
+    "A complete solution for PG owners and residents to manage hostels, rooms, rent, maintenance and notices — all in one place.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
@@ -27,7 +30,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#D97706",
+  themeColor: "#EEE8FE",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -40,26 +43,29 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable} h-full`}>
+    <html lang="en" className={`${jakarta.variable} ${jetbrainsMono.variable} h-full`}>
       <head>
         <link rel="icon" href="/icon.svg" type="image/svg+xml" />
         <link rel="apple-touch-icon" href="/icon.svg" />
       </head>
-      <body className="min-h-full antialiased text-[#09090B] bg-[#F8FAFC] selection:bg-[#FEF3C7] selection:text-[#B45309]">
+      <body className="min-h-full antialiased font-sans text-ink">
         {children}
         <Toaster
           position="top-center"
           toastOptions={{
             duration: 3500,
             style: {
-              background: "#FFFFFF",
-              color: "#09090B",
-              border: "1px solid #E2E8F0",
-              borderRadius: "8px",
-              boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04)",
+              background: "rgba(255,255,255,0.96)",
+              color: "#1A1870",
+              border: "1px solid #EDE7FD",
+              borderRadius: "16px",
+              padding: "10px 14px",
+              boxShadow: "0 18px 40px -14px rgba(70, 40, 160, 0.35)",
               fontSize: "13px",
-              fontWeight: 500,
+              fontWeight: 600,
             },
+            success: { iconTheme: { primary: "#17A06B", secondary: "#FFFFFF" } },
+            error: { iconTheme: { primary: "#E5484D", secondary: "#FFFFFF" } },
           }}
         />
       </body>

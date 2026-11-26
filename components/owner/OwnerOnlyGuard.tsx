@@ -3,6 +3,7 @@
 import React, { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useOwnerSession } from '@/hooks/useOwner';
+import { EmptyState } from '@/components/ui/empty-state';
 
 /**
  * Client guard for owner-only pages (Settings, Billing, Staff management).
@@ -20,6 +21,19 @@ export function OwnerOnlyGuard({ children }: { children: React.ReactNode }) {
     if (!allowed) router.replace('/dashboard');
   }, [allowed, router]);
 
-  if (!allowed) return null;
+  if (!allowed) {
+    // Shown only for the instant before the redirect lands.
+    return (
+      <div className="mx-auto max-w-md pt-6 animate-fade-up" role="status">
+        <div className="app-card">
+          <EmptyState
+            illustration="shield-orbit"
+            title="Owner access only"
+            description="This page is only available to the PG owner. Taking you to the dashboard…"
+          />
+        </div>
+      </div>
+    );
+  }
   return <>{children}</>;
 }

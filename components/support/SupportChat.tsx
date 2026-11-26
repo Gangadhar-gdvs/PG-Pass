@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { subscribeToSupportMessages } from '@/lib/firestore';
 import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Send, Check, CheckCheck } from 'lucide-react';
 import type { SupportMessage } from '@/types';
 
@@ -127,25 +128,38 @@ export function SupportChat({
 
   return (
     <div className="flex flex-col h-full">
-      <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-2.5 p-3">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-3 px-3 py-4 sm:px-5">
         {loading && (
-          <div className="space-y-2.5">
+          <div className="space-y-3" aria-hidden="true">
             {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className={`flex ${i % 2 ? 'justify-end' : 'justify-start'}`}>
-                <div className={`h-9 rounded-[16px] animate-shimmer bg-[#F5F3EF] ${i % 2 ? 'w-40' : 'w-52'}`} />
+                <div
+                  className={`h-11 animate-shimmer rounded-[20px] ${
+                    i % 2 ? 'w-40 rounded-br-md' : 'w-52 rounded-bl-md'
+                  }`}
+                />
               </div>
             ))}
           </div>
         )}
         {!loading && error && (
-          <div className="h-full flex flex-col items-center justify-center text-center text-xs text-[#DC2626] px-6 gap-1">
-            <span className="font-semibold">Couldn&apos;t load messages</span>
-            <span className="text-slate-400">Check your connection — new messages will appear once reconnected.</span>
+          <div className="flex h-full items-center justify-center">
+            <EmptyState
+              icon3d="alert"
+              className="py-6"
+              title="Couldn't load messages"
+              description="Check your connection — new messages will appear once reconnected."
+            />
           </div>
         )}
         {!loading && !error && messages.length === 0 && (
-          <div className="h-full flex items-center justify-center text-center text-xs text-slate-400 px-6">
-            {emptyHint || 'No messages yet. Start the conversation below.'}
+          <div className="flex h-full items-center justify-center">
+            <EmptyState
+              icon3d="bell-purple"
+              className="py-6"
+              title="No messages yet"
+              description={emptyHint || 'Start the conversation below.'}
+            />
           </div>
         )}
         {!loading && messages.map((m, i) => {
@@ -163,30 +177,32 @@ export function SupportChat({
             <React.Fragment key={m.id}>
               {showDaySep && when && (
                 <div className="flex justify-center py-1">
-                  <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 rounded-full px-2.5 py-0.5">
+                  <span className="rounded-full border border-white bg-white/80 px-3 py-1 text-[11px] font-semibold text-muted shadow-[0_4px_12px_-8px_rgba(70,40,160,0.4)]">
                     {dayLabel(when)}
                   </span>
                 </div>
               )}
               <div className={`flex ${mine ? 'justify-end' : 'justify-start'} animate-fade-up`}>
                 <div
-                  className={`max-w-[80%] px-3.5 py-2 rounded-[16px] text-sm ${
-                    mine ? 'accent-bg rounded-br-sm' : 'bg-slate-100 text-slate-900 rounded-bl-sm'
+                  className={`max-w-[82%] sm:max-w-[75%] px-4 py-2.5 text-sm leading-relaxed ${
+                    mine
+                      ? 'rounded-[20px] rounded-br-md bg-[image:var(--grad-brand)] text-white shadow-[0_12px_22px_-12px_rgba(106,43,234,0.65),inset_0_1px_0_rgba(255,255,255,0.3)]'
+                      : 'rounded-[20px] rounded-bl-md border border-white bg-white/90 text-ink shadow-[0_10px_20px_-14px_rgba(70,40,160,0.45)]'
                   }`}
                 >
                   <span className="block whitespace-pre-wrap break-words">{m.text}</span>
                   <span
-                    className={`flex items-center gap-1 justify-end text-[10px] mt-0.5 ${
-                      mine ? 'text-white/70' : 'text-slate-400'
+                    className={`mt-1 flex items-center justify-end gap-1 text-[10.5px] font-medium ${
+                      mine ? 'text-white/75' : 'text-muted'
                     }`}
                   >
                     <span>{m.sender === 'admin' ? 'Support' : 'You'}</span>
                     {when && <span>· {timeLabel(when)}</span>}
                     {mine &&
                       (seen ? (
-                        <CheckCheck className="w-3 h-3" aria-label="Seen" />
+                        <CheckCheck className="w-3.5 h-3.5" aria-label="Seen" />
                       ) : (
-                        <Check className="w-3 h-3" aria-label="Sent" />
+                        <Check className="w-3.5 h-3.5" aria-label="Sent" />
                       ))}
                   </span>
                 </div>
@@ -196,16 +212,28 @@ export function SupportChat({
         })}
       </div>
 
-      <form onSubmit={submit} className="flex items-center gap-2 p-3 border-t border-slate-100">
+      <form
+        onSubmit={submit}
+        className="flex items-center gap-2 border-t border-line bg-white/55 p-3 sm:px-4"
+      >
         <input
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="Type a message…"
+          aria-label="Type a message"
           maxLength={2000}
-          className="flex-1 h-11 px-4 rounded-full border-2 border-slate-200 text-sm focus:border-[color:var(--accent)] focus:outline-none"
+          className="h-12 min-w-0 flex-1 rounded-full border border-line-strong bg-white/95 px-5 text-sm text-ink placeholder:text-faint shadow-[inset_0_1px_2px_rgba(70,40,160,0.05)] transition-[border-color,box-shadow] hover:border-brand-200 focus-visible:border-brand focus-visible:shadow-[0_0_0_4px_rgba(123,63,242,0.14)] focus-visible:outline-none"
         />
-        <Button type="submit" variant="solid" size="md" loading={sending} disabled={!text.trim()}>
-          <Send className="w-4 h-4" />
+        <Button
+          type="submit"
+          variant="solid"
+          size="icon"
+          loading={sending}
+          disabled={!text.trim()}
+          aria-label="Send message"
+          className="shrink-0 !h-12 !w-12"
+        >
+          {!sending && <Send className="h-[18px] w-[18px] translate-x-[-1px] translate-y-[1px]" />}
         </Button>
       </form>
     </div>

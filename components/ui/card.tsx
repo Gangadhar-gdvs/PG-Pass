@@ -4,6 +4,13 @@ export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   variant?: "default" | "muted" | "flat" | "elevated";
 }
 
+/**
+ * Frosted glass card — the primary surface of the reference design.
+ *  - default  : glass (white → translucent) with lavender depth
+ *  - elevated : same, floating higher
+ *  - flat     : solid white, hairline border (dense data)
+ *  - muted    : lilac inset well (nested inside another card)
+ */
 export function Card({
   className = "",
   variant = "default",
@@ -11,15 +18,15 @@ export function Card({
   ...props
 }: CardProps) {
   const variants = {
-    default: "bg-white border-[rgba(124,58,237,0.06)] shadow-[var(--shadow-card)]",
-    muted: "bg-[#F8FAFC] border-[#E2E8F0]",
-    flat: "bg-white border-[#E2E8F0]",
-    elevated: "bg-white border-[rgba(124,58,237,0.06)] shadow-[var(--shadow-float)]",
+    default: "app-card",
+    elevated: "app-card shadow-[var(--shadow-float)]",
+    flat: "glass-solid",
+    muted: "well",
   };
 
   return (
     <div
-      className={`rounded-[16px] border p-5 transition-all duration-150 ${variants[variant]} ${className}`}
+      className={`${variants[variant]} p-5 transition-shadow duration-200 ${className}`}
       {...props}
     >
       {children}
@@ -46,7 +53,7 @@ export function CardTitle({
 }: React.HTMLAttributes<HTMLHeadingElement>) {
   return (
     <h3
-      className={`text-[15px] font-bold text-[#09090B] tracking-tight ${className}`}
+      className={`text-[17px] font-bold text-ink tracking-[-0.01em] ${className}`}
       {...props}
     >
       {children}
@@ -60,7 +67,7 @@ export function CardDescription({
   ...props
 }: React.HTMLAttributes<HTMLParagraphElement>) {
   return (
-    <p className={`text-xs text-[#64748B] leading-relaxed ${className}`} {...props}>
+    <p className={`text-[13px] text-muted leading-relaxed ${className}`} {...props}>
       {children}
     </p>
   );
@@ -85,7 +92,7 @@ export function CardFooter({
 }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={`flex items-center justify-between pt-4 border-t border-[#E2E8F0] text-xs text-[#64748B] ${className}`}
+      className={`flex items-center justify-between pt-4 border-t border-line text-xs text-muted ${className}`}
       {...props}
     >
       {children}

@@ -5,6 +5,7 @@ import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { clearLocalData } from '@/lib/client/localData';
 import { IDLE_TIMEOUT_MINUTES, IDLE_WARNING_SECONDS } from '@/lib/constants/limits';
+import { Icon3D } from '@/components/brand/Icon3D';
 
 /**
  * Idle auto-logout. After `IDLE_TIMEOUT_MINUTES[role]` of no user activity, the
@@ -125,24 +126,25 @@ export function IdleLogout({
   if (!warning) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4" role="alertdialog" aria-modal="true">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center animate-pop">
-        <div className="text-3xl font-extrabold font-mono-numbers text-slate-900">{secondsLeft}s</div>
-        <h2 className="text-base font-bold text-slate-900 mt-2">Still there?</h2>
-        <p className="text-sm text-slate-500 mt-1">
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-3 sm:p-4" role="alertdialog" aria-modal="true" aria-labelledby="idle-title">
+      <div className="fixed inset-0 bg-[#1A1458]/40 backdrop-blur-[3px] animate-fade" aria-hidden="true" />
+      <div className="relative w-full max-w-sm overflow-hidden rounded-[28px] border border-white bg-[linear-gradient(180deg,#FFFFFF_0%,#F5F0FF_100%)] p-6 text-center shadow-[0_30px_70px_-24px_rgba(40,20,120,0.55)] animate-pop">
+        <div aria-hidden className="pointer-events-none absolute -top-14 -right-12 h-40 w-40 rounded-full bg-[#D9C6FF]/50 blur-3xl" />
+        <div className="relative mx-auto grid h-24 w-24 place-items-center">
+          <Icon3D name="clock" size={44} className="absolute -top-1 -right-1 opacity-90" />
+          <span className="grid h-20 w-20 place-items-center rounded-full bg-[image:var(--grad-brand)] text-white shadow-[var(--shadow-brand)]">
+            <span className="text-[26px] font-extrabold font-mono-numbers leading-none">{secondsLeft}s</span>
+          </span>
+        </div>
+        <h2 id="idle-title" className="relative mt-3 text-lg font-extrabold text-ink tracking-[-0.015em]">Still there?</h2>
+        <p className="relative mt-1.5 text-sm text-ink-2/80 leading-relaxed">
           You&apos;ll be signed out shortly for your security. Your data stays safe.
         </p>
-        <div className="flex gap-2 mt-5">
-          <button
-            onClick={stay}
-            className="flex-1 h-11 rounded-full bg-slate-900 text-white text-sm font-bold press"
-          >
+        <div className="relative mt-6 grid grid-cols-[1fr_auto] gap-2.5">
+          <button onClick={stay} className="btn-pill w-full">
             Stay signed in
           </button>
-          <button
-            onClick={doLogout}
-            className="h-11 px-4 rounded-full border-2 border-slate-200 text-sm font-bold text-slate-600 press"
-          >
+          <button onClick={doLogout} className="btn-soft">
             Log out
           </button>
         </div>

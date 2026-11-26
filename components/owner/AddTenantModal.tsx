@@ -7,9 +7,39 @@ import { Input } from '@/components/ui/input';
 import { Dropdown } from '@/components/ui/dropdown';
 import { PhoneInput } from '@/components/ui/phone-input';
 import { Drawer } from '@/components/ui/drawer';
+import { IconBubble, Icon3D, type Icon3DName, type Tint } from '@/components/brand/Icon3D';
+import { UserRound } from 'lucide-react';
 import { validatePhone, sanitizeText } from '@/lib/security';
 import { errorMessage } from '@/lib/utils';
 import toast from 'react-hot-toast';
+
+/** Glass form section with a small 3D icon header (local to this drawer). */
+function FormSection({
+  icon,
+  tint,
+  title,
+  hint,
+  children,
+}: {
+  icon: Icon3DName;
+  tint: Tint;
+  title: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="app-card space-y-3.5 p-4">
+      <div className="flex items-center gap-2.5">
+        <IconBubble icon={icon} tint={tint} size={36} />
+        <div className="min-w-0">
+          <h4 className="text-[14.5px] font-bold leading-tight tracking-[-0.01em] text-ink">{title}</h4>
+          {hint && <p className="text-xs font-medium text-muted">{hint}</p>}
+        </div>
+      </div>
+      {children}
+    </section>
+  );
+}
 
 interface AddTenantModalProps {
   bed: Bed;
@@ -155,81 +185,89 @@ export function AddTenantModal({
         </div>
       }
     >
-      <form id="add-tenant-form" onSubmit={handleSubmit} className="space-y-4">
-        <Input
-          label="Resident Full Name"
-          placeholder="e.g. Rahul Sharma"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          required
-          disabled={loading}
-        />
-
-        <PhoneInput
-          label="WhatsApp Number"
-          value={phone}
-          onChange={setPhone}
-          error={phoneError}
-          disabled={loading}
-        />
-
-        <div className="grid grid-cols-2 gap-3">
+      <form id="add-tenant-form" onSubmit={handleSubmit} className="space-y-3.5 stagger">
+        <FormSection icon="user-add" tint="sky" title="Resident">
           <Input
-            label="Monthly Rent (₹)"
-            type="number"
-            min={1}
-            placeholder="Enter rent"
-            value={rent}
-            onChange={(e) => setRent(e.target.value)}
+            label="Resident Full Name"
+            placeholder="e.g. Rahul Sharma"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            leading={<UserRound />}
             required
             disabled={loading}
           />
 
-          <Input
-            label="Security Deposit (₹)"
-            type="number"
-            min={0}
-            placeholder="Enter deposit"
-            value={deposit}
-            onChange={(e) => setDeposit(e.target.value)}
-            required
+          <PhoneInput
+            label="WhatsApp Number"
+            value={phone}
+            onChange={setPhone}
+            error={phoneError}
             disabled={loading}
           />
-        </div>
+        </FormSection>
 
-        <div className="grid grid-cols-2 gap-3">
-          <Input
-            label="Move-In Date"
-            type="date"
-            value={moveInDate}
-            onChange={(e) => setMoveInDate(e.target.value)}
-            required
-            disabled={loading}
-          />
+        <FormSection icon="rupee" tint="mint" title="Rent & deposit">
+          <div className="grid grid-cols-1 gap-3 min-[380px]:grid-cols-2">
+            <Input
+              label="Monthly Rent (₹)"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              placeholder="Enter rent"
+              value={rent}
+              onChange={(e) => setRent(e.target.value)}
+              className="font-mono-numbers font-semibold"
+              required
+              disabled={loading}
+            />
 
-          <Dropdown
-            label="ID Proof Type"
-            id="add-tenant-idproof"
-            value={idProofType}
-            onChange={setIdProofType}
-            disabled={loading}
-            options={[
-              { value: 'aadhaar', label: 'Aadhaar Card' },
-              { value: 'pan', label: 'PAN Card' },
-              { value: 'driving_license', label: 'Driving License' },
-              { value: 'voter_id', label: 'Voter ID' },
-              { value: 'passport', label: 'Passport' },
-              { value: 'other', label: 'Other' },
-            ]}
-          />
-        </div>
+            <Input
+              label="Security Deposit (₹)"
+              type="number"
+              inputMode="numeric"
+              min={0}
+              placeholder="Enter deposit"
+              value={deposit}
+              onChange={(e) => setDeposit(e.target.value)}
+              className="font-mono-numbers font-semibold"
+              required
+              disabled={loading}
+            />
+          </div>
+        </FormSection>
+
+        <FormSection icon="calendar" tint="violet" title="Move-in & ID">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Input
+              label="Move-In Date"
+              type="date"
+              value={moveInDate}
+              onChange={(e) => setMoveInDate(e.target.value)}
+              required
+              disabled={loading}
+            />
+
+            <Dropdown
+              label="ID Proof Type"
+              id="add-tenant-idproof"
+              value={idProofType}
+              onChange={setIdProofType}
+              disabled={loading}
+              options={[
+                { value: 'aadhaar', label: 'Aadhaar Card' },
+                { value: 'pan', label: 'PAN Card' },
+                { value: 'driving_license', label: 'Driving License' },
+                { value: 'voter_id', label: 'Voter ID' },
+                { value: 'passport', label: 'Passport' },
+                { value: 'other', label: 'Other' },
+              ]}
+            />
+          </div>
+        </FormSection>
 
         {/* Emergency contact (optional) */}
-        <div className="space-y-3 pt-1">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-[#94A3B8]">
-            Emergency Contact (optional)
-          </span>
-          <div className="grid grid-cols-2 gap-3">
+        <FormSection icon="users" tint="peach" title="Emergency Contact" hint="Optional">
+          <div className="grid grid-cols-1 gap-3 min-[380px]:grid-cols-2">
             <Input
               label="Contact Name"
               placeholder="e.g. Parent / Guardian"
@@ -252,13 +290,17 @@ export function AddTenantModal({
             placeholder="10-digit mobile"
             value={emPhone}
             onChange={(e) => setEmPhone(e.target.value)}
+            className="font-mono-numbers"
             disabled={loading}
           />
-        </div>
+        </FormSection>
 
-        <div className="p-3.5 rounded-[8px] bg-[#F8FAFC] border border-[#E2E8F0] text-xs text-[#64748B] leading-relaxed">
-          Assigning this bed will atomically issue an unguessable cryptographic resident pass URL.
-          The tenant can verify via the last 4 digits of their phone, pay 0%-fee rent directly via UPI, and download verified HRA receipts.
+        <div className="well flex items-start gap-3 p-3.5">
+          <Icon3D name="check" size={30} className="mt-0.5" />
+          <p className="text-[12.5px] font-medium leading-relaxed text-ink-2">
+            Assigning this bed will atomically issue an unguessable cryptographic resident pass URL.
+            The tenant can verify via the last 4 digits of their phone, pay 0%-fee rent directly via UPI, and download verified HRA receipts.
+          </p>
         </div>
       </form>
     </Drawer>

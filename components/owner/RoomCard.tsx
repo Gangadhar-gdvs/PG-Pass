@@ -4,11 +4,15 @@ import React from 'react';
 import { Bed, RentRecord } from '@/types';
 import { formatCurrency, getWhatsAppLink } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Badge, type BadgeProps } from '@/components/ui/badge';
+import { IconTile, type Tint } from '@/components/brand/Icon3D';
+import { TileIconButton } from './BedCard';
 import {
   UserPlus,
   Send,
   Users,
   ChevronRight,
+  Snowflake,
 } from 'lucide-react';
 
 export interface RoomData {
@@ -23,46 +27,15 @@ export interface RoomData {
   totalCapacity: number;
 }
 
-const SHARING_CONFIG: Record<
-  string,
-  { label: string; bg: string; text: string; border: string }
-> = {
-  '1': {
-    label: 'Single Private',
-    bg: 'bg-purple-50',
-    text: 'text-purple-700',
-    border: 'border-purple-200',
-  },
-  '2': {
-    label: '2-Share (Double)',
-    bg: 'bg-sky-50',
-    text: 'text-sky-700',
-    border: 'border-sky-200',
-  },
-  '3': {
-    label: '3-Share (Triple)',
-    bg: 'bg-emerald-50',
-    text: 'text-emerald-700',
-    border: 'border-emerald-200',
-  },
-  '4': {
-    label: '4-Share (Quad)',
-    bg: 'bg-amber-50',
-    text: 'text-amber-700',
-    border: 'border-amber-200',
-  },
-  '5': {
-    label: '5-Share',
-    bg: 'bg-indigo-50',
-    text: 'text-indigo-700',
-    border: 'border-indigo-200',
-  },
-  '6': {
-    label: '6-Share (Dorm)',
-    bg: 'bg-orange-50',
-    text: 'text-orange-700',
-    border: 'border-orange-200',
-  },
+// Sharing-format labels. One violet badge style for every format (the system
+// reserves green / orange / red for rent status), the label carries the type.
+const SHARING_LABEL: Record<string, string> = {
+  '1': 'Single Private',
+  '2': '2-Share (Double)',
+  '3': '3-Share (Triple)',
+  '4': '4-Share (Quad)',
+  '5': '5-Share',
+  '6': '6-Share (Dorm)',
 };
 
 interface RoomCardProps {
@@ -89,15 +62,17 @@ export function RoomCard({
   onAddTenant,
   onSelectBed,
 }: RoomCardProps) {
-  const shareCfg = SHARING_CONFIG[room.sharingType] || {
-    label: `${room.sharingType}-Share`,
-    bg: 'bg-slate-50',
-    text: 'text-slate-700',
-    border: 'border-slate-200',
-  };
+  const shareLabel = SHARING_LABEL[room.sharingType] || `${room.sharingType}-Share`;
 
   const isAllVacant = room.occupiedCount === 0;
   const isFull = room.vacantCount === 0;
+
+  // Occupancy pill: empty → lilac, partly available → info blue, full → violet.
+  const occupancyVariant: NonNullable<BadgeProps['variant']> = isAllVacant
+    ? 'vacant'
+    : isFull
+    ? 'brand'
+    : 'cyan';
 
   const handleSendReminder = (e: React.MouseEvent, bed: Bed) => {
     e.stopPropagation();
@@ -112,82 +87,66 @@ export function RoomCard({
   };
 
   return (
-    <div className="bg-white border border-[#E2E8F0] hover:border-[#CBD5E1] rounded-[14px] p-4 sm:p-5 shadow-xs transition-all duration-150 flex flex-col justify-between text-left">
+    <div className="app-card flex h-full flex-col gap-3.5 p-4 text-left sm:p-5">
       {/* ROOM HEADER */}
-      <div>
-        <div className="flex items-start justify-between gap-2 pb-3 border-b border-[#F1F5F9]">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-base font-extrabold text-[#09090B] tracking-tight">
-                Room {room.roomNumber}
-              </span>
-
-              {/* Distinct Sharing Format Badge */}
-              <span
-                className={`text-[10px] font-bold px-2 py-0.5 rounded-[6px] border ${shareCfg.bg} ${shareCfg.text} ${shareCfg.border} inline-flex items-center gap-1`}
-              >
-                <Users className="w-3 h-3" />
-                <span>{shareCfg.label}</span>
-              </span>
-
-              {/* Climate Badge */}
-              <span
-                className={`text-[10px] font-bold px-1.5 py-0.5 rounded-[5px] border ${
-                  room.acType === 'ac'
-                    ? 'bg-[#E0F2FE] text-[#0369A1] border-[#BAE6FD]'
-                    : 'bg-[#F8FAFC] text-[#64748B] border-[#E2E8F0]'
-                }`}
-              >
-                {room.acType === 'ac' ? '❄️ AC' : 'Non-AC'}
-              </span>
-            </div>
-
-            <span className="text-[11px] text-[#64748B] block">
-              Floor {room.floor} · {formatCurrency(room.monthlyRent)}/bed/mo
-            </span>
-          </div>
-
-          {/* Occupancy Status Pill */}
-          <div className="text-right flex flex-col items-end">
-            <span
-              className={`text-[11px] font-bold px-2.5 py-1 rounded-[8px] border shadow-2xs inline-block ${
-                isAllVacant
-                  ? 'bg-[#ECFDF5] text-[#059669] border-[#A7F3D0]'
-                  : isFull
-                  ? 'bg-[#FEF2F2] text-[#DC2626] border-[#FECACA]'
-                  : 'bg-[#FEF3C7] text-[#D97706] border-[#FDE68A]'
-              }`}
-            >
+      <div className="flex items-start gap-3">
+        <IconTile icon="house" tint="violet" size={44} />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+            <h4 className="text-base font-extrabold tracking-[-0.015em] text-ink">
+              Room {room.roomNumber}
+            </h4>
+            {/* Occupancy Status Pill */}
+            <Badge variant={occupancyVariant} dot>
               {isAllVacant
-                ? `🟢 All ${room.totalCapacity} Vacant`
+                ? `All ${room.totalCapacity} Vacant`
                 : isFull
-                ? `🔴 Full (${room.totalCapacity}/${room.totalCapacity})`
-                : `🟡 ${room.vacantCount}/${room.totalCapacity} Available`}
-            </span>
+                ? `Full (${room.totalCapacity}/${room.totalCapacity})`
+                : `${room.vacantCount}/${room.totalCapacity} Available`}
+            </Badge>
           </div>
-        </div>
-
-        {/* Visual Occupancy Progress Bar */}
-        <div className="pt-2.5 pb-2">
-          <div className="flex items-center gap-1 w-full">
-            {room.beds.map((bed) => {
-              const isOccupied = bed.status !== 'vacant';
-              return (
-                <div
-                  key={bed.id}
-                  className={`h-2 flex-1 rounded-full transition-all ${
-                    isOccupied ? 'bg-[#10B981]' : 'bg-[#E2E8F0]'
-                  }`}
-                  title={`${bed.bedLabel}: ${isOccupied ? bed.tenantName || 'Occupied' : 'Vacant'}`}
-                />
-              );
-            })}
-          </div>
+          <span className="mt-0.5 block font-mono-numbers text-xs font-medium text-muted">
+            Floor {room.floor} · {formatCurrency(room.monthlyRent)}/bed/mo
+          </span>
         </div>
       </div>
 
+      {/* Sharing format + climate */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <Badge variant="brand">
+          <Users className="h-3 w-3" />
+          <span>{shareLabel}</span>
+        </Badge>
+        <Badge variant={room.acType === 'ac' ? 'cyan' : 'default'}>
+          {room.acType === 'ac' ? (
+            <>
+              <Snowflake className="h-3 w-3" />
+              <span>AC</span>
+            </>
+          ) : (
+            'Non-AC'
+          )}
+        </Badge>
+      </div>
+
+      {/* Visual Occupancy Progress Bar */}
+      <div className="flex w-full items-center gap-1">
+        {room.beds.map((bed) => {
+          const isOccupied = bed.status !== 'vacant';
+          return (
+            <div
+              key={bed.id}
+              className={`h-2 flex-1 rounded-full transition-all ${
+                isOccupied ? 'bg-[image:var(--grad-brand)]' : 'bg-lilac-2'
+              }`}
+              title={`${bed.bedLabel}: ${isOccupied ? bed.tenantName || 'Occupied' : 'Vacant'}`}
+            />
+          );
+        })}
+      </div>
+
       {/* BEDS LIST INSIDE THE ROOM */}
-      <div className="mt-2 space-y-2">
+      <div className="space-y-2">
         {room.beds.map((bed) => {
           // Payment status comes ONLY from the selected month's record (not the
           // bed's month-agnostic denormalized status), so navigating months shows
@@ -200,46 +159,50 @@ export function RoomCard({
           const isVerify = record?.status === 'verify';
           const noBill = !isVacant && !isGuest && !record;
 
+          // Row tint encodes status: paid → mint · due → peach · verify → violet
+          // · vacant / no bill → slate · guest → sky.
+          const tint: Tint = isVacant
+            ? 'slate'
+            : isGuest
+            ? 'sky'
+            : isPaid
+            ? 'mint'
+            : isVerify
+            ? 'violet'
+            : noBill
+            ? 'slate'
+            : 'peach';
+
           return (
             <div
               key={bed.id}
               onClick={() => (onSelectBed ? onSelectBed(bed) : isVacant ? onAddTenant(bed) : undefined)}
-              className={`group/bed relative rounded-[10px] p-2.5 border transition-all duration-150 cursor-pointer flex items-center justify-between gap-2 ${
-                isVacant
-                  ? 'bg-[#F8FAFC] border-dashed border-[#CBD5E1] hover:border-[#D97706] hover:bg-amber-50/30'
-                  : isGuest
-                  ? 'bg-violet-50/40 border-[#DDD6FE] hover:border-[#8B5CF6]'
-                  : isPaid
-                  ? 'bg-emerald-50/30 border-[#A7F3D0] hover:border-[#059669]'
-                  : isVerify
-                  ? 'bg-indigo-50/30 border-[#C7D2FE] hover:border-[#6366F1]'
-                  : noBill
-                  ? 'bg-[#F8FAFC] border-[#E2E8F0] hover:border-[#CBD5E1]'
-                  : 'bg-amber-50/30 border-[#FDE68A] hover:border-[#D97706]'
+              className={`tint-card tint-${tint} group/bed relative flex min-h-14 cursor-pointer items-center justify-between gap-2 py-2 pl-2.5 pr-2 press ${
+                isVacant ? 'border-dashed border-line-strong' : ''
               }`}
             >
               {/* Bed Label & Resident Info */}
-              <div className="flex items-center gap-2.5 min-w-0">
-                <span className="w-7 h-7 rounded-[7px] bg-white border border-[#E2E8F0] font-mono font-bold text-xs text-[#09090B] flex items-center justify-center shrink-0 shadow-2xs">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/85 font-mono-numbers text-[13px] font-extrabold text-ink shadow-[0_4px_10px_-6px_rgba(70,40,160,0.45)]">
                   {bed.bedLabel.split('-')[1] || bed.bedLabel}
                 </span>
 
                 <div className="min-w-0">
                   {isVacant ? (
                     <div>
-                      <span className="text-xs font-semibold text-[#64748B] block truncate">
+                      <span className="block truncate text-[13px] font-bold text-ink-2">
                         Available Bed
                       </span>
-                      <span className="text-[10px] text-[#94A3B8] font-mono-numbers">
+                      <span className="block font-mono-numbers text-[11.5px] font-medium text-muted">
                         {formatCurrency(bed.monthlyRent)}/mo
                       </span>
                     </div>
                   ) : (
                     <div>
-                      <span className="text-xs font-bold text-[#09090B] block truncate">
+                      <span className="block truncate text-[13px] font-bold text-ink">
                         {bed.tenantName || 'Resident'}
                       </span>
-                      <span className="text-[10px] text-[#64748B] font-mono-numbers block truncate">
+                      <span className="block truncate font-mono-numbers text-[11.5px] font-medium text-muted">
                         {bed.tenantPhone || 'No Phone'}
                       </span>
                     </div>
@@ -248,54 +211,44 @@ export function RoomCard({
               </div>
 
               {/* Status Badge & Actions */}
-              <div className="flex items-center gap-1.5 shrink-0">
+              <div className="flex shrink-0 items-center gap-1.5">
                 {isVacant ? (
                   <Button
-                    size="sm"
                     variant="outline"
-                    className="h-7 px-2.5 text-[11px] bg-white border-[#CBD5E1] text-[#D97706] hover:bg-[#FEF3C7] hover:border-[#D97706]"
                     onClick={(e) => {
                       e.stopPropagation();
                       onAddTenant(bed);
                     }}
                   >
-                    <UserPlus className="w-3 h-3 mr-1" />
+                    <UserPlus className="h-4 w-4" />
                     <span>Assign</span>
                   </Button>
                 ) : (
-                  <div className="flex items-center gap-1">
+                  <>
                     {/* Status Pill */}
                     {isPaid ? (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-[5px] bg-[#D1FAE5] text-[#065F46] border border-[#A7F3D0]">
-                        Paid
-                      </span>
+                      <Badge variant="paid" dot>Paid</Badge>
                     ) : isVerify ? (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-[5px] bg-[#E0E7FF] text-[#3730A3] border border-[#C7D2FE]">
-                        Verify
-                      </span>
+                      <Badge variant="verify" dot>Verify</Badge>
                     ) : noBill ? (
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-[5px] bg-[#F1F5F9] text-[#64748B] border border-[#E2E8F0]">
-                        No bill
-                      </span>
+                      <Badge variant="default">No bill</Badge>
                     ) : (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-[5px] bg-[#FEF3C7] text-[#92400E] border border-[#FDE68A]">
-                        Due
-                      </span>
+                      <Badge variant="pending" dot>Due</Badge>
                     )}
 
                     {/* Quick WhatsApp Reminder — only when there's a due bill this month */}
                     {!isPaid && !isVerify && !noBill && bed.tenantPhone && (
-                      <button
+                      <TileIconButton
                         title="Send WhatsApp Reminder"
+                        className="text-success-ink"
                         onClick={(e) => handleSendReminder(e, bed)}
-                        className="w-6 h-6 rounded-[5px] flex items-center justify-center text-[#16A34A] hover:bg-[#DCFCE7] transition-colors"
                       >
-                        <Send className="w-3 h-3" />
-                      </button>
+                        <Send />
+                      </TileIconButton>
                     )}
 
-                    <ChevronRight className="w-3.5 h-3.5 text-[#94A3B8] group-hover/bed:text-[#09090B]" />
-                  </div>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-ink-2/50 transition-colors group-hover/bed:text-brand" />
+                  </>
                 )}
               </div>
             </div>

@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { Mail, CheckCircle2, Link2Off } from 'lucide-react';
+import { Mail, Link2Off } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { InfoBanner } from '@/components/ui/dashboard-kit';
+import { IconTile } from '@/components/brand/Icon3D';
 import toast from 'react-hot-toast';
 import { errorMessage } from '@/lib/utils';
 
@@ -64,37 +66,34 @@ export function GmailConnectCard() {
   if (!status || !status.available) return null;
 
   return (
-    <div className="app-card rounded-[16px] p-5 sm:p-6">
-      <div className="flex items-center gap-2.5 mb-3">
-        <span className="icon-chip accent-text"><Mail className="h-5 w-5" /></span>
-        <div>
-          <h2 className="text-sm font-bold text-[#0F172A]">Rent reminders from your Gmail</h2>
-          <p className="text-[11px] text-[#64748B]">Send reminder emails directly from your own inbox — one button, no manual Gmail.</p>
+    <section className="app-card p-4 sm:p-5">
+      <div className="mb-4 flex items-center gap-3">
+        <IconTile icon="bell" tint="peach" size={48} />
+        <div className="min-w-0">
+          <h2 className="text-[17px] font-bold leading-snug tracking-[-0.015em] text-ink">Rent reminders from your Gmail</h2>
+          <p className="mt-0.5 text-[13px] font-medium leading-relaxed text-muted">
+            Send reminder emails directly from your own inbox — one button, no manual Gmail.
+          </p>
         </div>
       </div>
 
       {status.connected ? (
-        <div className="flex items-center justify-between gap-3 rounded-[12px] bg-[#ECFDF5] border border-[#A7F3D0] px-3.5 py-2.5">
-          <span className="flex items-center gap-2 text-xs font-semibold text-[#065F46] min-w-0">
-            <CheckCircle2 className="h-4 w-4 shrink-0" />
-            <span className="truncate">Connected{status.email ? ` · ${status.email}` : ''}</span>
-          </span>
-          <button
-            type="button"
-            onClick={disconnect}
-            disabled={busy}
-            className="inline-flex items-center gap-1 text-xs font-bold text-[#DC2626] px-2 py-1 rounded hover:bg-[#FEF2F2] shrink-0"
-          >
-            <Link2Off className="h-3.5 w-3.5" /> Disconnect
-          </button>
-        </div>
+        <InfoBanner
+          tone="success"
+          title="Connected"
+          description={status.email ? <span className="break-all">{status.email}</span> : undefined}
+          className="animate-pop"
+          action={
+            <Button variant="outline" onClick={disconnect} disabled={busy} className="w-full sm:w-auto">
+              <Link2Off className="h-4 w-4" /> Disconnect
+            </Button>
+          }
+        />
       ) : (
-        <a href="/api/owners/gmail/connect" className="inline-block">
-          <Button size="sm" variant="solid" type="button">
-            <Mail className="h-3.5 w-3.5 mr-1.5" /> Connect Gmail
-          </Button>
+        <a href="/api/owners/gmail/connect" className="btn-pill w-full sm:w-auto">
+          <Mail className="h-4 w-4" /> Connect Gmail
         </a>
       )}
-    </div>
+    </section>
   );
 }

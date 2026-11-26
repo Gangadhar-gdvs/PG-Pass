@@ -9,8 +9,17 @@ import {
 } from '@/lib/firestore';
 import { getCurrentPeriod, formatCurrency, getWhatsAppLink, errorMessage } from '@/lib/utils';
 import { Bed, Owner, RentRecord } from '@/types';
-import { StatsBar } from '@/components/owner/StatsBar';
-import { HeroHeader } from '@/components/ui/dashboard-kit';
+import { StatsBar, StatsRow } from '@/components/owner/StatsBar';
+import {
+  HeroHeader,
+  HeroAction,
+  InfoBanner,
+  KeyValue,
+  PageHeader,
+  QuickActionGrid,
+  StatTile,
+  type QuickAction,
+} from '@/components/ui/dashboard-kit';
 import { BedGrid } from '@/components/owner/BedGrid';
 import { AddTenantModal } from '@/components/owner/AddTenantModal';
 import { CheckInGuestModal } from '@/components/owner/CheckInGuestModal';
@@ -21,31 +30,58 @@ import { DocumentUploader } from '@/components/owner/DocumentUploader';
 import { TenantPhotoGallery } from '@/components/owner/TenantPhotoGallery';
 import { Button } from '@/components/ui/button';
 import { Drawer } from '@/components/ui/drawer';
-import { DashboardSkeleton } from '@/components/ui/skeletons';
+import { Skeleton } from '@/components/ui/skeleton';
+import { StatGridSkeleton, PanelSkeleton, CardListSkeleton } from '@/components/ui/skeletons';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { StatusDot } from '@/components/ui/status-dot';
 import { Avatar } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Input } from '@/components/ui/input';
+import { ProgressBar } from '@/components/ui/progress-bar';
+import { Icon3D, IconBubble } from '@/components/brand/Icon3D';
 import {
   Building,
   CheckCircle2,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Eye,
   LogOut,
   Send,
   Phone,
   Copy,
   UserPlus,
-  ShieldAlert,
   FileSpreadsheet,
   ArrowLeft,
   Layers,
-  IndianRupee,
   BedDouble,
   CalendarDays,
+  MapPin,
+  ShieldCheck,
+  RefreshCw,
+  Undo2,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
+/** Loading state shaped like the owner home (hero · stats · period · panels · rooms). */
+function OwnerHomeSkeleton() {
+  return (
+    <div className="space-y-5" role="status">
+      <span className="sr-only">Loading your dashboard…</span>
+      <Skeleton className="h-44 w-full rounded-3xl" />
+      <StatGridSkeleton count={4} />
+      <Skeleton className="h-14 w-full rounded-full" />
+      <div className="grid gap-5 lg:grid-cols-2">
+        <PanelSkeleton height="h-60" />
+        <PanelSkeleton height="h-60" />
+      </div>
+      <CardListSkeleton rows={4} height="h-28" cols={2} />
+    </div>
+  );
+}
+
 export default function OwnerDashboardPage() {
-  const { ownerId, phoneNumber, properties, selectedPropertyId } = useOwnerSession();
+  const { ownerId, phoneNumber, properties, selectedPropertyId, role } = useOwnerSession();
 
   // IMPORTANT backward-compat rule: only filter by property when the owner
   // actually has >1 property. Legacy single-PG data has no `propertyId` field,
@@ -553,31 +589,31 @@ export default function OwnerDashboardPage() {
   };
 
   if (loadingOwner) {
-    return <DashboardSkeleton />;
+    return <OwnerHomeSkeleton />;
   }
 
   // ---------------- LOAD FAILURE (never spin forever) ----------------
   if (ownerError || bedsError || tenantsError || rentError) {
     return (
-      <div className="py-20 flex flex-col items-center justify-center text-center px-6">
-        <div className="w-12 h-12 rounded-2xl bg-[#FEF2F2] border border-[#FECACA] flex items-center justify-center mb-4">
-          <ShieldAlert className="w-6 h-6 text-[#DC2626]" />
+      <div className="mx-auto max-w-xl py-6">
+        <div className="app-card">
+          <EmptyState
+            icon3d="alert"
+            title="Couldn’t load your dashboard"
+            description="We couldn’t reach the server in time. This is usually a temporary connection issue. Please check your internet and try again."
+            action={
+              <Button
+                onClick={() => {
+                  setOwnerError(false);
+                  reloadOwner();
+                }}
+              >
+                <RefreshCw className="h-4 w-4" />
+                <span>Retry</span>
+              </Button>
+            }
+          />
         </div>
-        <h2 className="text-base font-bold text-[#09090B]">Couldn&apos;t load your dashboard</h2>
-        <p className="text-xs text-[#64748B] mt-1 max-w-sm leading-relaxed">
-          We couldn&apos;t reach the server in time. This is usually a temporary
-          connection issue. Please check your internet and try again.
-        </p>
-        <button
-          onClick={() => {
-            setOwnerError(false);
-            reloadOwner();
-          }}
-          style={{ background: 'var(--accent)' }}
-          className="mt-5 h-11 px-5 rounded-full text-white text-sm font-bold press"
-        >
-          Retry
-        </button>
       </div>
     );
   }
@@ -605,26 +641,19 @@ export default function OwnerDashboardPage() {
   // ---------------- MANUAL RE-CONFIGURATION / ADD ROOMS ----------------
   if (showSetupWizard) {
     return (
-      <div className="space-y-4 text-left">
-        <div className="flex items-center justify-between pb-3 border-b border-[#E2E8F0]">
-          <div>
-            <h1 className="text-xl font-bold text-[#09090B] tracking-tight">
-              Property & Room Inventory Setup
-            </h1>
-            <p className="text-xs text-[#64748B] mt-0.5">
-              Configure room sharing formats (Single, 2-share to 6-share), rents, and floor layout matrix for {owner.pgName}
-            </p>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowSetupWizard(false)}
-            className="text-xs"
-          >
-            <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
-            <span>Back to Dashboard</span>
-          </Button>
-        </div>
+      <div className="space-y-5 text-left">
+        <PageHeader
+          icon="building"
+          tint="violet"
+          title="Property & Room Inventory Setup"
+          subtitle={`Configure room sharing formats (Single, 2-share to 6-share), rents, and floor layout matrix for ${owner.pgName}`}
+          actions={
+            <Button variant="outline" onClick={() => setShowSetupWizard(false)}>
+              <ArrowLeft className="h-4 w-4" />
+              <span>Back to Dashboard</span>
+            </Button>
+          }
+        />
         <PropertySetupWizard
           initialOwnerPhone={phoneNumber || owner.phone || '9876543210'}
           existingOwner={owner}
@@ -676,224 +705,267 @@ export default function OwnerDashboardPage() {
     ? tenants.find((t) => t.id === liveBed.tenantId)
     : null;
 
+  // ---------------- Presentation-only derivations ----------------
+  const isStaff = role === 'staff';
+  // Greet the owner by name (staff see the PG name — the profile is the owner's).
+  const ownerFirstLine = (owner.name || '').trim();
+  const heroName = !isStaff && ownerFirstLine ? ownerFirstLine : owner.pgName;
+  const heroPlace =
+    heroName === owner.pgName
+      ? owner.pgAddress || 'Live occupancy & automated rent settlement'
+      : [owner.pgName, owner.pgAddress].filter(Boolean).join(', ');
+  const periodLabel = isCurrentPeriod ? 'This Month' : labelPeriod(selectedPeriod);
+  // Active residents (the live feed is capped at 100 → show "100+").
+  const residentCount = `${tenants.length}${tenants.length >= 100 ? '+' : ''}`;
+  // Bulk confirm — every pending/verify record of the selected month.
+  const bulkPendingCount = rentRecords.filter(
+    (r) => r.status !== 'paid' && r.id && !r.id.startsWith('temp_')
+  ).length;
+  // Drawer status pill (selected month's record wins over the bed status).
+  const drawerStatus: 'paid' | 'verify' | 'pending' =
+    activeBedDrawer?.status === 'paid' || activeRecord?.status === 'paid'
+      ? 'paid'
+      : activeRecord?.status === 'verify'
+      ? 'verify'
+      : 'pending';
+  const drawerStatusLabel = drawerStatus === 'paid' ? 'Paid' : drawerStatus === 'verify' ? 'Verify' : 'Due';
+
+  const handleAddResident = () => {
+    if (beds.length === 0) {
+      toast.error('No beds configured yet. Please generate your room inventory first.');
+      setShowSetupWizard(true);
+      return;
+    }
+    const firstVacant = beds.find((b) => b.status === 'vacant');
+    if (firstVacant) {
+      setSelectedBedForAdd(firstVacant);
+    } else {
+      toast.error('All beds are currently occupied. Vacate a bed to add a new resident.');
+    }
+  };
+
+  // Quick actions only reuse existing handlers / routes.
+  const quickActions: QuickAction[] = [
+    { label: 'Add Resident', icon: 'users', tint: 'violet', onClick: handleAddResident },
+    { label: 'Add Room / Bed', icon: 'bed', tint: 'sky', onClick: () => setShowSetupWizard(true) },
+    { label: 'Bank CSV', icon: 'rupee', tint: 'mint', onClick: () => setShowBankReconciler(true) },
+    { label: 'Maintenance', icon: 'wrench-orange', tint: 'peach', href: '/maintenance' },
+    { label: 'Send Reminders', icon: 'bell-purple', tint: 'indigo', onClick: () => setShowReminderModal(true) },
+    isStaff
+      ? { label: 'View Analytics', icon: 'chart', tint: 'sky', href: '/analytics' }
+      : { label: 'View Reports', icon: 'report', tint: 'sky', href: '/reports' },
+  ];
+
+  const periodArrowClass =
+    'grid h-11 w-11 shrink-0 place-items-center rounded-full border border-white bg-white text-brand-700 shadow-[0_8px_18px_-10px_rgba(70,40,160,0.45)] transition-colors hover:bg-brand-50 press';
+
   return (
-    <div className="space-y-4 text-left">
-      {/* Gradient hero greeting band (design-ref style) — full-bleed on mobile so
-          it reads as an app header; the shell's horizontal padding is cancelled.
-          Resets to inline on md+ (desktop uses the sidebar layout, not px-4/6).
-          NOTE: no lg: negative margin — it would re-break out past the md reset. */}
-      <div className="-mx-4 -mt-4 sm:-mx-6 md:mx-0 md:mt-0">
+    <div className="space-y-5 text-left">
+      {/* Gradient hero greeting card (design ref: owner dashboard). Sits inside
+          the shell's padding as a rounded card on every breakpoint. */}
       <HeroHeader
-        eyebrow={<><Building className="h-3 w-3" /> PG Owner</>}
-        title={`Welcome, ${owner.pgName}`}
-        subtitle={owner.pgAddress || 'Live occupancy & automated rent settlement'}
+        variant="gradient"
+        illustration="hero-owner"
+        actionsClassName="hidden sm:flex"
+        eyebrow={
+          <>
+            <ShieldCheck /> {isStaff ? 'Staff' : 'Owner'}
+          </>
+        }
+        title="Welcome back,"
+        highlight={heroName}
+        meta={
+          <span className="inline-flex items-start gap-1.5 text-[13px] font-medium text-white/85">
+            <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
+            <span className="line-clamp-2">{heroPlace}</span>
+          </span>
+        }
       >
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              if (beds.length === 0) {
-                toast.error('No beds configured yet. Please generate your room inventory first.');
-                setShowSetupWizard(true);
-                return;
-              }
-              const firstVacant = beds.find((b) => b.status === 'vacant');
-              if (firstVacant) {
-                setSelectedBedForAdd(firstVacant);
-              } else {
-                toast.error('All beds are currently occupied. Vacate a bed to add a new resident.');
-              }
-            }}
-            className="inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-2 text-xs font-bold accent-text shadow-sm press"
-          >
-            <UserPlus className="h-3.5 w-3.5" /> Add Resident
-          </button>
+        {/* From sm up the pills stay left of the building art; on phones they
+            wrap freely (a narrower box would stack them three rows deep). */}
+        <div className="flex flex-wrap items-center gap-2 sm:max-w-[60%]">
+          <HeroAction onClick={handleAddResident}>
+            <UserPlus /> Add Resident
+          </HeroAction>
           {beds.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setShowSetupWizard(true)}
-              className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-4 py-2 text-xs font-bold text-white backdrop-blur-sm press"
-            >
-              <Building className="h-3.5 w-3.5" /> Room Setup
-            </button>
+            <HeroAction tone="glass" onClick={() => setShowSetupWizard(true)}>
+              <Building /> Room Setup
+            </HeroAction>
           )}
-          <button
-            type="button"
-            onClick={() => setShowBankReconciler(true)}
-            className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-4 py-2 text-xs font-bold text-white backdrop-blur-sm press"
-          >
-            <FileSpreadsheet className="h-3.5 w-3.5" /> Bank CSV
-          </button>
+          <HeroAction tone="glass" onClick={() => setShowBankReconciler(true)}>
+            <FileSpreadsheet /> Bank CSV
+          </HeroAction>
         </div>
       </HeroHeader>
-      </div>
 
       {/* Empty Inventory Onboarding Banner */}
       {beds.length === 0 && (
-        <div className="accent-soft-bg border rounded-[12px] p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4" style={{ borderColor: 'var(--accent-soft)' }}>
-          <div className="flex items-start gap-3">
-            <div className="p-2.5 text-white rounded-[10px] mt-0.5 shadow-xs" style={{ background: 'var(--accent)' }}>
-              <Building className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="text-sm font-bold" style={{ color: 'var(--accent-ink)' }}>
-                No Rooms or Beds Configured Yet (0 Units)
-              </h3>
-              <p className="text-xs mt-0.5" style={{ color: 'var(--accent-ink)' }}>
-                Your PG has 0 beds ready for lease. Configure your floor-by-floor sharing formats (Single, 2-share to 6-share) and pricing to generate your bed units.
-              </p>
-            </div>
-          </div>
-          <Button
-            variant="solid"
-            size="sm"
-            style={{ background: 'var(--accent)' }}
-            className="text-white whitespace-nowrap shadow-sm font-medium"
-            onClick={() => setShowSetupWizard(true)}
-          >
-            <Layers className="w-4 h-4 mr-1.5" />
-            <span>Configure Rooms & Generate Beds</span>
-          </Button>
-        </div>
+        <InfoBanner
+          tone="brand"
+          icon="building"
+          title="No Rooms or Beds Configured Yet (0 Units)"
+          description="Your PG has 0 beds ready for lease. Configure your floor-by-floor sharing formats (Single, 2-share to 6-share) and pricing to generate your bed units."
+          action={
+            <Button className="w-full sm:w-auto" onClick={() => setShowSetupWizard(true)}>
+              <Layers className="h-4 w-4" />
+              <span>
+                Configure Rooms<span className="hidden min-[400px]:inline"> &amp; Generate Beds</span>
+              </span>
+            </Button>
+          }
+        />
       )}
+
+      {/* Stat row: rooms · beds · residents · selected month's collection */}
+      <StatsRow
+        beds={beds}
+        rentRecords={rentRecords}
+        summary={summary}
+        residentCount={residentCount}
+        collectionLabel={periodLabel}
+        inventoryHref="#bed-inventory"
+        residentsHref="/tenants"
+        collectionHref="/analytics"
+      />
 
       {/* Resident join requests (from public PG discovery) */}
       {joinRequests.length > 0 && (
-        <div className="app-card overflow-hidden animate-pop">
-          <div className="accent-soft-bg px-4 py-2.5 flex items-center gap-2">
-            <UserPlus className="w-4 h-4" />
-            <span className="text-sm font-extrabold">
-              {joinRequests.length} resident {joinRequests.length === 1 ? 'wants' : 'want'} to join
-            </span>
-          </div>
-          <div className="divide-y divide-slate-100">
+        <InfoBanner
+          tone="brand"
+          icon="user-add"
+          className="animate-pop"
+          title={`${joinRequests.length} resident ${joinRequests.length === 1 ? 'wants' : 'want'} to join`}
+        >
+          <ul className="divide-y divide-white/80">
             {joinRequests.slice(0, 6).map((r) => (
-              <div key={r.id} className="flex items-center justify-between px-4 py-3">
-                <div className="min-w-0">
-                  <div className="text-sm font-bold text-slate-900 truncate">{r.residentName}</div>
-                  <div className="text-[11px] font-mono-numbers text-slate-500">{r.residentPhone}</div>
+              <li key={r.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <Avatar name={r.residentName} size="md" />
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-bold text-ink">{r.residentName}</div>
+                    <div className="font-mono-numbers text-xs font-medium text-muted">{r.residentPhone}</div>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <Button size="sm" variant="outline" onClick={() => declineJoinRequest(r.id)}>
+                <div className="flex shrink-0 items-center gap-2">
+                  <Button variant="outline" onClick={() => declineJoinRequest(r.id)}>
                     Decline
                   </Button>
-                  <Button size="sm" variant="solid" onClick={() => acceptJoinRequest(r)}>
-                    Accept
-                  </Button>
+                  <Button onClick={() => acceptJoinRequest(r)}>Accept</Button>
                 </div>
-              </div>
+              </li>
             ))}
-          </div>
+          </ul>
           {prefillTenant && (
-            <div className="px-4 py-2.5 text-[11px] accent-text accent-soft-bg font-semibold">
+            <div className="border-t border-white/80 bg-brand-50/70 px-4 py-2.5 text-xs font-semibold text-brand-700">
               Approved “{prefillTenant.name}” — now tap a vacant bed to finish adding them.
             </div>
           )}
-        </div>
+        </InfoBanner>
       )}
 
       {/* Defaulter / aging report — overdue unpaid rent across all months */}
       {defaulters.length > 0 && (
-        <div className="bg-[#FEF2F2] border border-[#FECACA] rounded-[14px] overflow-hidden shadow-[0_2px_8px_-2px_rgba(239,68,68,0.15)] animate-pop">
-          <button
-            type="button"
-            onClick={() => setShowDefaulters((s) => !s)}
-            className="w-full flex items-center justify-between px-4 py-3 text-left"
-          >
-            <div className="flex items-center gap-2">
-              <ShieldAlert className="w-4 h-4 text-[#DC2626]" />
-              <span className="text-sm font-bold text-[#991B1B]">
-                {defaulters.length} overdue {defaulters.length === 1 ? 'payment' : 'payments'}
-              </span>
-              <span className="text-xs text-[#B91C1C] font-mono-numbers">
-                · {formatCurrency(defaulters.reduce((s, d) => s + d.outstandingPaise, 0) / 100)} outstanding
-              </span>
-            </div>
-            <span className="text-xs text-[#B91C1C] font-semibold">
-              {showDefaulters ? 'Hide' : 'View'}
+        <InfoBanner
+          tone="danger"
+          icon="alert"
+          className="animate-pop"
+          title={`${defaulters.length} overdue ${defaulters.length === 1 ? 'payment' : 'payments'}`}
+          description={
+            <span className="font-mono-numbers">
+              {formatCurrency(defaulters.reduce((s, d) => s + d.outstandingPaise, 0) / 100)} outstanding
             </span>
-          </button>
+          }
+          action={
+            <Button
+              variant="outline"
+              className="w-full sm:w-auto"
+              aria-expanded={showDefaulters}
+              onClick={() => setShowDefaulters((s) => !s)}
+            >
+              <span>{showDefaulters ? 'Hide' : 'View'}</span>
+              <ChevronDown className={`h-4 w-4 transition-transform ${showDefaulters ? 'rotate-180' : ''}`} />
+            </Button>
+          }
+        >
           {showDefaulters && (
-            <div className="divide-y divide-[#FECACA] border-t border-[#FECACA]">
+            <ul className="divide-y divide-white/80">
               {defaulters.slice(0, 10).map((d) => (
-                <div key={d.id} className="flex items-center justify-between px-4 py-2.5 bg-white/40">
+                <li key={d.id} className="flex items-center justify-between gap-3 px-4 py-3">
                   <div className="min-w-0">
-                    <div className="text-xs font-bold text-[#09090B] truncate">
+                    <div className="truncate text-[13.5px] font-bold text-ink">
                       {d.tenantName || 'Resident'}{' '}
-                      <span className="font-normal text-[#64748B]">· {d.bedLabel || ''} · {d.period}</span>
+                      <span className="font-medium text-muted">· {d.bedLabel || ''} · {d.period}</span>
                     </div>
-                    <div className="text-[11px] text-[#B91C1C]">
+                    <div className="text-xs font-semibold text-danger-ink">
                       {d.daysOverdue} days overdue
                       {d.lateFeePaise > 0 && ` · late fee ${formatCurrency(d.lateFeePaise / 100)}`}
                     </div>
                   </div>
-                  <span className="text-xs font-bold font-mono-numbers text-[#991B1B] shrink-0">
+                  <span className="shrink-0 font-mono-numbers text-sm font-extrabold text-danger-ink">
                     {formatCurrency(d.outstandingPaise / 100)}
                   </span>
-                </div>
+                </li>
               ))}
               {defaulters.length > 10 && (
-                <div className="px-4 py-2 text-[11px] text-[#B91C1C] bg-white/40">
+                <li className="px-4 py-2.5 text-xs font-semibold text-danger-ink">
                   +{defaulters.length - 10} more…
-                </div>
+                </li>
               )}
-            </div>
+            </ul>
           )}
-        </div>
+        </InfoBanner>
       )}
 
       {/* Pending deposit refunds owed to tenants */}
       {pendingRefunds.length > 0 && (
-        <div className="bg-[#EFF6FF] border border-[#BFDBFE] rounded-[14px] p-3 space-y-2 shadow-[0_2px_8px_-2px_rgba(29,78,216,0.15)] animate-pop">
-          <div className="flex items-center gap-2">
-            <IndianRupee className="w-4 h-4 text-[#1D4ED8]" />
-            <span className="text-sm font-bold text-[#1E3A8A]">
-              {pendingRefunds.length} pending deposit {pendingRefunds.length === 1 ? 'refund' : 'refunds'}
-            </span>
-          </div>
-          <div className="divide-y divide-[#BFDBFE]">
+        <InfoBanner
+          tone="info"
+          icon="rupee-badge"
+          className="animate-pop"
+          title={`${pendingRefunds.length} pending deposit ${pendingRefunds.length === 1 ? 'refund' : 'refunds'}`}
+        >
+          <ul className="divide-y divide-white/80">
             {pendingRefunds.slice(0, 8).map((r) => (
-              <div key={r.id} className="flex items-center justify-between py-2">
+              <li key={r.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
                 <div className="min-w-0">
-                  <span className="text-xs font-semibold text-[#09090B] truncate block">
+                  <span className="block truncate text-[13.5px] font-bold text-ink">
                     {r.tenantName || 'Resident'}
                   </span>
-                  <span className="text-[11px] font-mono-numbers text-[#1D4ED8]">
+                  <span className="font-mono-numbers text-xs font-semibold text-info-ink">
                     {formatCurrency(r.amountPaise / 100)} to refund
                   </span>
                 </div>
                 <Button
-                  size="sm"
                   variant="outline"
                   disabled={refundBusyId === r.id}
                   onClick={() => markRefundIssued(r.id)}
                 >
                   Mark Paid Out
                 </Button>
-              </div>
+              </li>
             ))}
-          </div>
-        </div>
+          </ul>
+        </InfoBanner>
       )}
 
       {/* Billing period navigator — view/collect rent for any month */}
-      <div className="flex items-center justify-between app-card px-3 py-2">
+      <div className="app-card flex items-center justify-between gap-2 rounded-full p-1.5">
         <button
           type="button"
           onClick={() => setSelectedPeriod((p) => shiftPeriod(p, -1))}
-          className="inline-flex items-center justify-center h-11 w-11 rounded-[8px] text-[#64748B] hover:bg-[#F8FAFC] hover:text-[#09090B] transition-colors"
+          className={periodArrowClass}
           aria-label="Previous month"
         >
-          <ArrowLeft className="w-4 h-4" />
+          <ChevronLeft className="h-5 w-5" />
         </button>
-        <div className="text-center">
+        <div className="flex min-w-0 flex-col items-center text-center">
           {/* Tap the month label to open the OS month/year picker (full calendar
               selection) instead of only stepping one month at a time with arrows.
               A transparent native <input type="month"> overlays the label. */}
-          <label className="relative inline-flex items-center justify-center cursor-pointer">
-            <span className="text-sm font-bold text-[#09090B] inline-flex items-center gap-1">
+          <label className="relative inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-full px-3 py-1.5 transition-colors hover:bg-brand-50">
+            <CalendarDays className="h-4 w-4 shrink-0 text-brand" />
+            <span className="font-mono-numbers text-[15px] font-extrabold tracking-[-0.01em] text-ink">
               {labelPeriod(selectedPeriod)}
-              <CalendarDays className="w-3.5 h-3.5 text-[#94A3B8]" />
             </span>
             <input
               type="month"
@@ -904,14 +976,14 @@ export default function OwnerDashboardPage() {
                 if (e.target.value) setSelectedPeriod(e.target.value);
               }}
               aria-label="Select billing month"
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
             />
           </label>
           {!isCurrentPeriod && (
             <button
               type="button"
               onClick={() => setSelectedPeriod(getCurrentPeriod())}
-              className="block text-[11px] accent-text font-semibold"
+              className="block rounded-full px-2 text-[11.5px] font-bold text-brand-700 hover:underline"
             >
               Jump to current month
             </button>
@@ -921,75 +993,79 @@ export default function OwnerDashboardPage() {
           type="button"
           onClick={() => setSelectedPeriod((p) => shiftPeriod(p, 1))}
           disabled={isCurrentPeriod}
-          className="inline-flex items-center justify-center h-11 w-11 rounded-[8px] text-[#64748B] hover:bg-[#F8FAFC] hover:text-[#09090B] transition-colors disabled:opacity-30 disabled:pointer-events-none"
+          className={`${periodArrowClass} disabled:pointer-events-none disabled:opacity-40`}
           aria-label="Next month"
         >
-          <ArrowLeft className="w-4 h-4 rotate-180" />
+          <ChevronRight className="h-5 w-5" />
         </button>
       </div>
 
       {/* Bulk confirm — mark every pending/verify record this month paid at once */}
-      {(() => {
-        const pendingCount = rentRecords.filter(
-          (r) => r.status !== 'paid' && r.id && !r.id.startsWith('temp_')
-        ).length;
-        if (pendingCount < 2) return null;
-        return (
-          <div className="flex items-center justify-between bg-[#ECFDF5] border border-[#A7F3D0] rounded-[14px] px-3.5 py-2.5 shadow-[0_2px_8px_-2px_rgba(16,185,129,0.15)] animate-pop">
-            <span className="text-xs font-bold text-[#065F46]">
-              {pendingCount} payments pending this month
-            </span>
+      {bulkPendingCount >= 2 && (
+        <InfoBanner
+          tone="warning"
+          icon="calendar-clock"
+          className="animate-pop"
+          title={`${bulkPendingCount} payments pending this month`}
+          action={
             <Button
-              size="sm"
-              variant="solid"
-              className="bg-[#10B981] hover:bg-[#059669]"
+              variant="success"
+              className="w-full sm:w-auto"
               disabled={actionBusy}
               onClick={bulkConfirmPending}
             >
-              <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
-              Mark All Paid
+              <CheckCircle2 className="h-4 w-4" />
+              <span>Mark All Paid</span>
             </Button>
-          </div>
-        );
-      })()}
+          }
+        />
+      )}
 
-      {/* Bento Live HUD Telemetry Strip */}
-      <StatsBar
-        beds={beds}
-        rentRecords={rentRecords}
-        onRemindAll={() => setShowReminderModal(true)}
-        onEmailReminders={handleEmailReminders}
-        emailReminding={emailReminding}
-        summary={summary}
-      />
+      {/* Overview (occupancy donut + collection) beside Quick Actions on desktop */}
+      <div className="grid gap-5 lg:grid-cols-2">
+        <StatsBar
+          beds={beds}
+          rentRecords={rentRecords}
+          onRemindAll={() => setShowReminderModal(true)}
+          onEmailReminders={handleEmailReminders}
+          emailReminding={emailReminding}
+          summary={summary}
+          periodLabel={periodLabel}
+        />
+        <QuickActionGrid actions={quickActions} title="Quick Actions" icon="star" columns={3} />
+      </div>
 
       {/* Large-PG notice: the live grid is a bounded window; the HUD totals above
           are the accurate whole-PG figures (server-computed). */}
       {summary && summary.totalBeds > beds.length && (
-        <div className="flex items-start gap-2.5 rounded-[10px] bg-[#EFF6FF] border border-[#BFDBFE] px-4 py-3 text-xs text-[#1E40AF]">
-          <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5 text-[#2563EB]" />
-          <span>
-            Showing the most recent <strong>{beds.length}</strong> of{' '}
-            <strong>{summary.totalBeds}</strong> beds in the live grid. Occupancy above
-            reflects your <strong>entire</strong> PG; rent totals cover the beds currently
-            loaded. Use search and the filters to find a specific bed.
-          </span>
-        </div>
+        <InfoBanner
+          tone="info"
+          icon="building"
+          title={`Showing the most recent ${beds.length} of ${summary.totalBeds} beds in the live grid`}
+          description={
+            <>
+              Occupancy above reflects your <strong>entire</strong> PG; rent totals cover the beds
+              currently loaded. Use search and the filters to find a specific bed.
+            </>
+          }
+        />
       )}
 
-      {/* Bed Bento Grid Section */}
-      <BedGrid
-        beds={beds}
-        rentRecords={rentRecords}
-        ownerName={owner.name}
-        pgName={owner.pgName}
-        ownerUpi={owner.upiId}
-        onAddTenant={(bed) => setSelectedBedForAdd(bed)}
-        onMarkPaid={(bed, rec) => handleMarkPaid(bed, rec)}
-        onVerifyProof={(bed, rec) => setProofModalRecord({ bed, record: rec })}
-        onVacate={(bed) => setConfirmVacateBed(bed)}
-        onSelectBed={(bed) => setActiveBedDrawer(bed)}
-      />
+      {/* Bed inventory (rooms / beds) — anchor target of the stat tiles */}
+      <div id="bed-inventory" className="scroll-mt-24 md:scroll-mt-8">
+        <BedGrid
+          beds={beds}
+          rentRecords={rentRecords}
+          ownerName={owner.name}
+          pgName={owner.pgName}
+          ownerUpi={owner.upiId}
+          onAddTenant={(bed) => setSelectedBedForAdd(bed)}
+          onMarkPaid={(bed, rec) => handleMarkPaid(bed, rec)}
+          onVerifyProof={(bed, rec) => setProofModalRecord({ bed, record: rec })}
+          onVacate={(bed) => setConfirmVacateBed(bed)}
+          onSelectBed={(bed) => setActiveBedDrawer(bed)}
+        />
+      </div>
 
       {/* RIGHT-SIDE BED DETAILS COMMAND DRAWER */}
       <Drawer
@@ -1000,88 +1076,76 @@ export default function OwnerDashboardPage() {
         width="md"
         footer={
           activeBedDrawer?.status === 'guest' ? (
-            <a href="/guests" className="w-full">
-              <Button variant="solid" size="sm" className="w-full">
-                <BedDouble className="w-3.5 h-3.5 mr-1" />
-                <span>Manage Guest · Check out</span>
-              </Button>
+            <a href="/guests" className="btn-pill w-full">
+              <BedDouble className="h-4 w-4" />
+              <span>Manage Guest · Check out</span>
             </a>
           ) : activeBedDrawer?.status !== 'vacant' ? (
-            <div className="flex items-center justify-between w-full">
+            <div className="flex w-full flex-wrap items-center gap-2">
               <Button
                 variant="destructive"
-                size="sm"
                 onClick={() => setConfirmVacateBed(activeBedDrawer)}
               >
-                <LogOut className="w-3.5 h-3.5 mr-1" />
+                <LogOut className="h-4 w-4" />
                 <span>Vacate Bed</span>
               </Button>
 
-              <div className="flex items-center gap-2">
+              <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
                 {activeRecord?.status === 'verify' && (
                   <Button
-                    size="sm"
-                    variant="solid"
-                    className="bg-[#6366F1] hover:bg-[#4F46E5] text-white"
                     onClick={() => {
                       if (activeRecord) {
                         setProofModalRecord({ bed: activeBedDrawer!, record: activeRecord });
                       }
                     }}
                   >
-                    <Eye className="w-3.5 h-3.5 mr-1" />
+                    <Eye className="h-4 w-4" />
                     <span>View Proof</span>
                   </Button>
                 )}
 
                 {activeBedDrawer?.status !== 'paid' && activeRecord?.status !== 'paid' && (
                   <Button
-                    size="sm"
-                    variant="solid"
-                    className="bg-[#10B981] hover:bg-[#059669]"
+                    variant="success"
                     onClick={() => handleMarkPaid(activeBedDrawer!, activeRecord || undefined)}
                   >
-                    <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+                    <CheckCircle2 className="h-4 w-4" />
                     <span>Mark as Paid</span>
                   </Button>
                 )}
 
                 {(activeBedDrawer?.status === 'paid' || activeRecord?.status === 'paid') && activeRecord?.id && (
                   <Button
-                    size="sm"
                     variant="outline"
-                    className="text-[#DC2626] border-[#FECACA] hover:bg-[#FEF2F2]"
                     onClick={() => handleReversePaid(activeBedDrawer!, activeRecord)}
                   >
+                    <Undo2 className="h-4 w-4" />
                     <span>Reverse Payment</span>
                   </Button>
                 )}
               </div>
             </div>
           ) : (
-            <div className="flex items-center gap-2 w-full">
+            <div className="grid w-full grid-cols-2 gap-2">
               <Button
-                size="sm"
-                variant="solid"
-                className="flex-1"
+                size="full"
                 onClick={() => {
                   setSelectedBedForAdd(activeBedDrawer);
                   setActiveBedDrawer(null);
                 }}
               >
-                <UserPlus className="w-3.5 h-3.5 mr-1" />
+                <UserPlus className="h-4 w-4" />
                 <span>Add Resident</span>
               </Button>
               <Button
-                size="sm"
+                size="full"
                 variant="outline"
-                className="flex-1"
                 onClick={() => {
                   setGuestBed(activeBedDrawer);
                   setActiveBedDrawer(null);
                 }}
               >
-                <BedDouble className="w-3.5 h-3.5 mr-1" />
+                <BedDouble className="h-4 w-4" />
                 <span>Check in Guest</span>
               </Button>
             </div>
@@ -1089,109 +1153,90 @@ export default function OwnerDashboardPage() {
         }
       >
         {activeBedDrawer && (
-          <div className="space-y-5 text-left">
+          <div className="space-y-4 text-left">
             {activeBedDrawer.status === 'vacant' ? (
-              <div className="p-6 text-center rounded-[10px] bg-[#F8FAFC] border border-[#E2E8F0] space-y-2">
-                <span className="text-xs text-[#64748B] block">This bed is currently</span>
-                <span className="text-base font-bold text-[#09090B] block">Vacant</span>
-                <span className="font-mono-numbers text-sm accent-text font-bold block">
+              <div className="tint-card tint-slate flex flex-col items-center gap-1 px-6 py-7 text-center">
+                <Icon3D name="bed" size={56} />
+                <span className="mt-2 text-[13px] font-medium text-muted">This bed is currently</span>
+                <span className="text-lg font-extrabold tracking-[-0.015em] text-ink">Vacant</span>
+                <span className="font-mono-numbers text-[15px] font-extrabold text-brand-700">
                   {formatCurrency(activeBedDrawer.monthlyRent)}/month
                 </span>
               </div>
             ) : (
               <>
                 {/* Resident Card */}
-                <div className="p-4 rounded-[10px] bg-[#F8FAFC] border border-[#E2E8F0] flex items-start justify-between">
+                <div className="well p-4">
                   <div className="flex items-center gap-3">
                     <Avatar name={activeBedDrawer.tenantName || 'R'} size="lg" />
-                    <div>
-                      <h4 className="text-sm font-bold text-[#09090B]">
-                        {activeBedDrawer.tenantName}
-                      </h4>
-                      <p className="text-xs font-mono-numbers text-[#64748B]">
-                        {activeBedDrawer.tenantPhone}
-                      </p>
+                    <h4 className="min-w-0 flex-1 truncate text-base font-extrabold tracking-[-0.01em] text-ink">
+                      {activeBedDrawer.tenantName}
+                    </h4>
+                    <Badge variant={drawerStatus} dot>
+                      {drawerStatusLabel}
+                    </Badge>
+                  </div>
+                  {(activeBedDrawer.tenantPhone || activeTenant?.moveInDate) && (
+                    <div className="mt-3 divide-y divide-line border-t border-line">
+                      {activeBedDrawer.tenantPhone && (
+                        <KeyValue label="Phone" value={activeBedDrawer.tenantPhone} />
+                      )}
                       {activeTenant?.moveInDate && (
-                        <p className="text-[11px] text-[#94A3B8] mt-0.5">
-                          Since {new Date(activeTenant.moveInDate).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}
-                        </p>
+                        <KeyValue
+                          label="Resident since"
+                          value={new Date(activeTenant.moveInDate).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}
+                        />
                       )}
                     </div>
-                  </div>
-
-                  <StatusDot
-                    status={
-                      activeBedDrawer.status === 'paid' || activeRecord?.status === 'paid'
-                        ? 'paid'
-                        : activeRecord?.status === 'verify'
-                        ? 'verify'
-                        : 'pending'
-                    }
-                    label={
-                      activeBedDrawer.status === 'paid' || activeRecord?.status === 'paid'
-                        ? 'Paid'
-                        : activeRecord?.status === 'verify'
-                        ? 'Verify'
-                        : 'Due'
-                    }
-                  />
+                  )}
                 </div>
 
                 {/* Financial Summary */}
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="p-3.5 rounded-[8px] border border-[#E2E8F0] bg-white">
-                    <span className="text-[10px] uppercase font-semibold text-[#64748B]">
-                      Monthly Rent
-                    </span>
-                    <span className="text-base font-bold font-mono-numbers text-[#09090B] block mt-0.5">
-                      {formatCurrency(activeBedDrawer.monthlyRent)}
-                    </span>
-                  </div>
-
-                  <div className="p-3.5 rounded-[8px] border border-[#E2E8F0] bg-white">
-                    <span className="text-[10px] uppercase font-semibold text-[#64748B]">
-                      Security Deposit
-                    </span>
-                    <span className="text-base font-bold font-mono-numbers text-[#09090B] block mt-0.5">
-                      {formatCurrency(activeTenant?.depositPaid || activeBedDrawer.monthlyRent)}
-                    </span>
-                  </div>
+                  <StatTile
+                    icon="rupee"
+                    tint="mint"
+                    label="Monthly Rent"
+                    value={formatCurrency(activeBedDrawer.monthlyRent)}
+                  />
+                  <StatTile
+                    icon="wallet-sm"
+                    tint="violet"
+                    label="Security Deposit"
+                    value={formatCurrency(activeTenant?.depositPaid || activeBedDrawer.monthlyRent)}
+                  />
                 </div>
 
                 {/* Partial / advance payment — shown while the active record is not fully paid */}
                 {activeRecord && activeRecord.status !== 'paid' && (activeRecord.amountDuePaise ?? 0) > 0 && (
-                  <div className="p-3.5 rounded-[8px] border border-[#E2E8F0] bg-white space-y-2.5">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-semibold text-[#334155]">Collection Progress</span>
-                      <span className="font-mono-numbers text-[#64748B]">
+                  <div className="well space-y-3 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-[13px] font-bold text-ink-2">Collection Progress</span>
+                      <span className="font-mono-numbers text-[13px] font-semibold text-muted">
                         {formatCurrency((activeRecord.amountPaidPaise ?? 0) / 100)} / {formatCurrency((activeRecord.amountDuePaise ?? 0) / 100)}
                       </span>
                     </div>
-                    <div className="h-2 w-full rounded-full bg-[#F1F5F9] overflow-hidden">
-                      <div
-                        className="h-full bg-[#10B981] rounded-full transition-all"
-                        style={{
-                          width: `${Math.min(
-                            100,
-                            Math.round(
-                              ((activeRecord.amountPaidPaise ?? 0) / Math.max(1, activeRecord.amountDuePaise ?? 1)) * 100
-                            )
-                          )}%`,
-                        }}
-                      />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <input
+                    <ProgressBar
+                      color="emerald"
+                      value={Math.min(
+                        100,
+                        Math.round(
+                          ((activeRecord.amountPaidPaise ?? 0) / Math.max(1, activeRecord.amountDuePaise ?? 1)) * 100
+                        )
+                      )}
+                    />
+                    <div className="flex flex-col gap-2 min-[400px]:flex-row min-[400px]:items-center">
+                      <Input
                         type="number"
                         min={1}
                         inputMode="numeric"
                         placeholder="Amount (₹)"
+                        aria-label="Part payment amount (₹)"
                         value={partialAmount}
                         onChange={(e) => setPartialAmount(e.target.value)}
-                        className="flex-1 h-11 px-3 rounded-[8px] border border-[#CBD5E1] text-sm text-[#09090B] focus:border-[color:var(--accent)] focus:outline-none"
                       />
                       <Button
-                        size="sm"
+                        size="lg"
                         variant="outline"
                         disabled={actionBusy}
                         onClick={() => handleRecordPartial(activeRecord)}
@@ -1205,15 +1250,13 @@ export default function OwnerDashboardPage() {
                 {/* Direct Resident Contact Actions */}
                 {activeBedDrawer.tenantPhone && (
                   <div className="space-y-2">
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-[#64748B] block">
-                      Direct Actions
-                    </span>
-                    <div className="grid grid-cols-2 gap-2">
+                    <h4 className="text-[13px] font-bold text-ink-2">Direct actions</h4>
+                    <div className="grid grid-cols-2 gap-2.5">
                       <a
                         href={`tel:${activeBedDrawer.tenantPhone}`}
-                        className="flex items-center justify-center gap-1.5 h-9 rounded-[8px] border border-[#E2E8F0] text-xs font-semibold text-[#09090B] hover:bg-[#F8FAFC] transition-colors cursor-pointer"
+                        className="btn-soft h-11 text-sm"
                       >
-                        <Phone className="w-3.5 h-3.5 text-[#64748B]" />
+                        <Phone className="h-4 w-4 text-brand" />
                         <span>Call</span>
                       </a>
                       <a
@@ -1223,9 +1266,9 @@ export default function OwnerDashboardPage() {
                         )}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center justify-center gap-1.5 h-9 rounded-[8px] bg-[#10B981] hover:bg-[#059669] text-white text-xs font-semibold transition-colors cursor-pointer"
+                        className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-[linear-gradient(135deg,#4FD69C_0%,#1FAE76_50%,#128A5B_100%)] px-4 text-sm font-bold text-white shadow-[0_12px_24px_-10px_rgba(18,138,91,0.5),inset_0_1px_0_rgba(255,255,255,0.3)] transition-[filter] hover:brightness-105 press"
                       >
-                        <Send className="w-3.5 h-3.5" />
+                        <Send className="h-4 w-4" />
                         <span>WhatsApp</span>
                       </a>
                     </div>
@@ -1242,51 +1285,52 @@ export default function OwnerDashboardPage() {
 
                 {/* Photo gallery (move-in / ID / payment proofs) */}
                 {activeTenant?.id && (
-                  <div className="space-y-2">
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-[#64748B] block">
-                      Document & Photo Vault
-                    </span>
+                  <div className="space-y-2.5">
+                    <h4 className="flex items-center gap-2 text-[13px] font-bold text-ink-2">
+                      <Icon3D name="doc-green" size={22} />
+                      Document &amp; Photo Vault
+                    </h4>
                     <TenantPhotoGallery tenantId={activeTenant.id} />
                   </div>
                 )}
 
                 {/* Emergency Contact */}
                 {activeTenant?.emergencyContactPhone && (
-                  <div className="p-3.5 rounded-[8px] bg-[#F8FAFC] border border-[#E2E8F0] flex items-center justify-between">
-                    <div className="min-w-0">
-                      <span className="text-[11px] font-semibold uppercase tracking-wider text-[#64748B] block">
-                        Emergency Contact
-                      </span>
-                      <span className="text-xs text-[#09090B] font-semibold">
+                  <div className="well flex items-center gap-3 p-3.5">
+                    <IconBubble icon="person" tint="peach" size={40} />
+                    <div className="min-w-0 flex-1">
+                      <span className="block text-xs font-semibold text-muted">Emergency contact</span>
+                      <span className="block truncate text-[13.5px] font-bold text-ink">
                         {activeTenant.emergencyContactName || 'Contact'}
                         {activeTenant.emergencyContactRelation ? ` · ${activeTenant.emergencyContactRelation}` : ''}
                       </span>
-                      <span className="text-[11px] font-mono-numbers text-[#64748B] block">
+                      <span className="block font-mono-numbers text-xs font-medium text-muted">
                         {activeTenant.emergencyContactPhone}
                       </span>
                     </div>
                     <a
                       href={`tel:${activeTenant.emergencyContactPhone}`}
-                      className="inline-flex items-center justify-center h-11 w-11 rounded-[8px] border border-[#E2E8F0] text-[#64748B] hover:bg-white transition-colors shrink-0"
+                      className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-white bg-white text-brand-700 shadow-[0_8px_18px_-10px_rgba(70,40,160,0.45)] transition-colors hover:bg-brand-50 press"
                       aria-label="Call emergency contact"
                     >
-                      <Phone className="w-4 h-4" />
+                      <Phone className="h-4 w-4" />
                     </a>
                   </div>
                 )}
 
                 {/* Public Link Share */}
                 {activeTenant?.token && (
-                  <div className="p-3.5 rounded-[8px] bg-[#F8FAFC] border border-[#E2E8F0] space-y-1.5">
-                    <span className="text-[11px] font-semibold text-[#475569] block">
+                  <div className="well space-y-2.5 p-4">
+                    <span className="flex items-center gap-2 text-[13px] font-bold text-ink-2">
+                      <Icon3D name="doc" size={22} />
                       Resident Private Portal Link
                     </span>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-mono-numbers text-[11px] text-[#64748B] truncate max-w-[220px]">
+                    <div className="flex items-center gap-2">
+                      <span className="min-w-0 flex-1 truncate rounded-xl border border-line bg-white/85 px-3 py-2.5 font-mono text-[12px] text-ink-2">
                         {typeof window !== 'undefined' ? `${window.location.origin}/t/${activeTenant.token}` : `/t/${activeTenant.token}`}
                       </span>
-                      <button
-                        type="button"
+                      <Button
+                        variant="soft"
                         onClick={async () => {
                           const url = `${window.location.origin}/t/${activeTenant.token}`;
                           try {
@@ -1311,11 +1355,10 @@ export default function OwnerDashboardPage() {
                             toast.error('Could not copy — long-press the link to copy it manually');
                           }
                         }}
-                        className="accent-text font-semibold hover:underline inline-flex items-center gap-1 cursor-pointer"
                       >
-                        <Copy className="w-3 h-3" />
+                        <Copy className="h-4 w-4" />
                         <span>Copy</span>
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 )}
@@ -1384,45 +1427,41 @@ export default function OwnerDashboardPage() {
           description={`Resident: ${proofModalRecord.bed.tenantName}`}
           width="md"
           footer={
-            <div className="flex items-center justify-end gap-2">
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button
                 variant="outline"
-                size="sm"
+                className="w-full sm:w-auto"
                 onClick={() => setProofModalRecord(null)}
               >
                 Close
               </Button>
               <Button
-                variant="solid"
-                size="sm"
-                className="bg-[#10B981] hover:bg-[#059669]"
+                variant="success"
+                className="w-full sm:w-auto"
                 onClick={handleApproveProof}
               >
-                <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
+                <CheckCircle2 className="h-4 w-4" />
                 <span>Approve & Issue HRA Receipt</span>
               </Button>
             </div>
           }
         >
           <div className="space-y-4 text-left">
-            <div className="p-3.5 bg-[#F8FAFC] rounded-[8px] border border-[#E2E8F0] flex items-center justify-between text-xs">
-              <span className="text-[#64748B]">Claimed Amount:</span>
-              <span className="font-mono-numbers font-bold text-sm text-[#09090B]">
-                {formatCurrency(proofModalRecord.record.amount || 0)}
-              </span>
+            <div className="well divide-y divide-line px-4">
+              <KeyValue
+                label="Claimed Amount"
+                value={formatCurrency(proofModalRecord.record.amount || 0)}
+              />
+              {proofModalRecord.record.paymentReference && (
+                <KeyValue
+                  label="Claimed UPI UTR"
+                  value={<span className="font-mono">{proofModalRecord.record.paymentReference}</span>}
+                />
+              )}
             </div>
 
-            {proofModalRecord.record.paymentReference && (
-              <div className="p-3 bg-[#EEF2FF] rounded-[8px] border border-[#C7D2FE] flex items-center justify-between text-xs">
-                <span className="text-[#4338CA] font-medium">Claimed UPI UTR:</span>
-                <span className="font-mono font-bold text-sm text-[#1E1B4B]">
-                  {proofModalRecord.record.paymentReference}
-                </span>
-              </div>
-            )}
-
             {proofModalRecord.record.proofImageUrl ? (
-              <div className="border border-[#E2E8F0] rounded-[10px] overflow-hidden bg-black/5 p-2 flex items-center justify-center">
+              <div className="well flex items-center justify-center overflow-hidden p-2">
                 {/* Plain <img>: this is a short-lived B2 presigned URL (expires
                     ~5 min) of a user-uploaded proof of arbitrary dimensions.
                     next/image can't optimize a rotating private URL and would
@@ -1431,13 +1470,13 @@ export default function OwnerDashboardPage() {
                 <img
                   src={proofModalRecord.record.proofImageUrl}
                   alt="Proof screenshot"
-                  className="max-h-96 object-contain rounded-[6px]"
+                  className="max-h-96 rounded-xl object-contain"
                 />
               </div>
             ) : (
-              <p className="text-xs text-[#64748B] italic text-center py-8">
-                No screenshot image was attached.
-              </p>
+              <div className="well">
+                <EmptyState icon3d="doc" title="No screenshot image was attached." />
+              </div>
             )}
           </div>
         </Drawer>
@@ -1452,17 +1491,17 @@ export default function OwnerDashboardPage() {
           description={`Bed ${confirmVacateBed.bedLabel} (${confirmVacateBed.tenantName})`}
           width="sm"
           footer={
-            <div className="flex items-center justify-end gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <Button
                 variant="outline"
-                size="sm"
+                size="full"
                 onClick={() => setConfirmVacateBed(null)}
               >
                 Cancel
               </Button>
               <Button
                 variant="destructive"
-                size="sm"
+                size="full"
                 onClick={handleConfirmVacate}
               >
                 Confirm Vacate
@@ -1470,14 +1509,18 @@ export default function OwnerDashboardPage() {
             </div>
           }
         >
-          <div className="space-y-3 text-left text-xs text-[#475569] leading-relaxed">
-            <div className="p-3.5 rounded-[8px] bg-[#FEF2F2] border border-[#FECACA] text-[#991B1B] flex items-start gap-2">
-              <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>
-                This will unassign <strong>{confirmVacateBed.tenantName}</strong> from Bed {confirmVacateBed.bedLabel} and archive their active lease. Their private portal URL will be disabled.
-              </span>
-            </div>
-            <p>
+          <div className="space-y-3 text-left">
+            <InfoBanner
+              tone="danger"
+              icon="alert"
+              title={
+                <>
+                  This will unassign {confirmVacateBed.tenantName} from Bed {confirmVacateBed.bedLabel}
+                </>
+              }
+              description="Their active lease will be archived and their private portal URL will be disabled."
+            />
+            <p className="px-1 text-[13px] leading-relaxed text-ink-2">
               Please verify that all outstanding dues and deposit refunds have been finalized before completing this step.
             </p>
           </div>

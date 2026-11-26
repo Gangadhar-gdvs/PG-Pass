@@ -5,7 +5,6 @@ import { useOwnerSession } from '@/hooks/useOwner';
 import { PLAN_LIMITS } from '@/lib/constants/limits';
 import { PLAN_TIER, PlanTier, ACCOUNT_STATUS } from '@/lib/constants/status';
 import {
-  Users,
   UserPlus,
   ShieldCheck,
   Phone,
@@ -13,21 +12,30 @@ import {
   Trash2,
   Lock,
   Unlock,
-  AlertCircle,
-  ExternalLink,
+  ArrowRight,
+  Copy,
+  Share2,
+  Star,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { PhoneInput } from '@/components/ui/phone-input';
 import { Drawer } from '@/components/ui/drawer';
 import { Avatar } from '@/components/ui/avatar';
-import { HeaderSkeleton, CardListSkeleton } from '@/components/ui/skeletons';
+import { EmptyState } from '@/components/ui/empty-state';
+import { HeaderSkeleton, CardListSkeleton, ListSkeleton } from '@/components/ui/skeletons';
+import { PageHeader, SectionCard, InfoBanner } from '@/components/ui/dashboard-kit';
+import { GlyphTile, IconBubble } from '@/components/brand/Icon3D';
 import { validatePhone, sanitizeText } from '@/lib/security';
 import { errorMessage } from '@/lib/utils';
 import { OwnerOnlyGuard } from '@/components/owner/OwnerOnlyGuard';
 import { StaffPermissionsEditor } from '@/components/owner/StaffPermissionsEditor';
-import { DEFAULT_STAFF_PERMISSIONS, StaffPermission } from '@/lib/constants/permissions';
-import { Star } from 'lucide-react';
+import {
+  DEFAULT_STAFF_PERMISSIONS,
+  STAFF_PERMISSION_LABELS,
+  StaffPermission,
+} from '@/lib/constants/permissions';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 
@@ -201,177 +209,206 @@ function StaffPageInner() {
 
   if (loading) {
     return (
-      <div className="max-w-3xl mx-auto space-y-4">
+      <div className="max-w-4xl mx-auto space-y-5">
         <HeaderSkeleton />
-        <CardListSkeleton rows={3} height="h-20" />
+        <CardListSkeleton rows={1} height="h-24" />
+        <ListSkeleton rows={3} />
       </div>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto py-8 space-y-6 text-left">
+    <div className="max-w-4xl mx-auto space-y-5 text-left">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-4 border-b border-[#E2E8F0]">
-        <div>
-          <h1 className="text-xl font-bold text-[#09090B] tracking-tight">
-            Staff & Warden Delegation
-          </h1>
-          <p className="text-xs text-[#64748B] mt-0.5">
-            Delegate resident check-ins and rent payment recording with scoped RBAC.
-          </p>
-        </div>
-
-        <Button
-          variant="solid"
-          size="md"
-          disabled={!canAddStaff}
-          onClick={() => setIsInviteOpen(true)}
-          className="accent-bg hover:opacity-90 text-white text-xs font-semibold"
-        >
-          <UserPlus className="w-4 h-4 mr-1.5" />
-          <span>Add Staff Member ({staffList.length}/{currentLimits.maxStaff})</span>
-        </Button>
-      </div>
+      <PageHeader
+        icon="staff"
+        tint="indigo"
+        title="Staff & Warden"
+        highlight="Delegation"
+        subtitle="Delegate resident check-ins and rent payment recording with scoped RBAC."
+        actions={
+          <Button
+            variant="solid"
+            size="md"
+            disabled={!canAddStaff}
+            onClick={() => setIsInviteOpen(true)}
+          >
+            <UserPlus className="h-4 w-4" />
+            <span>
+              Add Staff Member ({staffList.length}/{currentLimits.maxStaff})
+            </span>
+          </Button>
+        }
+      />
 
       {/* Free Tier Upgrade Banner if maxStaff === 0 */}
       {currentLimits.maxStaff === 0 && (
-        <div className="tint-card tint-violet p-4 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 accent-text shrink-0 mt-0.5" />
-          <div className="text-xs space-y-1">
-            <span className="font-bold accent-text block">
-              Staff Delegation is Locked on Free Tier
-            </span>
-            <p className="text-[#475569] leading-relaxed">
+        <InfoBanner
+          tone="brand"
+          icon="alert"
+          title="Staff Delegation is Locked on Free Tier"
+          description={
+            <>
               Your PG is on the Free tier (1 owner). Upgrade to{' '}
-              <strong className="font-semibold">Growth (1 staff seat)</strong> or{' '}
-              <strong className="font-semibold">Pro (5 staff seats)</strong> to invite wardens and assistants.
-            </p>
-            <div className="pt-1">
-              <Link
-                href="/billing"
-                className="inline-flex items-center gap-1 text-xs font-bold accent-text hover:underline"
-              >
-                <span>View SaaS upgrade options</span>
-                <ExternalLink className="w-3 h-3" />
-              </Link>
-            </div>
-          </div>
-        </div>
+              <strong className="font-bold text-ink">Growth (1 staff seat)</strong> or{' '}
+              <strong className="font-bold text-ink">Pro (5 staff seats)</strong> to invite wardens and assistants.
+            </>
+          }
+          action={
+            <Link href="/billing" className="btn-pill h-11 w-full px-5 text-[13px] sm:w-auto">
+              <span>View SaaS upgrade options</span>
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          }
+        />
       )}
 
-      {/* Scoped RBAC Explanation Box */}
-      <div className="p-4 rounded-[10px] bg-[#F8FAFC] border border-[#E2E8F0] space-y-2 text-xs">
-        <div className="flex items-center gap-1.5 font-bold text-[#09090B]">
-          <ShieldCheck className="w-4 h-4 text-[#10B981]" />
-          <span>Per-Staff Access Control</span>
-        </div>
-        <p className="text-[#475569] pt-1 leading-relaxed">
-          Each staff member gets their own access toggles — grant only what that person needs.
-          Permissions are independent per staff (never shared), enforced on the server, and banking
-          settings, subscription and staff management always stay owner-only.
-        </p>
-      </div>
+      {/* Scoped RBAC Explanation */}
+      <InfoBanner
+        tone="info"
+        icon={<GlyphTile icon={ShieldCheck} tone="sky" size={40} />}
+        title="Per-Staff Access Control"
+        description="Each staff member gets their own access toggles — grant only what that person needs. Permissions are independent per staff (never shared), enforced on the server, and banking settings, subscription and staff management always stay owner-only."
+      />
 
-      {/* Staff List Table / Cards */}
+      {/* Staff List */}
       {staffList.length === 0 ? (
-        <div className="app-card rounded-[16px] p-10 text-center space-y-2">
-          <Users className="w-10 h-10 text-[#94A3B8] mx-auto mb-2" />
-          <h3 className="text-sm font-bold text-[#09090B]">No Staff Members Added</h3>
-          <p className="text-xs text-[#64748B] max-w-sm mx-auto">
-            Add a warden or manager to let them manage daily room occupancies without granting access to banking settings.
-          </p>
+        <div className="app-card">
+          <EmptyState
+            icon3d="staff"
+            title="No Staff Members Added"
+            description="Add a warden or manager to let them manage daily room occupancies without granting access to banking settings."
+          />
         </div>
       ) : (
-        <div className="app-card rounded-[16px] divide-y divide-[#E2E8F0]">
-          {staffList.map((staff) => {
-            const staffUid = staff.uid || staff.id || '';
-            const agg = staff.ratingAgg || { count: 0, sum: 0 };
-            const ratingAvg = agg.count > 0 ? Math.round((agg.sum / agg.count) * 10) / 10 : 0;
-            return (
-            <div key={staffUid} className="p-4 text-xs">
-             <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-3 min-w-0">
-                <Avatar name={staff.name} size="md" />
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-[#09090B] text-sm">
-                      {staff.name}
-                    </span>
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-[4px] uppercase ${
-                        staff.accountStatus === ACCOUNT_STATUS.ACTIVE
-                          ? 'bg-[#ECFDF5] text-[#10B981]'
-                          : 'bg-[#FEF2F2] text-[#DC2626]'
-                      }`}
-                    >
-                      {staff.accountStatus}
-                    </span>
-                    {agg.count > 0 && (
-                      <span className="text-[10px] font-bold text-amber-600 flex items-center gap-0.5">
-                        <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
-                        {ratingAvg} ({agg.count})
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[#64748B] mt-0.5">
-                    <span className="flex items-center gap-1 min-w-0">
-                      <Mail className="w-3 h-3 text-[#94A3B8] shrink-0" />
-                      <span className="truncate max-w-[180px] sm:max-w-none">{staff.email}</span>
-                    </span>
-                    <span className="flex items-center gap-1 font-mono">
-                      <Phone className="w-3 h-3 text-[#94A3B8] shrink-0" />
-                      <span>+91 {staff.phone}</span>
-                    </span>
-                  </div>
-                </div>
-              </div>
+        <SectionCard
+          title="Staff Members"
+          icon="users"
+          action={
+            <span className="chip shrink-0 font-mono-numbers">
+              {staffList.length}/{currentLimits.maxStaff} seats
+            </span>
+          }
+        >
+          <div className="divide-y divide-line stagger">
+            {staffList.map((staff) => {
+              const staffUid = staff.uid || staff.id || '';
+              const agg = staff.ratingAgg || { count: 0, sum: 0 };
+              const ratingAvg = agg.count > 0 ? Math.round((agg.sum / agg.count) * 10) / 10 : 0;
+              const isActive = staff.accountStatus === ACCOUNT_STATUS.ACTIVE;
+              const permsOpen = permsOpenUid === staffUid;
+              // Same source the permissions editor starts from, shown as chips.
+              const grantedPerms = ((staff.permissions as StaffPermission[]) || DEFAULT_STAFF_PERMISSIONS).filter(
+                (p) => p in STAFF_PERMISSION_LABELS
+              );
+              return (
+                <div key={staffUid} className="py-4 first:pt-1 last:pb-1">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="flex min-w-0 items-start gap-3">
+                      <Avatar name={staff.name} size="lg" />
+                      <div className="min-w-0 flex-1 space-y-1.5">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="mr-0.5 text-[15px] font-bold text-ink">{staff.name}</span>
+                          <Badge variant={isActive ? 'paid' : 'danger'} dot className="capitalize">
+                            {(staff.accountStatus || '').replace(/_/g, ' ')}
+                          </Badge>
+                          {staff.role && (
+                            <Badge variant="brand" className="capitalize">
+                              {staff.role}
+                            </Badge>
+                          )}
+                          {agg.count > 0 && (
+                            <Badge variant="pending">
+                              <Star className="h-3 w-3 fill-current" />
+                              {ratingAvg} ({agg.count})
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] font-medium text-muted">
+                          <span className="flex min-w-0 items-center gap-1.5">
+                            <Mail className="h-3.5 w-3.5 shrink-0 text-faint" />
+                            <span className="max-w-[200px] truncate sm:max-w-none">{staff.email}</span>
+                          </span>
+                          <span className="flex items-center gap-1.5 font-mono-numbers">
+                            <Phone className="h-3.5 w-3.5 shrink-0 text-faint" />
+                            <span>+91 {staff.phone}</span>
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                          {grantedPerms.length === 0 ? (
+                            <Badge variant="vacant">No access granted</Badge>
+                          ) : (
+                            <>
+                              {grantedPerms.slice(0, 3).map((p) => (
+                                <span key={p} className="chip">
+                                  {STAFF_PERMISSION_LABELS[p]}
+                                </span>
+                              ))}
+                              {grantedPerms.length > 3 && (
+                                <span className="chip bg-lilac-2 text-ink-2">+{grantedPerms.length - 3} more</span>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
 
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setPermsOpenUid(permsOpenUid === staffUid ? null : staffUid)}
-                  className="px-2.5 py-1.5 rounded-[6px] border border-[#E2E8F0] hover:bg-[#F8FAFC] text-[#475569] font-semibold transition-colors cursor-pointer"
-                >
-                  {permsOpenUid === staffUid ? 'Close' : 'Permissions'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleToggleStatus(staff)}
-                  title={staff.accountStatus === ACCOUNT_STATUS.ACTIVE ? 'Suspend' : 'Activate'}
-                  className="p-1.5 rounded-[6px] border border-[#E2E8F0] hover:bg-[#F8FAFC] text-[#475569] transition-colors cursor-pointer"
-                >
-                  {staff.accountStatus === ACCOUNT_STATUS.ACTIVE ? (
-                    <Lock className="w-3.5 h-3.5 text-[#DC2626]" />
-                  ) : (
-                    <Unlock className="w-3.5 h-3.5 text-[#10B981]" />
+                    <div className="flex shrink-0 flex-wrap items-center gap-2 min-[380px]:pl-[60px] sm:pl-0">
+                      <Button
+                        type="button"
+                        variant="soft"
+                        size="md"
+                        aria-expanded={permsOpen}
+                        onClick={() => setPermsOpenUid(permsOpenUid === staffUid ? null : staffUid)}
+                      >
+                        <ShieldCheck className="h-4 w-4" />
+                        {permsOpen ? 'Close' : 'Permissions'}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => handleToggleStatus(staff)}
+                        title={isActive ? 'Suspend' : 'Activate'}
+                        aria-label={isActive ? 'Suspend' : 'Activate'}
+                        className="shrink-0"
+                      >
+                        {isActive ? (
+                          <Lock className="h-4 w-4 text-danger" />
+                        ) : (
+                          <Unlock className="h-4 w-4 text-success" />
+                        )}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => handleRevoke(staff)}
+                        title="Revoke access"
+                        aria-label="Revoke access"
+                        className="shrink-0"
+                      >
+                        <Trash2 className="h-4 w-4 text-danger" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {permsOpen && (
+                    <StaffPermissionsEditor
+                      staffUid={staffUid}
+                      initial={(staff.permissions as StaffPermission[]) || DEFAULT_STAFF_PERMISSIONS}
+                      onSaved={(perms) =>
+                        setStaffList((list) =>
+                          list.map((s) => ((s.uid || s.id) === staffUid ? { ...s, permissions: perms } : s))
+                        )
+                      }
+                    />
                   )}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleRevoke(staff)}
-                  title="Revoke access"
-                  className="p-1.5 rounded-[6px] border border-[#FECACA] hover:bg-[#FEF2F2] text-[#DC2626] transition-colors cursor-pointer"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-             </div>
-
-             {permsOpenUid === staffUid && (
-               <StaffPermissionsEditor
-                 staffUid={staffUid}
-                 initial={(staff.permissions as StaffPermission[]) || DEFAULT_STAFF_PERMISSIONS}
-                 onSaved={(perms) =>
-                   setStaffList((list) =>
-                     list.map((s) => ((s.uid || s.id) === staffUid ? { ...s, permissions: perms } : s))
-                   )
-                 }
-               />
-             )}
-            </div>
-            );
-          })}
-        </div>
+                </div>
+              );
+            })}
+          </div>
+        </SectionCard>
       )}
 
       {/* INVITE STAFF DRAWER */}
@@ -382,11 +419,11 @@ function StaffPageInner() {
         description="Creates an authorized account bound to your PG accommodation"
         width="md"
         footer={
-          <div className="flex items-center justify-end gap-2">
+          <div className="grid grid-cols-2 gap-2.5 sm:flex sm:justify-end">
             <Button
               type="button"
               variant="outline"
-              size="sm"
+              size="md"
               onClick={() => setIsInviteOpen(false)}
             >
               Cancel
@@ -394,10 +431,9 @@ function StaffPageInner() {
             <Button
               type="submit"
               form="invite-staff-form"
-              size="sm"
+              size="md"
               variant="solid"
               loading={submitting}
-              className="accent-bg hover:opacity-90 text-white"
             >
               Provision Account
             </Button>
@@ -436,9 +472,12 @@ function StaffPageInner() {
             disabled={submitting}
           />
 
-          <div className="p-3.5 rounded-[8px] bg-[#F8FAFC] border border-[#E2E8F0] text-xs text-[#64748B] leading-relaxed">
-            The warden can sign in using Google or Email/Password. Custom security claims
-            will automatically scope all their reads to your PG.
+          <div className="well flex items-start gap-3 p-3.5">
+            <IconBubble icon={<ShieldCheck className="h-4.5 w-4.5" />} tint="violet" size={36} />
+            <p className="text-[13px] leading-relaxed text-ink-2">
+              The warden can sign in using Google or Email/Password. Custom security claims
+              will automatically scope all their reads to your PG.
+            </p>
           </div>
         </form>
       </Drawer>
@@ -453,14 +492,14 @@ function StaffPageInner() {
       >
         {setupLinkInfo && (
           <div className="space-y-4">
-            <p className="text-xs text-[#64748B] leading-relaxed">
+            <p className="text-[13px] leading-relaxed text-ink-2">
               Send this one-time link to the warden so they can set their password and sign in.
               It is shown only now — you can regenerate it later via “Forgot password”.
             </p>
-            <div className="p-3 rounded-[8px] bg-[#F8FAFC] border border-[#E2E8F0] break-all text-xs font-mono text-[#334155]">
+            <div className="well break-all p-3.5 font-mono text-xs text-ink-2">
               {setupLinkInfo.link}
             </div>
-            <div className="flex flex-col sm:flex-row gap-2">
+            <div className="flex flex-col gap-2.5 sm:flex-row">
               <Button
                 type="button"
                 variant="solid"
@@ -470,19 +509,19 @@ function StaffPageInner() {
                   toast.success('Setup link copied');
                 }}
               >
+                <Copy className="h-4 w-4" />
                 Copy Link
               </Button>
               <a
-                className="flex-1"
+                className="btn-soft h-11 flex-1 text-sm"
                 href={`https://wa.me/?text=${encodeURIComponent(
                   `Hi ${setupLinkInfo.name}, set up your PGPass warden login here: ${setupLinkInfo.link}`
                 )}`}
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                <Button type="button" variant="outline" className="w-full">
-                  Share on WhatsApp
-                </Button>
+                <Share2 className="h-4 w-4 text-brand" />
+                Share on WhatsApp
               </a>
             </div>
           </div>
