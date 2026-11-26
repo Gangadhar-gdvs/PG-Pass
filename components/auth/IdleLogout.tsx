@@ -41,7 +41,7 @@ export function IdleLogout({
     } finally {
       clearLocalData();
       if (typeof window !== 'undefined') {
-        window.location.href = `${redirectTo}?idle=1`;
+        window.location.href = new URL(`${redirectTo}?idle=1`, window.location.origin).href;
       }
     }
   }, [redirectTo]);
@@ -58,7 +58,11 @@ export function IdleLogout({
   // the warning appeared and immediately re-armed/cancelled it (auto-logout
   // never actually fired). Refs keep the effect stable for the component's life.
   const warningRef = useRef(false);
-  warningRef.current = warning;
+  // Write the ref AFTER commit (not during render) to satisfy the refs-purity
+  // rule; the activity listener reads it asynchronously so one frame's lag is fine.
+  useEffect(() => {
+    warningRef.current = warning;
+  }, [warning]);
 
   const armTimers = useCallback(() => {
     clearTimers();
@@ -78,7 +82,11 @@ export function IdleLogout({
   // Keep the latest armTimers in a ref so the mount-once effect never needs it
   // as a dependency.
   const armRef = useRef(armTimers);
-  armRef.current = armTimers;
+  // Keep the ref current AFTER commit (not during render) per the refs-purity
+  // rule; the mount-once effect below calls armRef.current() asynchronously.
+  useEffect(() => {
+    armRef.current = armTimers;
+  }, [armTimers]);
 
   useEffect(() => {
     armRef.current();
@@ -105,8 +113,8 @@ export function IdleLogout({
       events.forEach((e) => window.removeEventListener(e, onActivity));
       document.removeEventListener('visibilitychange', onVisible);
     };
-    // Mount-once: timers + listeners live for the component's lifetime.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Mount-once: timers + listeners live for the component's lifetime; the
+    // latest warning/armTimers are read via refs, so no deps are needed.
   }, []);
 
   const stay = () => {

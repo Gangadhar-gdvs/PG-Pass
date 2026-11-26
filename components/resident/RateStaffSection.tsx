@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Star, UserCheck } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { errorMessage } from '@/lib/utils';
 
 interface StaffRow {
   uid: string;
@@ -50,8 +51,8 @@ export function RateStaffSection({ staff }: { staff: StaffRow[] }) {
       setOpenUid(null);
       setRating(0);
       setNote('');
-    } catch (e: any) {
-      toast.error(e.message || 'Could not submit rating');
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, 'Could not submit rating'));
     } finally {
       setBusy(false);
     }

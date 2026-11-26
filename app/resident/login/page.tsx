@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PhoneInput } from '@/components/ui/phone-input';
 import { validatePhone } from '@/lib/security';
+import { errorMessage } from '@/lib/utils';
 import { UserCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -86,8 +87,8 @@ export default function ResidentLoginPage() {
       const cred = await signInWithPopup(auth, new GoogleAuthProvider());
       const idToken = await cred.user.getIdToken();
       await finish(idToken, mode === 'signup');
-    } catch (e: any) {
-      toast.error(e.message || 'Google sign-in failed');
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, 'Google sign-in failed'));
     } finally {
       setBusy(false);
     }
@@ -104,18 +105,18 @@ export default function ResidentLoginPage() {
           : await signInWithEmailAndPassword(auth, email.trim(), password);
       const idToken = await cred.user.getIdToken();
       await finish(idToken, mode === 'signup');
-    } catch (e: any) {
-      toast.error(e.message?.replace('Firebase:', '').trim() || 'Sign-in failed');
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, 'Sign-in failed').replace('Firebase:', '').trim() || 'Sign-in failed');
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#F0FDFA] flex flex-col items-center justify-center p-4">
-      <div className="w-full max-w-sm bg-white rounded-[16px] border border-[#CCFBF1] shadow-sm p-6 space-y-5">
+    <div className="theme-resident min-h-screen bg-[#F0FDFA] flex flex-col items-center justify-center p-4">
+      <div className="w-full max-w-sm app-card rounded-[16px] shadow-[var(--shadow-card)] p-6 space-y-5">
         <div className="text-center space-y-1">
-          <div className="w-12 h-12 mx-auto rounded-[12px] bg-[#0D9488] text-white flex items-center justify-center">
+          <div className="w-12 h-12 mx-auto rounded-[12px] accent-bg text-white flex items-center justify-center">
             <UserCircle className="w-6 h-6" />
           </div>
           <h1 className="text-lg font-bold">Resident {mode === 'signup' ? 'Sign Up' : 'Login'}</h1>
@@ -132,7 +133,7 @@ export default function ResidentLoginPage() {
         <form onSubmit={handleEmail} className="space-y-3">
           <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required disabled={busy} />
           <Input label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required disabled={busy} />
-          <Button type="submit" variant="solid" loading={busy} className="w-full bg-[#0D9488] hover:bg-[#0F766E]">
+          <Button type="submit" variant="solid" loading={busy} className="w-full">
             {mode === 'signup' ? 'Create Account' : 'Login'}
           </Button>
         </form>
@@ -149,7 +150,7 @@ export default function ResidentLoginPage() {
         <button
           type="button"
           onClick={() => setMode(mode === 'signup' ? 'signin' : 'signup')}
-          className="w-full text-xs text-[#0D9488] font-semibold"
+          className="w-full text-xs accent-text font-semibold"
         >
           {mode === 'signup' ? 'Already have an account? Login' : 'New here? Create an account'}
         </button>

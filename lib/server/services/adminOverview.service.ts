@@ -1,8 +1,24 @@
 import 'server-only';
 import { adminDb } from '../firebase-admin';
-import { Owner, Bed, Tenant, RentRecord } from '@/types';
-import { getCurrentPeriod } from '@/lib/utils';
+import { Owner, Bed, Tenant, RentRecord, Timestampish } from '@/types';
+import { getCurrentPeriod, tsToMillis } from '@/lib/utils';
 import { ACCOUNT_STATUS } from '@/lib/constants/status';
+import type {
+  DocumentData,
+  QueryDocumentSnapshot,
+  QuerySnapshot,
+} from 'firebase-admin/firestore';
+
+interface StaffDoc {
+  id: string;
+  name?: string;
+  email?: string;
+  phone?: string;
+  accountStatus?: string;
+  permissions?: unknown;
+  ratingAgg?: { count?: number; sum?: number };
+  deletedAt?: Timestampish | null;
+}
 
 export interface AdminStaffSummary {
   uid: string;
@@ -141,18 +157,22 @@ export async function getPlatformOverview(
       const pgTenants = tenantsSnap.docs.map((d) => ({ ...d.data(), id: d.id } as Tenant));
       const pgRecords = recordsSnap.docs.map((d) => ({ ...d.data(), id: d.id } as RentRecord));
       const pgStaff: AdminStaffSummary[] = staffSnap.docs
-        .map((d) => ({ ...d.data(), id: d.id } as any))
+        .map((d) => ({ ...d.data(), id: d.id } as StaffDoc))
         .map((s) => {
           const agg = s.ratingAgg || { count: 0, sum: 0 };
+          const count = agg.count || 0;
+          const sum = agg.sum || 0;
           return {
             uid: s.id,
             name: s.name || 'Staff',
             email: s.email || '',
             phone: s.phone || '',
             accountStatus: s.accountStatus || 'active',
-            permissions: Array.isArray(s.permissions) ? s.permissions : [],
-            ratingAvg: agg.count > 0 ? Math.round((agg.sum / agg.count) * 10) / 10 : 0,
-            ratingCount: agg.count || 0,
+            permissions: Array.isArray(s.permissions)
+              ? (s.permissions as string[])
+              : [],
+            ratingAvg: count > 0 ? Math.round((sum / count) * 10) / 10 : 0,
+            ratingCount: count,
             deleted: !!s.deletedAt,
           };
         });
@@ -238,13 +258,19 @@ export async function getPgAdminDetail(ownerId: string) {
     adminDb.collection('system_logs').where('ownerId', '==', ownerId).limit(100).get(),
   ]);
 
-  const byCreatedDesc = (a: any, b: any) =>
-    (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0);
-  const map = (snap: any) => snap.docs.map((d: any) => ({ ...d.data(), id: d.id }));
+  type DocRow = DocumentData & {
+    id: string;
+    createdAt?: Timestampish;
+    period?: string;
+  };
+  const byCreatedDesc = (a: DocRow, b: DocRow) =>
+    tsToMillis(b.createdAt) - tsToMillis(a.createdAt);
+  const map = (snap: QuerySnapshot): DocRow[] =>
+    snap.docs.map((d: QueryDocumentSnapshot) => ({ ...d.data(), id: d.id }) as DocRow);
 
   return {
     owner: ownerSnap.exists ? { ...ownerSnap.data(), id: ownerSnap.id } : null,
-    rentRecords: map(recordsSnap).sort((a: any, b: any) => (b.period || '').localeCompare(a.period || '')),
+    rentRecords: map(recordsSnap).sort((a, b) => (b.period || '').localeCompare(a.period || '')),
     deposits: map(depositsSnap).sort(byCreatedDesc),
     // Surface soft-deleted expenses too (admin history), flagged.
     expenses: map(expensesSnap).sort(byCreatedDesc),

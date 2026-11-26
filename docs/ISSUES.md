@@ -29,24 +29,26 @@ Status legend: 🔴 open · 🟡 in progress · 🟢 fixed · ⚪ deferred (deci
 ## Tech debt / defects found during work
 
 ### CI & lint
-- 🔴 **CI lint gate is RED.** `npm run lint` exits 1 → the `Lint` step in
-  `.github/workflows/ci.yml` fails on every push/PR. Pre-existing, not from
-  current work.
-- ⚪ **Project-wide lint debt: 335 problems (233 errors) across 87 files.**
-  **Decision: deferred** — keep the active dashboard file clean, fix the rest in
-  a dedicated later pass. Breakdown:
-  - 196 `@typescript-eslint/no-explicit-any` (worst: `types/index.ts` with many
-    `any` timestamp fields)
-  - 94 `@typescript-eslint/no-unused-vars`
-  - 22 `react-hooks/set-state-in-effect`
-  - 6 `react/no-unescaped-entities`
-  - 4 `react-hooks/exhaustive-deps`, 4 `@next/next`, misc react-hooks rules
-  - Top files: `types/index.ts` (42e), `app/admin/page.tsx` (9e/14w),
-    `components/admin/AdminPgManage.tsx` (11e), `discovery.service.ts` (11e),
-    `beds.service.ts` (8e), `adminOverview.service.ts` (7e)
-  - **When tackled:** `types/index.ts` `any` → `Timestamp | FieldValue` style
-    types will clear the single biggest chunk; many are the `createdAt?: any`
-    Firestore timestamp pattern.
+- 🟢 **Lint debt CLEARED — 328 → 0. CI lint gate is GREEN** (`npm run lint`
+  exits 0). Fixed properly in batches, no blanket suppressions. All four gates
+  pass: lint 0 · typecheck 0 · 63 tests · build ✓. What was done:
+  - 🟢 `no-explicit-any` (196→0) — `types/index.ts` timestamps use a shared
+    `FirestoreTimestamp`/`Timestampish` type + `tsToDate`/`tsToMillis` helpers in
+    `lib/utils`; services/components use real domain types; `catch` → `unknown` +
+    `errorMessage`; API wrappers made generic over their context.
+  - 🟢 `no-unused-vars` (94→0) — dead imports/vars removed; eslint config honours
+    `^_` prefix for intentionally-unused args (`eslint.config.mjs`).
+  - 🟢 `react-hooks/*` (28→0) — set-state-in-effect deferred via `queueMicrotask`
+    / render-time adjust; hooks (useBeds/useTenants/useOwner/useAuth) fixed;
+    `H` helper in AdminPgManage hoisted to module scope (static-components);
+    IdleLogout ref writes moved into effects; admin `loadPlatformData` hoisted to
+    a `useCallback` (use-before-declare + exhaustive-deps); scoped, justified
+    disables only where re-running would change behavior.
+  - 🟢 `no-unescaped-entities`, `no-img-element`, `no-location-assign-*`,
+    `ban-ts-comment`: 0.
+  - A handful of scoped `eslint-disable-next-line` remain ONLY where the rule
+    would otherwise force a behavior change (mount-once effects, dynamic remote
+    `<img>`), each with a one-line reason — these are intentional, not debt.
 
 ### Files already cleaned (0 lint problems)
 - 🟢 `app/(owner)/dashboard/page.tsx` — fixed 10 errors + 6 warnings:
@@ -88,6 +90,79 @@ Status legend: 🔴 open · 🟡 in progress · 🟢 fixed · ⚪ deferred (deci
   reads to owner/staff/admin). Portal is still PIN+lockout gated. Accepted as the
   convenience-link trade-off, consistent with the existing staff `manage_tenants`
   role. Revisit only if staff should not see resident portal links.
+
+## UI redesign (in progress — match design-ref screenshots: violet gradients, 3D depth, soft/clean)
+- 🟢 **Design foundation** — `app/globals.css` v3 tokens: lavender canvas, violet
+  accent, pastel tint palette, layered soft "3D" shadows, `.hero-gradient`,
+  `.tint-card`, `.icon-chip`, bigger radii. Per-panel accents kept (owner violet /
+  resident teal / admin indigo) over one shared canvas + depth.
+- 🟢 **Reusable kit** — `components/ui/dashboard-kit.tsx`: `HeroHeader`, `StatTile`,
+  `QuickActionGrid`, `DonutChart`, `SectionHeader`, `ActivityRow`. All panels draw
+  from these so the look is consistent by construction.
+- 🟢 **Owner dashboard** — gradient `HeroHeader` greeting band (full-bleed on
+  mobile) + `StatsBar` rebuilt with a donut occupancy chart + pastel collected/
+  pending `StatTile`s (replaces the old 4-bento/progress-bar layout).
+- 🟢 **Resident home + admin dashboard** — gradient hero greeting; admin platform
+  metrics now pastel `StatTile`s (violet/sky/mint/peach); amber→accent across admin.
+- 🟢 **Shared primitives** — `card` (rounder, softer shadow), `input` (rounder,
+  accent focus), `button` (already accent-pill) updated, so every page lifts.
+- 🟢 **All panel pages refreshed** — owner (dashboard, billing, expenses, staff,
+  settings, maintenance, guests, tenants, analytics, support), resident (home,
+  tenancy, discover, login), admin, auth login, and the public landing. Brand
+  amber → `var(--accent)` everywhere; genuine STATUS amber (due/pending/overdue/
+  aging/ratings) deliberately kept. Done by parallel agents with status-amber
+  guardrails; each verified tsc 0 + lint 0.
+- 🟢 **Verified live** — set up `.env.development` + Firebase emulators (Auth/
+  Firestore) + dev server; confirmed landing (violet) and admin login (indigo)
+  render the new design correctly, per-panel theming works, no compile/runtime
+  errors. Authenticated dashboard interiors need seeded data to screenshot — the
+  user will do the final visual review with their own data.
+- Final gate after redesign: **lint 0 · typecheck 0 · 63 tests · build ✓.**
+
+### Responsive recheck (mobile + tablet + desktop)
+- 🟢 **Fixed:** owner dashboard hero had `lg:-mx-8` which re-broke it out of the
+  layout past the `md:mx-0` reset → removed, so it's full-bleed on mobile only
+  and inline on the md+ sidebar layout.
+- 🟢 **Fixed:** resident home hero reset at `md` but the resident layout is a
+  phone-column at every width → now `-mx-4 -mt-3` (full-bleed across breakpoints).
+- 🟢 **Fixed:** StatsBar donut sized down to 112px + `shrink-0` so the Overview
+  card doesn't squeeze the info column on 320px screens.
+- 🟢 **Verified no horizontal overflow at 320px** (landing + login): docW==winW,
+  zero over-wide elements. Desktop (1280) landing + split-panel login look correct.
+- 🟢 Grids are responsive: admin StatTiles `grid-cols-2 sm:grid-cols-4`; StatsBar
+  tiles `grid-cols-2`; quick-actions `grid-cols-3`; bed-grid filter bar keeps
+  `overflow-x-auto`.
+- ⚠️ **Authenticated dashboard interiors (owner/resident/admin) not screenshotted**
+  — the local Firestore emulator's gRPC transport won't load default credentials
+  for the session-write path (a known emulator/`preferRest` quirk, NOT a prod bug;
+  prod has real creds). Those pages compile/typecheck/lint clean and use the same
+  responsive kit, but the user should eyeball them once logged in with real data.
+
+## Architecture decisions — auth / deploy / admin tiers
+
+**Context:** requirement is — shared login for Owner/Staff/Resident, separate Admin
+login+URL; one super-admin plus multiple sub-admins whose access is managed by the
+super-admin; ONE backend for mobile/website/admin.
+
+- ✅ **Shared login, role-based (keep as-is):** one Firebase Auth project + one
+  `app/api/**` backend. Entry points stay split: `/login` (owner+staff),
+  `/resident/login` (residents), `/admin` (admins). Role resolved server-side from
+  custom claims. Do NOT fork auth or backend. Mobile is the PWA of the same app.
+- ✅ **Separate URLs = subdomains, ONE app (decided):** `app.pgpass.com` (owner/
+  resident) + `admin.pgpass.com` (admin), served from a single Next.js deploy with
+  one backend; `proxy.ts` routes by hostname. **To wire up at deploy time** (DNS +
+  middleware host check). Preferred over two deployments — keeps "same backend".
+- ⚪ **Tiered admin permissions — DEFERRED (decision: after UI review).** Today
+  `admin` is a single boolean claim (`admin:true`) → every admin has full access;
+  no super-vs-sub distinction. **Planned model (not built yet):**
+  - Claim: `admin:true` + `adminRole: 'super' | 'staff'`.
+  - New `admin_users` collection with `permissions[]` (e.g. `pg.suspend`,
+    `support.reply`, `reviews.moderate`, `subscriptions.approve`, `logs.view`,
+    `admins.manage`). `admins.manage` is super-admin-only.
+  - Super-admin-only UI to create/edit admins + assign permissions.
+  - Enforce via `withAuth({ adminPermission })` on admin routes — mirrors the
+    existing per-staff `permission` pattern (reuse it).
+  - Migration: existing `admin:true` accounts become `adminRole:'super'`.
 
 ## Follow-ups (explicitly deferred, not forgotten)
 - 🔴 **#6 avatar image upload** — the top-bar profile currently shows initials

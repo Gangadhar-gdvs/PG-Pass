@@ -5,6 +5,7 @@ import { uploadPhotoToB2 } from '@/lib/client/uploader';
 import { Button } from '@/components/ui/button';
 import { IdCard, FileText } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { errorMessage } from '@/lib/utils';
 
 type DocPhotoType = 'id_proof' | 'agreement';
 
@@ -47,8 +48,8 @@ export function DocumentUploader({
       await uploadPhotoToB2({ file, photoType, tenantId });
       toast.success(`${preset.label} saved securely`);
       setDone(true);
-    } catch (err: any) {
-      toast.error(err.message || 'Could not upload document');
+    } catch (err: unknown) {
+      toast.error(errorMessage(err, 'Could not upload document'));
     } finally {
       setUploading(false);
     }

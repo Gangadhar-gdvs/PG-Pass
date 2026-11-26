@@ -3,11 +3,13 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { formatCurrency, formatDateIN } from '@/lib/utils';
+import { formatCurrency, formatDateIN, errorMessage } from '@/lib/utils';
 import { HeaderSkeleton, PanelSkeleton } from '@/components/ui/skeletons';
 import { Button } from '@/components/ui/button';
+import { HeroHeader } from '@/components/ui/dashboard-kit';
 import { ArrowLeft, ShieldCheck, Wrench, Star } from 'lucide-react';
 import { RateStaffSection } from '@/components/resident/RateStaffSection';
+import type { Tenant, RentRecord, MaintenanceTicket } from '@/types';
 import toast from 'react-hot-toast';
 
 const STATUS_STYLE: Record<string, string> = {
@@ -16,10 +18,24 @@ const STATUS_STYLE: Record<string, string> = {
   pending: 'bg-[#FEF3C7] text-[#92400E]',
 };
 
+interface TenancyStaffRow {
+  uid: string;
+  name: string;
+  ratingAvg: number;
+  ratingCount: number;
+}
+
+interface TenancyData {
+  tenant: Tenant;
+  rentHistory: RentRecord[];
+  tickets: MaintenanceTicket[];
+  staff: TenancyStaffRow[];
+}
+
 export default function TenancyDetail() {
   const params = useParams();
   const tenantId = params.tenantId as string;
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<TenancyData | null>(null);
   const [loading, setLoading] = useState(true);
   const [issueOpen, setIssueOpen] = useState(false);
   const [desc, setDesc] = useState('');
@@ -33,14 +49,21 @@ export default function TenancyDetail() {
     setLoading(true);
     try {
       const res = await fetch(`/api/resident/tenancy/${tenantId}`);
-      if (res.ok) setData(await res.json());
+      if (res.ok) setData((await res.json()) as TenancyData);
     } finally {
       setLoading(false);
     }
   }, [tenantId]);
 
   useEffect(() => {
-    load();
+    // Defer so setState runs after commit, not in the effect body (cascading-render lint rule).
+    let active = true;
+    queueMicrotask(() => {
+      if (active) load();
+    });
+    return () => {
+      active = false;
+    };
   }, [load]);
 
   const raiseIssue = async (e: React.FormEvent) => {
@@ -58,8 +81,8 @@ export default function TenancyDetail() {
       setDesc('');
       setIssueOpen(false);
       await load();
-    } catch (e: any) {
-      toast.error(e.message || 'Could not submit');
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, 'Could not submit'));
     } finally {
       setSending(false);
     }
@@ -101,8 +124,8 @@ export default function TenancyDetail() {
       setPgOpen(false);
       setPgText('');
       setPgRating(0);
-    } catch (e: any) {
-      toast.error(e.message || 'Could not submit review');
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, 'Could not submit review'));
     } finally {
       setPgBusy(false);
     }
@@ -114,33 +137,30 @@ export default function TenancyDetail() {
         <ArrowLeft className="w-4 h-4" /> My PGs
       </Link>
 
-      <div>
-        <h1 className="text-xl font-extrabold text-slate-900">Your Tenancy</h1>
-        <p className="text-xs text-slate-500 mt-0.5">
-          {tenant.roomNumber ? `Room ${tenant.roomNumber} · ` : ''}Bed {tenant.bedLabel || '—'} · since{' '}
-          {formatDateIN(tenant.moveInDate)}
-        </p>
-      </div>
-
-      {/* Deposit card */}
-      <div className="app-card p-4 flex items-center gap-3">
-        <div className="w-11 h-11 rounded-[14px] accent-soft-bg flex items-center justify-center">
-          <ShieldCheck className="w-5 h-5" />
-        </div>
-        <div className="flex-1">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Security Deposit</div>
-          <div className="font-extrabold font-mono-numbers text-lg text-slate-900">
-            {formatCurrency((tenant.depositPaidPaise || 0) / 100)}
+      <HeroHeader
+        eyebrow="Your Tenancy"
+        title={tenant.ownerName || 'Your Tenancy'}
+        subtitle={`${tenant.roomNumber ? `Room ${tenant.roomNumber} · ` : ''}Bed ${tenant.bedLabel || '—'} · since ${formatDateIN(tenant.moveInDate)}`}
+      >
+        <div className="rounded-[16px] bg-white/15 backdrop-blur-sm px-4 py-3 flex items-center gap-3">
+          <div className="w-11 h-11 rounded-[14px] bg-white/20 flex items-center justify-center shrink-0">
+            <ShieldCheck className="w-5 h-5 text-white" />
+          </div>
+          <div className="flex-1">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-white/80">Security Deposit</div>
+            <div className="font-extrabold font-mono-numbers text-lg text-white">
+              {formatCurrency((tenant.depositPaidPaise || 0) / 100)}
+            </div>
           </div>
         </div>
-      </div>
+      </HeroHeader>
 
       {/* Rent history */}
       <section>
         <h2 className="text-sm font-extrabold text-slate-900 mb-2 px-1">Payment History</h2>
         <div className="space-y-2 stagger">
           {rentHistory.length === 0 && <p className="text-xs text-slate-400 px-1">No rent records yet.</p>}
-          {rentHistory.map((r: any) => (
+          {rentHistory.map((r) => (
             <div key={r.id} className="app-card p-3.5 flex items-center justify-between">
               <div>
                 <div className="text-sm font-bold text-slate-900">{r.period}</div>
@@ -232,7 +252,7 @@ export default function TenancyDetail() {
 
         <div className="space-y-2 stagger">
           {tickets.length === 0 && <p className="text-xs text-slate-400 px-1">No issues raised.</p>}
-          {tickets.map((t: any) => (
+          {tickets.map((t) => (
             <div key={t.id} className="app-card p-3.5">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-bold capitalize flex items-center gap-1.5 text-slate-900">

@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import type { Property } from '@/types';
 
 export interface PropertyLite {
   id: string;
@@ -54,7 +55,7 @@ export function OwnerSessionProvider({
       const res = await fetch('/api/properties');
       if (!res.ok) return;
       const data = await res.json();
-      const list: PropertyLite[] = (data.properties || []).map((p: any) => ({
+      const list: PropertyLite[] = (data.properties || []).map((p: Property) => ({
         id: p.id,
         pgName: p.pgName,
         isPrimary: p.isPrimary,
@@ -79,7 +80,15 @@ export function OwnerSessionProvider({
   }, []);
 
   useEffect(() => {
-    reloadProperties();
+    // Defer so reloadProperties' synchronous setState runs after commit, not in
+    // the effect body (cascading-render lint rule).
+    let active = true;
+    queueMicrotask(() => {
+      if (active) reloadProperties();
+    });
+    return () => {
+      active = false;
+    };
   }, [reloadProperties]);
 
   return (

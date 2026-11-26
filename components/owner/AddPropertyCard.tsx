@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Building2, Plus } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { errorMessage } from '@/lib/utils';
 
 /**
  * Lets an owner add an additional property. Once created, it appears in the
@@ -41,8 +42,8 @@ export function AddPropertyCard() {
       setOpen(false);
       await reloadProperties();
       if (data.property?.id) setSelectedPropertyId(data.property.id);
-    } catch (err: any) {
-      toast.error(err.message || 'Could not add property');
+    } catch (err: unknown) {
+      toast.error(errorMessage(err, 'Could not add property'));
     } finally {
       setSaving(false);
     }
@@ -52,7 +53,7 @@ export function AddPropertyCard() {
     <div className="bg-white border border-[#E2E8F0] rounded-[12px] p-4 sm:p-6 shadow-xs">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Building2 className="w-4 h-4 text-[#D97706]" />
+          <Building2 className="w-4 h-4 accent-text" />
           <h2 className="text-sm font-bold text-[#09090B]">
             Properties <span className="text-[#64748B] font-normal">· {properties.length}</span>
           </h2>
@@ -68,7 +69,7 @@ export function AddPropertyCard() {
         <ul className="mt-3 space-y-1.5">
           {properties.map((p) => (
             <li key={p.id} className="text-xs text-[#334155] flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#D97706]" />
+              <span className="w-1.5 h-1.5 rounded-full accent-bg" />
               {p.pgName}
               {p.isPrimary ? <span className="text-[#94A3B8]">(Main)</span> : null}
             </li>

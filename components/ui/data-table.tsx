@@ -19,7 +19,7 @@ export interface DataTableProps<T> {
   className?: string;
 }
 
-export function DataTable<T extends Record<string, any>>({
+export function DataTable<T>({
   columns,
   data,
   keyExtractor,
@@ -46,8 +46,8 @@ export function DataTable<T extends Record<string, any>>({
   const sortedData = React.useMemo(() => {
     if (!sortKey) return data;
     return [...data].sort((a, b) => {
-      const aVal = a[sortKey];
-      const bVal = b[sortKey];
+      const aVal = (a as Record<string, unknown>)[sortKey] as string | number | null | undefined;
+      const bVal = (b as Record<string, unknown>)[sortKey] as string | number | null | undefined;
       if (aVal === bVal) return 0;
       if (aVal === null || aVal === undefined) return 1;
       if (bVal === null || bVal === undefined) return -1;
@@ -55,9 +55,6 @@ export function DataTable<T extends Record<string, any>>({
       return sortDirection === "asc" ? 1 : -1;
     });
   }, [data, sortKey, sortDirection]);
-
-  const alignClass = (align?: Column<T>["align"]) =>
-    align === "right" ? "text-right" : align === "center" ? "text-center" : "text-left";
 
   return (
     <div className={`w-full overflow-hidden rounded-[10px] border border-[#E2E8F0] bg-white shadow-xs ${className}`}>
@@ -83,7 +80,7 @@ export function DataTable<T extends Record<string, any>>({
                     {col.header}
                   </span>
                   <span className="text-[13px] text-[#09090B] text-right">
-                    {col.render ? col.render(row) : row[col.key]}
+                    {col.render ? col.render(row) : ((row as Record<string, unknown>)[col.key] as React.ReactNode)}
                   </span>
                 </div>
               ))}
@@ -163,7 +160,7 @@ export function DataTable<T extends Record<string, any>>({
                           : "text-left"
                       }`}
                     >
-                      {col.render ? col.render(row) : row[col.key]}
+                      {col.render ? col.render(row) : ((row as Record<string, unknown>)[col.key] as React.ReactNode)}
                     </td>
                   ))}
                 </tr>

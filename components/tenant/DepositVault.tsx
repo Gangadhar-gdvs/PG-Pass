@@ -4,7 +4,7 @@ import React, { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { uploadPhotoToB2 } from '@/lib/client/uploader';
 import { ShieldCheck, Plus, Share2 } from 'lucide-react';
-import { formatCurrency, getWhatsAppLink } from '@/lib/utils';
+import { formatCurrency, getWhatsAppLink, errorMessage } from '@/lib/utils';
 import { config } from '@/lib/config';
 import toast from 'react-hot-toast';
 
@@ -71,9 +71,9 @@ export function DepositVault({
       toast.success(
         `${successful} move-in inspection photo(s) secured in private vault`
       );
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Vault photo upload failed:', err);
-      toast.error(err.message || 'Upload failed. Please try again.');
+      toast.error(errorMessage(err, 'Upload failed. Please try again.'));
     } finally {
       setLoading(false);
     }

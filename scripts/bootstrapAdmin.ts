@@ -1,4 +1,4 @@
-import { initializeApp, cert, getApps } from 'firebase-admin/app';
+import { initializeApp, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import * as fs from 'fs';
@@ -6,12 +6,15 @@ import * as path from 'path';
 
 // Native environment variable loading from .env.local and .env
 function loadEnv() {
-  if (typeof (process as any).loadEnvFile === 'function') {
+  const proc = process as NodeJS.Process & {
+    loadEnvFile?: (path: string) => void;
+  };
+  if (typeof proc.loadEnvFile === 'function') {
     try {
-      (process as any).loadEnvFile(path.resolve(process.cwd(), '.env.local'));
+      proc.loadEnvFile(path.resolve(process.cwd(), '.env.local'));
     } catch {}
     try {
-      (process as any).loadEnvFile(path.resolve(process.cwd(), '.env'));
+      proc.loadEnvFile(path.resolve(process.cwd(), '.env'));
     } catch {}
     return;
   }

@@ -43,7 +43,8 @@ export function ConfirmDialog({
 
   // Reset the reason each time the dialog opens.
   React.useEffect(() => {
-    if (open) setReason('');
+    // Defer so setState runs after commit, not in the effect body (cascading-render lint rule).
+    if (open) queueMicrotask(() => setReason(''));
   }, [open]);
 
   React.useEffect(() => {

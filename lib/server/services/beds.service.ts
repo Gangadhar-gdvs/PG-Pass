@@ -6,6 +6,14 @@ import { BED_STATUS } from '@/lib/constants/status';
 import { MAX_LIST_LIMIT } from '@/lib/constants/limits';
 import { Timestamp } from 'firebase-admin/firestore';
 
+/** A new bed doc as written to Firestore: the tenant fields are explicitly
+ *  `null` (so a merge-revive clears any stale occupancy) rather than absent. */
+type NewBedDoc = Omit<Bed, 'tenantId' | 'tenantName' | 'tenantPhone'> & {
+  tenantId: null;
+  tenantName: null;
+  tenantPhone: null;
+};
+
 export class BedsService {
   constructor() {
     this.createBedsBatch = this.createBedsBatch.bind(this);
@@ -44,7 +52,7 @@ export class BedsService {
     if (data.ownerId !== ownerId) {
       throw new AppError(403, 'Unauthorized bed access');
     }
-    if ((data as any).deletedAt) {
+    if (data.deletedAt) {
       throw new AppError(404, 'Bed not found');
     }
     return { ...data, id: doc.id };
@@ -97,7 +105,7 @@ export class BedsService {
     // If a soft-deleted bed occupies this id, it is revived below (set overwrites
     // it with a fresh vacant bed and clears deletedAt).
 
-    const newBed: Bed = {
+    const newBed: NewBedDoc = {
       id: bedId,
       ownerId,
       propertyId,
@@ -110,16 +118,16 @@ export class BedsService {
       acType: data.acType,
       roomAmenities: data.roomAmenities,
       status: BED_STATUS.VACANT,
-      tenantId: null as any,
-      tenantName: null as any,
-      tenantPhone: null as any,
+      tenantId: null,
+      tenantName: null,
+      tenantPhone: null,
       deletedAt: null, // explicit so `where('deletedAt','==',null)` matches
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
     };
 
     await bedRef.set(newBed);
-    return newBed;
+    return newBed as unknown as Bed;
   }
 
   async createBedsBatch(
@@ -177,7 +185,7 @@ export class BedsService {
     for (const data of bedsList) {
       const bedId = `${effPropertyId}_${data.roomNumber}_${data.bedLabel}`.replace(/[\s/]/g, '-');
       const bedRef = adminDb.collection('beds').doc(bedId);
-      const newBed: Bed = {
+      const newBed: NewBedDoc = {
         id: bedId,
         ownerId,
         propertyId: effPropertyId,
@@ -190,9 +198,9 @@ export class BedsService {
         acType: data.acType,
         roomAmenities: data.roomAmenities,
         status: BED_STATUS.VACANT,
-        tenantId: null as any,
-        tenantName: null as any,
-        tenantPhone: null as any,
+        tenantId: null,
+        tenantName: null,
+        tenantPhone: null,
         deletedAt: null, // explicit: matches the deletedAt==null query + clears any stale value on merge-revive
         createdAt: now,
         updatedAt: now,
@@ -216,7 +224,7 @@ export class BedsService {
       throw new AppError(400, 'Cannot mark an occupied bed as vacant directly. Move out tenant first.');
     }
 
-    const updatePayload: any = {
+    const updatePayload: Partial<Bed> = {
       ...data,
       updatedAt: Timestamp.now(),
     };

@@ -8,22 +8,19 @@ import {
   parseBankStatementCsv,
   matchBankTransactions,
   ReconcileMatch,
+  type ReconcilableRentRecord,
 } from '@/lib/client/bankCsv';
 import {
   FileSpreadsheet,
   CheckCircle2,
-  AlertCircle,
-  Upload,
   RefreshCw,
-  Sparkles,
-  ArrowRight,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface BankCsvReconcilerProps {
   isOpen: boolean;
   onClose: () => void;
-  rentRecords: any[];
+  rentRecords: ReconcilableRentRecord[];
   onComplete?: () => void;
 }
 
@@ -73,7 +70,7 @@ export function BankCsvReconciler({
         setSelectedIds(exactMatchIds);
 
         toast.success(`Parsed ${txs.length} bank entries · ${exactMatchIds.size} high-confidence matches`);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('CSV Parsing error:', err);
         toast.error('Failed to parse statement format');
       } finally {
@@ -119,7 +116,7 @@ export function BankCsvReconciler({
       toast.success(`Successfully confirmed ${successCount} rent payments!`);
       onComplete?.();
       onClose();
-    } catch (err: any) {
+    } catch {
       toast.error('Some payments failed to confirm');
     } finally {
       setConfirming(false);
@@ -169,9 +166,9 @@ export function BankCsvReconciler({
         {matches.length === 0 ? (
           <div
             onClick={() => fileInputRef.current?.click()}
-            className="border-2 border-dashed border-[#CBD5E1] hover:border-[#D97706] bg-[#F8FAFC] hover:bg-white rounded-[12px] p-8 text-center transition-all cursor-pointer group space-y-2"
+            className="border-2 border-dashed border-[#CBD5E1] hover:border-[color:var(--accent)] bg-[#F8FAFC] hover:bg-white rounded-[12px] p-8 text-center transition-all cursor-pointer group space-y-2"
           >
-            <div className="w-12 h-12 rounded-full bg-[#FEF3C7] text-[#D97706] flex items-center justify-center mx-auto mb-2 group-hover:scale-105 transition-transform">
+            <div className="w-12 h-12 rounded-full accent-soft-bg accent-text flex items-center justify-center mx-auto mb-2 group-hover:scale-105 transition-transform">
               <FileSpreadsheet className="w-6 h-6" />
             </div>
             <span className="text-sm font-bold text-[#09090B] block">
@@ -190,7 +187,7 @@ export function BankCsvReconciler({
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="text-xs text-[#D97706] font-semibold hover:underline inline-flex items-center gap-1"
+                className="text-xs accent-text font-semibold hover:underline inline-flex items-center gap-1"
               >
                 <RefreshCw className="w-3 h-3" />
                 <span>Upload Another CSV</span>
@@ -200,7 +197,7 @@ export function BankCsvReconciler({
             <div className="bg-white border border-[#E2E8F0] rounded-[10px] divide-y divide-[#E2E8F0] max-h-96 overflow-y-auto">
               {matchedItems.map((m, idx) => {
                 const rec = m.rentRecord;
-                const isSelected = selectedIds.has(rec?.id);
+                const isSelected = rec?.id ? selectedIds.has(rec.id) : false;
 
                 return (
                   <div

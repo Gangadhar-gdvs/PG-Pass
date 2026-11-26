@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { BED_STATUS, PHOTO_TYPE, PLAN_TIER } from '@/lib/constants/status';
+import { BED_STATUS, PLAN_TIER } from '@/lib/constants/status';
 
 // Owner onboarding and update schema
 export const ownerProfileSchema = z.object({

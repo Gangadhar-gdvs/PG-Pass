@@ -81,7 +81,7 @@ describe('Bank Statement CSV Matcher & UTR Parser', () => {
       const matches = matchBankTransactions(transactions, rentRecords);
       expect(matches.length).toBe(1);
       expect(matches[0].confidence).toBe('exact_utr');
-      expect(matches[0].rentRecord.id).toBe('rec_exact_utr');
+      expect(matches[0].rentRecord?.id).toBe('rec_exact_utr');
     });
 
     it('should fallback to amount match when UTR is not present on rent record', () => {
@@ -107,7 +107,7 @@ describe('Bank Statement CSV Matcher & UTR Parser', () => {
       const matches = matchBankTransactions(transactions, rentRecords);
       expect(matches.length).toBe(1);
       expect(matches[0].confidence).toBe('amount_match');
-      expect(matches[0].rentRecord.id).toBe('rec_anand');
+      expect(matches[0].rentRecord?.id).toBe('rec_anand');
     });
 
     it('should not match already paid rent records', () => {

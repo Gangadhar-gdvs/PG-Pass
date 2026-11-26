@@ -10,6 +10,7 @@ import {
 import { getCurrentPeriod, formatCurrency, getWhatsAppLink, errorMessage } from '@/lib/utils';
 import { Bed, Owner, RentRecord } from '@/types';
 import { StatsBar } from '@/components/owner/StatsBar';
+import { HeroHeader } from '@/components/ui/dashboard-kit';
 import { BedGrid } from '@/components/owner/BedGrid';
 import { AddTenantModal } from '@/components/owner/AddTenantModal';
 import { CheckInGuestModal } from '@/components/owner/CheckInGuestModal';
@@ -535,7 +536,8 @@ export default function OwnerDashboardPage() {
             setOwnerError(false);
             reloadOwner();
           }}
-          className="mt-5 h-11 px-5 rounded-full bg-[#D97706] hover:bg-[#B45309] text-white text-sm font-bold press"
+          style={{ background: 'var(--accent)' }}
+          className="mt-5 h-11 px-5 rounded-full text-white text-sm font-bold press"
         >
           Retry
         </button>
@@ -638,46 +640,20 @@ export default function OwnerDashboardPage() {
     : null;
 
   return (
-    <div className="space-y-6 text-left">
-      {/* Top Header Strip */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#E2E8F0]">
-        <div>
-          <h1 className="text-xl font-bold text-[#09090B] tracking-tight">
-            {owner.pgName}
-          </h1>
-          <p className="text-xs text-[#64748B] mt-0.5">
-            {owner.pgAddress || 'Live occupancy HUD & automated rent settlement'}
-          </p>
-        </div>
-
+    <div className="space-y-4 text-left">
+      {/* Gradient hero greeting band (design-ref style) — full-bleed on mobile so
+          it reads as an app header; the shell's horizontal padding is cancelled.
+          Resets to inline on md+ (desktop uses the sidebar layout, not px-4/6).
+          NOTE: no lg: negative margin — it would re-break out past the md reset. */}
+      <div className="-mx-4 -mt-4 sm:-mx-6 md:mx-0 md:mt-0">
+      <HeroHeader
+        eyebrow={<><Building className="h-3 w-3" /> PG Owner</>}
+        title={`Welcome, ${owner.pgName}`}
+        subtitle={owner.pgAddress || 'Live occupancy & automated rent settlement'}
+      >
         <div className="flex flex-wrap items-center gap-2">
-          {/* Single "Room Setup" entry point. When there are no beds yet, the
-              onboarding banner below is the primary call-to-action, so this
-              duplicate header button is hidden to avoid two identical actions on
-              the same screen. */}
-          {beds.length > 0 && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setShowSetupWizard(true)}
-              className="text-xs border-[#CBD5E1] text-[#334155] hover:bg-[#F8FAFC]"
-            >
-              <Building className="w-3.5 h-3.5 mr-1.5 text-[#D97706]" />
-              <span>Room Setup</span>
-            </Button>
-          )}
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setShowBankReconciler(true)}
-            className="text-xs border-[#CBD5E1] text-[#334155] hover:bg-[#F8FAFC]"
-          >
-            <FileSpreadsheet className="w-3.5 h-3.5 mr-1.5 text-emerald-600" />
-            <span>Bank CSV</span>
-          </Button>
-          <Button
-            size="sm"
-            variant="solid"
+          <button
+            type="button"
             onClick={() => {
               if (beds.length === 0) {
                 toast.error('No beds configured yet. Please generate your room inventory first.');
@@ -691,26 +667,42 @@ export default function OwnerDashboardPage() {
                 toast.error('All beds are currently occupied. Vacate a bed to add a new resident.');
               }
             }}
-            className="text-xs"
+            className="inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-2 text-xs font-bold accent-text shadow-sm press"
           >
-            <UserPlus className="w-3.5 h-3.5 mr-1.5" />
-            <span>Add Resident</span>
-          </Button>
+            <UserPlus className="h-3.5 w-3.5" /> Add Resident
+          </button>
+          {beds.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowSetupWizard(true)}
+              className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-4 py-2 text-xs font-bold text-white backdrop-blur-sm press"
+            >
+              <Building className="h-3.5 w-3.5" /> Room Setup
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setShowBankReconciler(true)}
+            className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-4 py-2 text-xs font-bold text-white backdrop-blur-sm press"
+          >
+            <FileSpreadsheet className="h-3.5 w-3.5" /> Bank CSV
+          </button>
         </div>
+      </HeroHeader>
       </div>
 
       {/* Empty Inventory Onboarding Banner */}
       {beds.length === 0 && (
-        <div className="bg-[#FEF3C7] border border-[#FDE68A] rounded-[12px] p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="accent-soft-bg border rounded-[12px] p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4" style={{ borderColor: 'var(--accent-soft)' }}>
           <div className="flex items-start gap-3">
-            <div className="p-2.5 bg-[#D97706] text-white rounded-[10px] mt-0.5 shadow-xs">
+            <div className="p-2.5 text-white rounded-[10px] mt-0.5 shadow-xs" style={{ background: 'var(--accent)' }}>
               <Building className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-[#92400E]">
+              <h3 className="text-sm font-bold" style={{ color: 'var(--accent-ink)' }}>
                 No Rooms or Beds Configured Yet (0 Units)
               </h3>
-              <p className="text-xs text-[#B45309] mt-0.5">
+              <p className="text-xs mt-0.5" style={{ color: 'var(--accent-ink)' }}>
                 Your PG has 0 beds ready for lease. Configure your floor-by-floor sharing formats (Single, 2-share to 6-share) and pricing to generate your bed units.
               </p>
             </div>
@@ -718,7 +710,8 @@ export default function OwnerDashboardPage() {
           <Button
             variant="solid"
             size="sm"
-            className="bg-[#D97706] hover:bg-[#B45309] text-white whitespace-nowrap shadow-sm font-medium"
+            style={{ background: 'var(--accent)' }}
+            className="text-white whitespace-nowrap shadow-sm font-medium"
             onClick={() => setShowSetupWizard(true)}
           >
             <Layers className="w-4 h-4 mr-1.5" />
@@ -881,7 +874,7 @@ export default function OwnerDashboardPage() {
             <button
               type="button"
               onClick={() => setSelectedPeriod(getCurrentPeriod())}
-              className="block text-[11px] text-[#D97706] font-semibold"
+              className="block text-[11px] accent-text font-semibold"
             >
               Jump to current month
             </button>
@@ -1062,7 +1055,7 @@ export default function OwnerDashboardPage() {
               <div className="p-6 text-center rounded-[10px] bg-[#F8FAFC] border border-[#E2E8F0] space-y-2">
                 <span className="text-xs text-[#64748B] block">This bed is currently</span>
                 <span className="text-base font-bold text-[#09090B] block">Vacant</span>
-                <span className="font-mono-numbers text-sm text-[#D97706] font-bold block">
+                <span className="font-mono-numbers text-sm accent-text font-bold block">
                   {formatCurrency(activeBedDrawer.monthlyRent)}/month
                 </span>
               </div>
@@ -1156,7 +1149,7 @@ export default function OwnerDashboardPage() {
                         placeholder="Amount (₹)"
                         value={partialAmount}
                         onChange={(e) => setPartialAmount(e.target.value)}
-                        className="flex-1 h-11 px-3 rounded-[8px] border border-[#CBD5E1] text-sm text-[#09090B] focus:border-[#D97706] focus:outline-none"
+                        className="flex-1 h-11 px-3 rounded-[8px] border border-[#CBD5E1] text-sm text-[#09090B] focus:border-[color:var(--accent)] focus:outline-none"
                       />
                       <Button
                         size="sm"
@@ -1279,7 +1272,7 @@ export default function OwnerDashboardPage() {
                             toast.error('Could not copy — long-press the link to copy it manually');
                           }
                         }}
-                        className="text-[#D97706] font-semibold hover:underline inline-flex items-center gap-1 cursor-pointer"
+                        className="accent-text font-semibold hover:underline inline-flex items-center gap-1 cursor-pointer"
                       >
                         <Copy className="w-3 h-3" />
                         <span>Copy</span>

@@ -1,17 +1,27 @@
 import {
-  ACCOUNT_STATUS,
   AccountStatus,
-  PHOTO_TYPE,
   PhotoType,
-  PLAN_TIER,
   PlanTier,
-  SUBSCRIPTION_REQUEST_STATUS,
   SubscriptionRequestStatus,
-  ROLE,
-  Role,
 } from '@/lib/constants/status';
 
 export * from '@/lib/constants/status';
+
+/**
+ * A Firestore timestamp as it appears on documents across the app. Both the
+ * firebase-admin and client `Timestamp` expose `toDate()`/`toMillis()`; writes
+ * may use a server-timestamp sentinel (`FieldValue`); and some legacy/serialized
+ * paths carry a `Date`, ISO string, or epoch number. This captures exactly what
+ * the code relies on (`?.toDate?.()`, `?.toMillis?.()`) without coupling the
+ * shared types to either SDK — replacing the former `any` on every date field.
+ */
+export interface FirestoreTimestamp {
+  toDate?: () => Date;
+  toMillis?: () => number;
+  seconds?: number;
+  nanoseconds?: number;
+}
+export type Timestampish = FirestoreTimestamp | Date | string | number;
 
 // Expanded BedStatus to support both Rev 3 spec and legacy UI prototype indicators
 export type BedStatus = 'vacant' | 'occupied' | 'maintenance' | 'guest' | 'paid' | 'pending' | 'verify';
@@ -37,9 +47,9 @@ export interface GuestStay {
   idProofType?: string;
   notes?: string;
   status: 'active' | 'completed';
-  checkedOutAt?: any;
+  checkedOutAt?: Timestampish;
   recordedBy: string;
-  createdAt?: any;
+  createdAt?: Timestampish;
 }
 export type RentStatus = 'pending' | 'verify' | 'paid';
 
@@ -63,7 +73,7 @@ export interface Owner {
   upiMerchantName?: string;
   accountStatus?: AccountStatus;
   plan?: PlanTier;
-  subscriptionExpiresAt?: any;
+  subscriptionExpiresAt?: Timestampish;
   maxBeds?: number;
   maxTenants?: number;
   maxPhotos?: number;
@@ -81,8 +91,8 @@ export interface Owner {
   lateFeePerDayPaise?: number; // optional late fee accrued per overdue day
   lateFeeGraceDays?: number; // days after due date before late fee starts
   pgAmenities?: string[];
-  createdAt?: any;
-  updatedAt?: any;
+  createdAt?: Timestampish;
+  updatedAt?: Timestampish;
 }
 
 /** Owner↔admin support thread (one per owner). Messages live in a subcollection. */
@@ -93,10 +103,10 @@ export interface SupportThread {
   pgName?: string;
   lastMessage?: string;
   lastSender?: 'owner' | 'admin';
-  lastAt?: any;
+  lastAt?: Timestampish;
   unreadForAdmin?: number;
   unreadForOwner?: number;
-  createdAt?: any;
+  createdAt?: Timestampish;
 }
 
 export interface SupportMessage {
@@ -105,7 +115,7 @@ export interface SupportMessage {
   sender: 'owner' | 'admin';
   senderUid: string;
   text: string;
-  createdAt?: any;
+  createdAt?: Timestampish;
 }
 
 export interface Resident {
@@ -113,8 +123,8 @@ export interface Resident {
   name: string;
   phone: string; // cleaned 10-digit; the key that links to tenant records
   email?: string;
-  createdAt?: any;
-  updatedAt?: any;
+  createdAt?: Timestampish;
+  updatedAt?: Timestampish;
 }
 
 /** A resident's request to join a PG they discovered publicly. */
@@ -127,8 +137,8 @@ export interface JoinRequest {
   residentPhone: string;
   message?: string;
   status: 'pending' | 'approved' | 'declined';
-  createdAt?: any;
-  reviewedAt?: any;
+  createdAt?: Timestampish;
+  reviewedAt?: Timestampish;
   reviewedBy?: string;
 }
 
@@ -153,8 +163,8 @@ export interface Property {
   lateFeeGraceDays?: number;
   pgAmenities?: string[];
   nextReceiptSeq?: number; // per-property receipt counter
-  createdAt?: any;
-  updatedAt?: any;
+  createdAt?: Timestampish;
+  updatedAt?: Timestampish;
 }
 
 // PG gallery photo (PUBLIC) — shown to prospective residents in discovery.
@@ -170,7 +180,7 @@ export interface PropertyPhoto {
   contentType: string;
   sizeBytes: number;
   uploadedBy: string;
-  createdAt?: any;
+  createdAt?: Timestampish;
 }
 
 export interface Bed {
@@ -189,9 +199,9 @@ export interface Bed {
   tenantId?: string;
   tenantName?: string;
   tenantPhone?: string;
-  createdAt?: any;
-  updatedAt?: any;
-  deletedAt?: any | null; // soft-delete marker; absent/null = active
+  createdAt?: Timestampish;
+  updatedAt?: Timestampish;
+  deletedAt?: Timestampish | null; // soft-delete marker; absent/null = active
 }
 
 export interface Tenant {
@@ -217,12 +227,12 @@ export interface Tenant {
   depositPaid?: number;
   moveInDate: string;
   moveOutDate?: string;
-  deletedAt?: any;
+  deletedAt?: Timestampish | null;
   deletedBy?: string;
   active?: boolean;
   token?: string;
-  createdAt?: any;
-  updatedAt?: any;
+  createdAt?: Timestampish;
+  updatedAt?: Timestampish;
 }
 
 export type MaintenanceCategory =
@@ -248,10 +258,10 @@ export interface MaintenanceTicket {
   photoId?: string;
   status: MaintenanceStatus;
   resolvedBy?: string;
-  resolvedAt?: any;
+  resolvedAt?: Timestampish;
   resolutionNote?: string;
-  createdAt?: any;
-  updatedAt?: any;
+  createdAt?: Timestampish;
+  updatedAt?: Timestampish;
 }
 
 export type ExpenseCategory =
@@ -275,8 +285,8 @@ export interface Expense {
   date: string; // YYYY-MM-DD
   period: string; // YYYY-MM (derived from date, for monthly grouping)
   recordedBy: string;
-  createdAt?: any;
-  deletedAt?: any | null; // soft-delete marker; absent/null = active
+  createdAt?: Timestampish;
+  deletedAt?: Timestampish | null; // soft-delete marker; absent/null = active
 }
 
 export type RefundStatus = 'pending' | 'issued';
@@ -295,9 +305,9 @@ export interface DepositRecord {
   // been paid out to the tenant yet.
   refundStatus?: RefundStatus;
   issuedBy?: string;
-  issuedAt?: any;
+  issuedAt?: Timestampish;
   tenantName?: string;
-  createdAt: any;
+  createdAt: Timestampish;
 }
 
 export interface RentRecord {
@@ -322,15 +332,15 @@ export interface RentRecord {
   paymentReference?: string;
   proofPhotoId?: string;
   proofImageUrl?: string;
-  claimedAt?: any;
-  confirmedAt?: any;
+  claimedAt?: Timestampish;
+  confirmedAt?: Timestampish;
   confirmedBy?: string;
   receiptNumber?: number;
-  lastRemindedAt?: any;
-  reversedAt?: any;
+  lastRemindedAt?: Timestampish;
+  reversedAt?: Timestampish;
   reversalReason?: string;
-  createdAt?: any;
-  updatedAt?: any;
+  createdAt?: Timestampish;
+  updatedAt?: Timestampish;
 }
 
 export interface MoveInPhoto {
@@ -347,19 +357,19 @@ export interface MoveInPhoto {
   sha256?: string;
   uploadedBy?: string;
   photoUrls?: string[];
-  timestamp?: any;
-  createdAt?: any;
+  timestamp?: Timestampish;
+  createdAt?: Timestampish;
 }
 
 export interface PortalToken {
   tokenHash: string;
   tenantId: string;
   ownerId: string;
-  expiresAt: any;
+  expiresAt: Timestampish;
   singleUse: boolean;
-  usedAt?: any;
-  revokedAt?: any;
-  createdAt: any;
+  usedAt?: Timestampish;
+  revokedAt?: Timestampish;
+  createdAt: Timestampish;
 }
 
 export interface SubscriptionRequest {
@@ -371,7 +381,7 @@ export interface SubscriptionRequest {
   utrReference: string;
   status: SubscriptionRequestStatus;
   reviewedBy?: string;
-  reviewedAt?: any;
+  reviewedAt?: Timestampish;
   notes?: string;
-  createdAt: any;
+  createdAt: Timestampish;
 }

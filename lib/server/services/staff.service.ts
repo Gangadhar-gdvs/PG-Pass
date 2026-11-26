@@ -9,6 +9,8 @@ import {
 } from '@/lib/constants/permissions';
 import { invalidateStaffPermissions } from '../auth/entitlements';
 import { Timestamp } from 'firebase-admin/firestore';
+import { Timestampish } from '@/types';
+import { errorMessage } from '@/lib/utils';
 
 export interface StaffMember {
   id: string; // Auth UID
@@ -21,9 +23,9 @@ export interface StaffMember {
   accountStatus: AccountStatus;
   permissions?: StaffPermission[];
   invitedBy: string;
-  createdAt: any;
-  updatedAt?: any;
-  deletedAt?: any | null; // soft-delete marker; null/absent = active
+  createdAt: Timestampish;
+  updatedAt?: Timestampish;
+  deletedAt?: Timestampish | null; // soft-delete marker; null/absent = active
   revokedBy?: string;
 }
 
@@ -88,14 +90,17 @@ export class StaffService {
     let userRecord;
     try {
       userRecord = await adminAuth.getUserByEmail(email);
-    } catch (err: any) {
-      if (err.code === 'auth/user-not-found') {
+    } catch (err: unknown) {
+      if ((err as { code?: string })?.code === 'auth/user-not-found') {
         userRecord = await adminAuth.createUser({
           email,
           displayName: input.name.trim(),
         });
       } else {
-        throw new AppError(500, `Failed to initialize auth user: ${err.message}`);
+        throw new AppError(
+          500,
+          `Failed to initialize auth user: ${errorMessage(err, 'unknown error')}`
+        );
       }
     }
 

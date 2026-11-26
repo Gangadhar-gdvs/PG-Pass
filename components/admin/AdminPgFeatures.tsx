@@ -15,7 +15,10 @@ export function AdminPgFeatures({ ownerId }: { ownerId: string }) {
   const [savingKey, setSavingKey] = useState<string | null>(null);
 
   useEffect(() => {
-    setFeatures(null);
+    // Defer so setState runs after commit, not in the effect body (cascading-render lint rule).
+    queueMicrotask(() => {
+      setFeatures(null);
+    });
     fetch(`/api/admin/features?ownerId=${encodeURIComponent(ownerId)}`)
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((d) => setFeatures(d.features))

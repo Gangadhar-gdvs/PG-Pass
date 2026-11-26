@@ -4,10 +4,10 @@ import { withCronAuth } from '@/lib/server/api/withCronAuth';
 import { adminDb } from '@/lib/server/firebase-admin';
 import { RENT_STATUS, ACCOUNT_STATUS } from '@/lib/constants/status';
 import { rentDueDate } from '@/lib/utils';
-import { Timestamp } from 'firebase-admin/firestore';
+import { Timestamp, QueryDocumentSnapshot } from 'firebase-admin/firestore';
 
 export const POST = withErrorHandler(
-  withCronAuth(async (req: NextRequest) => {
+  withCronAuth(async (_req: NextRequest) => {
     const todayStr = new Date().toISOString().split('T')[0];
     const now = Timestamp.now();
 
@@ -63,7 +63,7 @@ export const POST = withErrorHandler(
     const PAGE = 300;
     // Firestore QueryDocumentSnapshot cursor; typed loosely to avoid the global
     // FirebaseFirestore namespace.
-    let lastTenant: any = undefined;
+    let lastTenant: QueryDocumentSnapshot | undefined = undefined;
     let batch = adminDb.batch();
     let batchOps = 0;
 

@@ -15,23 +15,30 @@ export class AppError extends Error {
   }
 }
 
+export type RouteContext = { params?: Promise<Record<string, unknown>> };
+
 export type RouteHandler = (
   req: NextRequest,
-  ctx?: any
+  ctx?: RouteContext
 ) => Promise<Response | NextResponse>;
 
-export function withErrorHandler(handler: RouteHandler): RouteHandler {
-  return async (req: NextRequest, ctx?: any) => {
+export function withErrorHandler<C extends RouteContext = RouteContext>(
+  handler: (req: NextRequest, ctx: C) => Promise<Response | NextResponse>
+): RouteHandler {
+  return async (req: NextRequest, ctx?: RouteContext) => {
     const requestId = crypto.randomUUID();
     const startTime = Date.now();
     const route = req.nextUrl?.pathname || req.url;
     const reqLogger = createLogger({ requestId, route });
 
     // Store requestId on the request context if possible
-    (req as any).requestId = requestId;
+    (req as NextRequest & { requestId?: string }).requestId = requestId;
 
     try {
-      const response = await handler(req, ctx);
+      // The framework supplies the concrete context (e.g. route `params`); this
+      // wrapper is a transparent pass-through, so the caller-chosen `C` is what
+      // actually arrives at runtime.
+      const response = await handler(req, (ctx ?? {}) as C);
       const durationMs = Date.now() - startTime;
       reqLogger.info('Request succeeded', {
         status: response.status,
@@ -66,13 +73,14 @@ export function withErrorHandler(handler: RouteHandler): RouteHandler {
 
       // Zod validation errors → clean 400, not an opaque 500. Detected by shape
       // to avoid importing zod into this low-level handler.
+      const zodErr = err as { name?: string; issues?: unknown };
       if (
         err &&
         typeof err === 'object' &&
-        (err as any).name === 'ZodError' &&
-        Array.isArray((err as any).issues)
+        zodErr.name === 'ZodError' &&
+        Array.isArray(zodErr.issues)
       ) {
-        const issues = (err as any).issues as Array<{ path?: (string | number)[]; message: string }>;
+        const issues = zodErr.issues as Array<{ path?: (string | number)[]; message: string }>;
         const first = issues[0];
         const field = first?.path?.length ? `${first.path.join('.')}: ` : '';
         reqLogger.warn('Validation error', { durationMs, issues: issues.length });

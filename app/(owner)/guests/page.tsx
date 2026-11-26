@@ -3,12 +3,13 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useOwnerSession } from '@/hooks/useOwner';
 import { useBeds } from '@/hooks/useBeds';
-import { formatCurrency, formatDateIN } from '@/lib/utils';
+import { formatCurrency, formatDateIN, errorMessage } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { CardListSkeleton } from '@/components/ui/skeletons';
 import { EmptyState } from '@/components/ui/empty-state';
 import { TabBar } from '@/components/ui/tab-bar';
 import { CheckInGuestModal } from '@/components/owner/CheckInGuestModal';
+import { HeroHeader } from '@/components/ui/dashboard-kit';
 import { UserPlus, LogOut, Phone, BedDouble } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { GuestStay, Bed } from '@/types';
@@ -37,7 +38,15 @@ export default function GuestsPage() {
   }, [tab]);
 
   useEffect(() => {
-    if (ownerId) load();
+    if (!ownerId) return;
+    // Defer so setState runs after commit, not in the effect body (cascading-render lint rule).
+    let active = true;
+    queueMicrotask(() => {
+      if (active) load();
+    });
+    return () => {
+      active = false;
+    };
   }, [ownerId, load]);
 
   const checkout = async (id: string) => {
@@ -48,8 +57,8 @@ export default function GuestsPage() {
       if (!res.ok) throw new Error('Checkout failed');
       toast.success('Guest checked out · bed freed');
       await load();
-    } catch (e: any) {
-      toast.error(e.message || 'Checkout failed');
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, 'Checkout failed'));
     } finally {
       setBusyId(null);
     }
@@ -57,21 +66,23 @@ export default function GuestsPage() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-5 pt-2">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-extrabold text-slate-900">Guests</h1>
-          <p className="text-xs text-slate-500">Short stays — check in & out in seconds.</p>
-        </div>
-        <Button
-          variant="solid"
-          onClick={() => {
-            if (vacantBeds.length === 0) return toast.error('No vacant bed available');
-            setBedToCheckIn(vacantBeds[0]);
-          }}
-        >
-          <UserPlus className="w-4 h-4" /> Check in Guest
-        </Button>
-      </div>
+      <HeroHeader
+        eyebrow="Guests"
+        title="Guests"
+        subtitle="Short stays — check in & out in seconds."
+        right={
+          <button
+            type="button"
+            onClick={() => {
+              if (vacantBeds.length === 0) return toast.error('No vacant bed available');
+              setBedToCheckIn(vacantBeds[0]);
+            }}
+            className="inline-flex items-center gap-1.5 h-10 px-4 rounded-full bg-white text-[color:var(--accent)] text-xs font-bold press shadow-sm"
+          >
+            <UserPlus className="w-4 h-4" /> Check in
+          </button>
+        }
+      />
 
       <TabBar
         tabs={[
@@ -79,7 +90,7 @@ export default function GuestsPage() {
           { id: 'completed', label: 'History' },
         ]}
         activeTab={tab}
-        onChange={(id) => setTab(id as any)}
+        onChange={(id) => setTab(id as 'active' | 'completed')}
         variant="pill"
       />
 

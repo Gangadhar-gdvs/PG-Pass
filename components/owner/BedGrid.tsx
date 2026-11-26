@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Bed, RentRecord } from '@/types';
 import { BedCard } from './BedCard';
 import { RoomCard, RoomData } from './RoomCard';
-import { Search, Layers, Building, LayoutGrid, Grid3X3, Users } from 'lucide-react';
+import { Search, Layers, Building, LayoutGrid, Grid3X3 } from 'lucide-react';
 import { TabBar } from '@/components/ui/tab-bar';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Button } from '@/components/ui/button';
@@ -139,7 +139,7 @@ export function BedGrid({
           <Dropdown
             aria-label="Filter by status"
             value={activeFilter}
-            onChange={(v) => setActiveFilter(v as any)}
+            onChange={(v) => setActiveFilter(v as 'all' | 'paid' | 'pending' | 'verify' | 'vacant')}
             containerClassName="w-full sm:w-40"
             className="h-11 text-xs font-semibold"
             options={[
@@ -232,7 +232,7 @@ export function BedGrid({
           </div>
           <h3 className="text-sm font-bold text-[#09090B]">No Beds Configured in Inventory</h3>
           <p className="text-xs text-[#64748B] mt-1 max-w-md mx-auto">
-            You haven't generated your room inventory yet. Configure your floor-by-floor sharing formats (Single, 2-share to 6-share) and pricing to generate your bed units.
+            You haven&apos;t generated your room inventory yet. Configure your floor-by-floor sharing formats (Single, 2-share to 6-share) and pricing to generate your bed units.
           </p>
           {onConfigureRooms && (
             <div className="mt-4">
@@ -276,11 +276,21 @@ export function BedGrid({
                 const vacantCount = sortedBeds.filter((b) => b.status === 'vacant').length;
                 const occupiedCount = sortedBeds.length - vacantCount;
                 const refBed = sortedBeds[0];
+                const countStr = String(sortedBeds.length);
+                const derivedSharing: RoomData['sharingType'] =
+                  countStr === '1' ||
+                  countStr === '2' ||
+                  countStr === '3' ||
+                  countStr === '4' ||
+                  countStr === '5' ||
+                  countStr === '6'
+                    ? countStr
+                    : '2';
 
                 return {
                   roomNumber,
                   floor: floorNum,
-                  sharingType: refBed.sharingType || (String(sortedBeds.length) as any) || '2',
+                  sharingType: refBed.sharingType || derivedSharing,
                   acType: refBed.acType || 'non-ac',
                   beds: sortedBeds,
                   monthlyRent: refBed.monthlyRent,

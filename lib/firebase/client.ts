@@ -17,11 +17,10 @@ export const db = getFirestore(app);
 // In development with emulators enabled, connect client SDK to emulators
 if (typeof window !== 'undefined' && publicEnv.NEXT_PUBLIC_USE_EMULATORS) {
   try {
-    // @ts-ignore
     if (!auth.emulatorConfig) {
       connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
     }
-    // @ts-ignore
+    // @ts-expect-error _settingsFrozen is an internal Firestore flag not exposed on the public type
     if (!db._settingsFrozen) {
       connectFirestoreEmulator(db, 'localhost', 8080);
     }

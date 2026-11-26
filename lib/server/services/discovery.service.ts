@@ -1,9 +1,19 @@
 import 'server-only';
 import { adminDb } from '../firebase-admin';
 import { AppError } from '../api/withErrorHandler';
-import { JoinRequest } from '@/types';
+import { JoinRequest, PropertyPhoto, Timestampish } from '@/types';
 import { recordEvent } from './systemLogs.service';
-import { Timestamp } from 'firebase-admin/firestore';
+import { tsToDate, tsToMillis } from '@/lib/utils';
+
+interface PgReviewDoc {
+  id: string;
+  reviewerName?: string;
+  reviewerRole?: string;
+  rating: number;
+  text?: string;
+  updatedAt?: Timestampish;
+}
+import { Timestamp, Query, QueryDocumentSnapshot } from 'firebase-admin/firestore';
 
 export interface PublicListing {
   propertyId: string;
@@ -20,25 +30,39 @@ export interface PublicListing {
 }
 
 /** Average helper from a {count,sum} aggregate. */
-function avgOf(agg: any): { ratingAvg: number; ratingCount: number } {
+function avgOf(agg: { count?: number; sum?: number } | undefined): {
+  ratingAvg: number;
+  ratingCount: number;
+} {
   const count = agg?.count || 0;
   const sum = agg?.sum || 0;
   return { ratingAvg: count > 0 ? Math.round((sum / count) * 10) / 10 : 0, ratingCount: count };
 }
 
 /** Only public-safe fields — never owner PII, UPI, PAN, etc. */
-function toListing(id: string, data: any): PublicListing {
+function toListing(id: string, data: Record<string, unknown>): PublicListing {
+  const d = data as {
+    ownerId: string;
+    pgName?: string;
+    city?: string;
+    area?: string;
+    pgCategory?: string;
+    foodPlan?: string;
+    monthlyRent?: number;
+    coverPhotoUrl?: string;
+    reviewAgg?: { count?: number; sum?: number };
+  };
   return {
     propertyId: id,
-    ownerId: data.ownerId,
-    pgName: data.pgName || 'PG',
-    city: data.city,
-    area: data.area,
-    pgCategory: data.pgCategory,
-    foodPlan: data.foodPlan,
-    monthlyRent: data.monthlyRent,
-    coverPhotoUrl: data.coverPhotoUrl || undefined, // denormalized on first photo upload
-    ...avgOf(data.reviewAgg),
+    ownerId: d.ownerId,
+    pgName: d.pgName || 'PG',
+    city: d.city,
+    area: d.area,
+    pgCategory: d.pgCategory,
+    foodPlan: d.foodPlan,
+    monthlyRent: d.monthlyRent,
+    coverPhotoUrl: d.coverPhotoUrl || undefined, // denormalized on first photo upload
+    ...avgOf(d.reviewAgg),
   };
 }
 
@@ -49,15 +73,18 @@ export class DiscoveryService {
    */
   async search(params: { city?: string; q?: string; limit?: number }): Promise<PublicListing[]> {
     const lim = Math.min(params.limit || 50, 100);
-    let query = adminDb.collection('properties').where('isListed', '==', true) as any;
+    let query: Query = adminDb.collection('properties').where('isListed', '==', true);
     if (params.city) query = query.where('city', '==', params.city.trim());
     query = query.limit(lim);
 
     const snap = await query.get();
     // Honor the admin per-PG `discovery` feature flag (fail-open unless set false).
     let listings = snap.docs
-      .filter((d: any) => d.data()?.features?.discovery !== false)
-      .map((d: any) => toListing(d.id, d.data()));
+      .filter((d: QueryDocumentSnapshot) => {
+        const features = d.data()?.features as { discovery?: boolean } | undefined;
+        return features?.discovery !== false;
+      })
+      .map((d: QueryDocumentSnapshot) => toListing(d.id, d.data()));
 
     const q = params.q?.trim().toLowerCase();
     if (q) {
@@ -92,7 +119,7 @@ export class DiscoveryService {
     if (!doc.exists || !doc.data()?.isListed) {
       throw new AppError(404, 'PG not found or not listed');
     }
-    return toListing(doc.id, doc.data());
+    return toListing(doc.id, doc.data()!);
   }
 
   /**
@@ -104,8 +131,8 @@ export class DiscoveryService {
     if (!propDoc.exists || !propDoc.data()?.isListed || propDoc.data()?.features?.discovery === false) {
       throw new AppError(404, 'PG not found or not listed');
     }
-    const listing = toListing(propDoc.id, propDoc.data());
     const data = propDoc.data()!;
+    const listing = toListing(propDoc.id, data);
 
     const [photoSnap, reviewSnap, ownerDoc] = await Promise.all([
       adminDb.collection('property_photos').where('propertyId', '==', propertyId).limit(30).get(),
@@ -119,9 +146,9 @@ export class DiscoveryService {
     ]);
 
     const photos = photoSnap.docs
-      .map((d) => d.data())
-      .sort((a: any, b: any) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0))
-      .map((p: any) => ({
+      .map((d) => d.data() as PropertyPhoto)
+      .sort((a, b) => tsToMillis(b.createdAt) - tsToMillis(a.createdAt))
+      .map((p) => ({
         id: p.id,
         category: p.category,
         caption: p.caption || null,
@@ -135,15 +162,15 @@ export class DiscoveryService {
     const reviews = !reviewsEnabled
       ? []
       : reviewSnap.docs
-          .map((d) => d.data())
-          .sort((a: any, b: any) => (b.updatedAt?.toMillis?.() || 0) - (a.updatedAt?.toMillis?.() || 0))
-          .map((r: any) => ({
+          .map((d) => d.data() as PgReviewDoc)
+          .sort((a, b) => tsToMillis(b.updatedAt) - tsToMillis(a.updatedAt))
+          .map((r) => ({
             id: r.id,
             reviewerName: r.reviewerName,
             reviewerRole: r.reviewerRole,
             rating: r.rating,
             text: r.text || '',
-            createdAt: r.updatedAt?.toDate?.()?.toISOString?.() || null,
+            createdAt: tsToDate(r.updatedAt)?.toISOString() || null,
           }));
 
     // Public contact — phone + address only (owner opted into listing).
@@ -201,7 +228,7 @@ export class DiscoveryService {
       .get();
     return snap.docs
       .map((d) => ({ ...d.data(), id: d.id } as JoinRequest))
-      .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+      .sort((a, b) => tsToMillis(b.createdAt) - tsToMillis(a.createdAt));
   }
 
   async review(

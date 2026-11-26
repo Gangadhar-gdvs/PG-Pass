@@ -13,6 +13,8 @@ import {
 } from '@/lib/constants/storage';
 import { PhotoType } from '@/lib/constants/status';
 import { PROPERTY_PHOTO_MAX } from '@/lib/constants/limits';
+import { PropertyPhoto } from '@/types';
+import { tsToDate, tsToMillis } from '@/lib/utils';
 import { Timestamp } from 'firebase-admin/firestore';
 import crypto from 'crypto';
 
@@ -45,7 +47,7 @@ export class PhotosService {
    * Mints an S3 presigned PUT URL for client upload to Backblaze B2 (pending/ prefix).
    */
   async createUploadIntent(params: CreateUploadIntentParams) {
-    const { ownerId, tenantId, photoType, contentType, sizeBytes } = params;
+    const { ownerId, tenantId, contentType, sizeBytes } = params;
 
     // 1. Verify content type
     if (!ALLOWED_MIME_TYPES.includes(contentType as AllowedMimeType)) {
@@ -149,7 +151,7 @@ export class PhotosService {
     let streamResult;
     try {
       streamResult = await storageProvider.streamAndVerify(bucket, objectKey);
-    } catch (err) {
+    } catch {
       await storageProvider.deleteObject(bucket, objectKey).catch(() => {});
       throw new AppError(500, 'Failed to inspect uploaded file');
     }
@@ -181,7 +183,7 @@ export class PhotosService {
     try {
       await storageProvider.copyObject(bucket, objectKey, destKey);
       await storageProvider.deleteObject(bucket, objectKey);
-    } catch (err) {
+    } catch {
       throw new AppError(500, 'Failed to finalize storage object placement');
     }
 
@@ -465,16 +467,16 @@ export class PhotosService {
       .where('propertyId', '==', propertyId)
       .limit(Math.min(limitCount, 100))
       .get();
-    const photos = snap.docs.map((d) => d.data());
+    const photos = snap.docs.map((d) => d.data() as PropertyPhoto);
     // Sort newest-first in memory to avoid needing a composite index.
-    photos.sort((a: any, b: any) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
-    return photos.map((p: any) => ({
+    photos.sort((a, b) => tsToMillis(b.createdAt) - tsToMillis(a.createdAt));
+    return photos.map((p) => ({
       id: p.id,
       category: p.category,
       caption: p.caption || null,
       sharingType: p.sharingType || null,
       publicUrl: p.publicUrl,
-      createdAt: p.createdAt?.toDate?.()?.toISOString?.() || null,
+      createdAt: tsToDate(p.createdAt)?.toISOString() || null,
     }));
   }
 

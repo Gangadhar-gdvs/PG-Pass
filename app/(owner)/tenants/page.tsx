@@ -21,6 +21,7 @@ import { DataTable, Column } from '@/components/ui/data-table';
 import { Avatar } from '@/components/ui/avatar';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ListSkeleton } from '@/components/ui/skeletons';
+import { HeroHeader } from '@/components/ui/dashboard-kit';
 import toast from 'react-hot-toast';
 
 export default function TenantsPage() {
@@ -55,7 +56,10 @@ export default function TenantsPage() {
     safePage * PAGE_SIZE + PAGE_SIZE
   );
   React.useEffect(() => {
-    setPage(0);
+    // Defer so setState runs after commit, not in the effect body (cascading-render lint rule).
+    queueMicrotask(() => {
+      setPage(0);
+    });
   }, [search]);
 
   const handleCopyLink = (token?: string) => {
@@ -159,9 +163,9 @@ export default function TenantsPage() {
             type="button"
             title="Copy resident link"
             onClick={() => handleCopyLink(t.token)}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-[6px] border border-[#E2E8F0] hover:bg-[#F8FAFC] text-[11px] font-semibold text-[#D97706] transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-[6px] border border-[#E2E8F0] hover:bg-[#F8FAFC] text-[11px] font-semibold accent-text transition-colors cursor-pointer"
           >
-            <Copy className="w-3 h-3 text-[#D97706]" />
+            <Copy className="w-3 h-3 accent-text" />
             <span>Copy</span>
           </button>
           <a
@@ -204,30 +208,23 @@ export default function TenantsPage() {
   ];
 
   return (
-    <div className="space-y-6 text-left">
+    <div className="space-y-5 text-left">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-3 border-b border-[#E2E8F0]">
-        <div>
-          <h1 className="text-xl font-bold text-[#09090B] tracking-tight">
-            Resident Directory
-          </h1>
-          <p className="text-xs text-[#64748B] mt-0.5">
-            Active leaseholders, private portal URLs, and deposit ledger ({tenants.length} total).
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            variant="outline"
+      <HeroHeader
+        eyebrow="Residents"
+        title="Resident Directory"
+        subtitle={`Active leaseholders, private portal URLs, and deposit ledger (${tenants.length} total).`}
+        right={
+          <button
+            type="button"
             onClick={handleExportCsv}
-            className="text-xs"
+            className="inline-flex items-center h-9 px-4 rounded-full bg-white/15 hover:bg-white/25 border border-white/25 text-white text-xs font-bold press"
           >
             <Download className="w-3.5 h-3.5 mr-1.5" />
             <span>Export CSV</span>
-          </Button>
-        </div>
-      </div>
+          </button>
+        }
+      />
 
       {/* Search Input */}
       <div className="relative max-w-sm">
@@ -237,7 +234,7 @@ export default function TenantsPage() {
           placeholder="Filter by name, phone, or bed label..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full bg-white border border-[#E2E8F0] rounded-[8px] pl-9 pr-3 py-2 text-xs text-[#09090B] placeholder:text-[#94A3B8] focus:outline-none focus:border-[#D97706]"
+          className="w-full bg-white border border-[#E2E8F0] rounded-[8px] pl-9 pr-3 py-2 text-xs text-[#09090B] placeholder:text-[#94A3B8] focus:outline-none focus:border-[color:var(--accent)]"
         />
       </div>
 
@@ -252,7 +249,7 @@ export default function TenantsPage() {
           action={
             <button
               onClick={() => window.location.reload()}
-              className="h-11 px-5 rounded-full bg-[#D97706] hover:bg-[#B45309] text-white text-sm font-bold press"
+              className="h-11 px-5 rounded-full accent-bg text-white text-sm font-bold press"
             >
               Retry
             </button>

@@ -22,7 +22,7 @@ import toast from 'react-hot-toast';
 const FEATURES = [
   {
     icon: Layers,
-    tint: 'bg-[#FEF3C7] text-[#D97706]',
+    tint: 'accent-soft-bg',
     title: 'Visual bed inventory',
     desc: 'Every room and bed by floor, colour-coded: paid, due, or vacant — at a glance.',
   },
@@ -79,12 +79,12 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white text-[#09090B] flex flex-col font-sans selection:bg-[#FEF3C7] selection:text-[#B45309] pb-24 sm:pb-0">
+    <div className="min-h-screen bg-white text-[#09090B] flex flex-col font-sans selection:bg-[var(--accent-soft)] selection:text-[var(--accent-ink)] pb-24 sm:pb-0">
       {/* ===================== TOP NAV ===================== */}
       <header className="sticky top-0 z-40 bg-white/85 backdrop-blur-xl border-b border-[#F1F5F9]">
         <div className="max-w-5xl mx-auto px-5 h-14 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-[10px] bg-[#D97706] text-white flex items-center justify-center shadow-sm">
+            <div className="w-8 h-8 rounded-[10px] accent-bg text-white flex items-center justify-center shadow-sm">
               <Building className="w-4 h-4" />
             </div>
             <span className="font-extrabold text-[15px] tracking-tight">PGPass</span>
@@ -112,18 +112,18 @@ export default function LandingPage() {
           {/* soft gradient backdrop */}
           <div
             aria-hidden
-            className="absolute inset-0 bg-gradient-to-b from-[#FFF7ED] via-white to-white"
+            className="absolute inset-0 bg-gradient-to-b from-[var(--accent-tint)] via-white to-white"
           />
           <div className="relative max-w-5xl mx-auto px-5 pt-14 pb-12 sm:pt-20 sm:pb-16 text-center">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-[#FDE68A] text-[11px] font-bold text-[#92400E] shadow-xs">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#D97706] animate-pulse" />
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-[var(--accent-soft)] text-[11px] font-bold text-[var(--accent-ink)] shadow-xs">
+              <span className="h-1.5 w-1.5 rounded-full accent-bg animate-pulse" />
               100% free · zero app downloads for residents
             </span>
 
             <h1 className="mt-6 text-[32px] leading-[1.1] sm:text-[52px] sm:leading-[1.05] font-extrabold tracking-tight text-[#09090B]">
               Run your PG from
               <br className="hidden sm:block" />
-              <span className="text-[#D97706]"> your phone.</span>
+              <span className="accent-text"> your phone.</span>
             </h1>
 
             <p className="mt-4 text-sm sm:text-lg text-[#475569] leading-relaxed max-w-xl mx-auto">
@@ -134,7 +134,7 @@ export default function LandingPage() {
             <div className="mt-7 flex flex-col sm:flex-row items-center justify-center gap-3">
               <Link
                 href="/login"
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 h-12 rounded-full bg-[#D97706] hover:bg-[#B45309] text-white text-sm font-bold shadow-[0_8px_24px_-8px_rgba(217,119,6,0.6)] transition-colors"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 h-12 rounded-full accent-bg hover:brightness-105 text-white text-sm font-bold shadow-[0_8px_24px_-8px_color-mix(in_srgb,var(--accent)_60%,transparent)] transition-all"
               >
                 Open your dashboard
                 <ArrowRight className="w-4 h-4" />
@@ -155,7 +155,7 @@ export default function LandingPage() {
                     <span className="text-[13px] font-bold block">Your PG Dashboard</span>
                     <span className="text-[10px] text-[#94A3B8]">Product preview · sample data</span>
                   </div>
-                  <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-[#FEF3C7] text-[#92400E]">
+                  <span className="text-[10px] font-bold px-2 py-1 rounded-full accent-soft-bg">
                     Live
                   </span>
                 </div>
@@ -232,7 +232,7 @@ export default function LandingPage() {
         <section id="how" className="bg-[#0F172A] text-white py-16 sm:py-20">
           <div className="max-w-5xl mx-auto px-5">
             <div className="text-center max-w-md mx-auto mb-12">
-              <span className="text-[11px] font-bold uppercase tracking-widest text-[#F59E0B]">
+              <span className="text-[11px] font-bold uppercase tracking-widest text-[var(--accent-2)]">
                 Workflow
               </span>
               <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight mt-2">
@@ -243,7 +243,7 @@ export default function LandingPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {STEPS.map((s, i) => (
                 <div key={s.n} className="relative rounded-[22px] bg-white/[0.04] border border-white/10 p-6">
-                  <div className="w-10 h-10 rounded-full bg-[#D97706] text-white flex items-center justify-center font-extrabold text-sm mb-4">
+                  <div className="w-10 h-10 rounded-full accent-bg text-white flex items-center justify-center font-extrabold text-sm mb-4">
                     {s.n}
                   </div>
                   <h3 className="text-base font-bold">{s.title}</h3>
@@ -260,7 +260,7 @@ export default function LandingPage() {
         {/* ===================== RESIDENT LOOKUP ===================== */}
         <section id="resident" className="max-w-xl mx-auto px-5 py-16 sm:py-20">
           <div className="rounded-[26px] border border-[#E2E8F0] bg-gradient-to-b from-white to-[#F8FAFC] p-6 sm:p-8 shadow-[0_20px_50px_-20px_rgba(15,23,42,0.18)] text-center">
-            <div className="w-12 h-12 rounded-[16px] bg-[#FEF3C7] text-[#D97706] flex items-center justify-center mx-auto mb-4">
+            <div className="w-12 h-12 rounded-[16px] accent-soft-bg flex items-center justify-center mx-auto mb-4">
               <QrCode className="w-6 h-6" />
             </div>
             <h2 className="text-xl font-extrabold tracking-tight">Staying at a PG?</h2>
@@ -285,13 +285,13 @@ export default function LandingPage() {
                   placeholder="abcd1234efgh"
                   value={tokenInput}
                   onChange={(e) => setTokenInput(e.target.value.trim())}
-                  className="w-full h-12 pl-11 pr-4 rounded-2xl border border-[#E2E8F0] bg-[#F8FAFC] text-[15px] font-mono tracking-[0.15em] text-[#09090B] placeholder:text-[#CBD5E1] placeholder:tracking-normal shadow-xs transition-all focus:outline-none focus:bg-white focus:border-[#D97706] focus:ring-2 focus:ring-[#FDE68A]"
+                  className="w-full h-12 pl-11 pr-4 rounded-2xl border border-[#E2E8F0] bg-[#F8FAFC] text-[15px] font-mono tracking-[0.15em] text-[#09090B] placeholder:text-[#CBD5E1] placeholder:tracking-normal shadow-xs transition-all focus:outline-none focus:bg-white focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]"
                 />
               </div>
               <Button
                 type="submit"
                 variant="solid"
-                className="w-full h-12 rounded-2xl bg-[#D97706] hover:bg-[#B45309] text-white text-sm font-bold shadow-[0_8px_24px_-8px_rgba(217,119,6,0.55)]"
+                className="w-full h-12 rounded-2xl text-white text-sm font-bold"
               >
                 Open my portal
                 <ArrowRight className="w-4 h-4 ml-1.5" />
@@ -308,7 +308,7 @@ export default function LandingPage() {
       <footer className="border-t border-[#F1F5F9] bg-white py-8">
         <div className="max-w-5xl mx-auto px-5 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#64748B]">
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-[8px] bg-[#D97706] text-white flex items-center justify-center font-extrabold text-[11px]">
+            <div className="w-6 h-6 rounded-[8px] accent-bg text-white flex items-center justify-center font-extrabold text-[11px]">
               P
             </div>
             <span className="font-bold text-[#09090B]">PGPass</span>
@@ -327,7 +327,7 @@ export default function LandingPage() {
       <div className="sm:hidden fixed inset-x-0 bottom-0 z-40 bg-white/90 backdrop-blur-xl border-t border-[#F1F5F9] px-4 py-3" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}>
         <Link
           href="/login"
-          className="flex items-center justify-center gap-2 h-12 rounded-full bg-[#D97706] text-white text-sm font-bold shadow-[0_8px_24px_-8px_rgba(217,119,6,0.6)]"
+          className="flex items-center justify-center gap-2 h-12 rounded-full accent-bg text-white text-sm font-bold shadow-[0_8px_24px_-8px_color-mix(in_srgb,var(--accent)_60%,transparent)]"
         >
           Get started free
           <ArrowRight className="w-4 h-4" />

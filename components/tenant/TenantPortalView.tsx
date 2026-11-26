@@ -12,11 +12,10 @@ import {
   ShieldCheck,
   Lock,
   Unlock,
-  KeyRound,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getWhatsAppLink } from '@/lib/utils';
-import Link from 'next/link';
+import type { RentRecord } from '@/types';
 import toast from 'react-hot-toast';
 
 interface TenantPortalViewProps {
@@ -40,7 +39,7 @@ interface PortalData {
     upiMerchantName?: string;
     phone?: string;
   };
-  rentRecords: any[];
+  rentRecords: RentRecord[];
 }
 
 export function TenantPortalView({ token }: TenantPortalViewProps) {
@@ -80,7 +79,7 @@ export function TenantPortalView({ token }: TenantPortalViewProps) {
       setErrorMsg(null);
       localStorage.setItem(storageKey, pin);
       return true;
-    } catch (err: any) {
+    } catch {
       if (!isAuto) {
         setErrorMsg('Network error. Please try again.');
       }
@@ -98,6 +97,10 @@ export function TenantPortalView({ token }: TenantPortalViewProps) {
       setLoading(false);
     }
     init();
+    // Run once per token: auto-unlock from a saved PIN. `attemptUnlock`/`storageKey`
+    // are intentionally omitted — they're recreated each render and including them
+    // would re-trigger an unlock attempt on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   const handlePinSubmit = async (e: React.FormEvent) => {
@@ -197,11 +200,7 @@ export function TenantPortalView({ token }: TenantPortalViewProps) {
 
   // No fabricated amount — when there's no rent record yet, leave the due amount
   // unknown (null) so the UI shows "—" instead of inventing ₹8,500.
-  const activeRentRecord = portalData.rentRecords?.[0] || {
-    period: new Date().toLocaleDateString('en-IN', { month: 'short', year: 'numeric' }),
-    amountDuePaise: null as number | null,
-    status: 'pending',
-  };
+  const activeRentRecord: RentRecord | undefined = portalData.rentRecords?.[0];
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-[#09090B] flex flex-col items-center px-4 py-6 sm:py-10">

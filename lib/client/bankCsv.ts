@@ -1,5 +1,24 @@
 'use client';
 
+import type { RentRecord } from '@/types';
+
+/**
+ * The subset of a rent record the bank-statement reconciler reads. Derived from
+ * the real `RentRecord` domain type (not `any`) but widened to the handful of
+ * fields the matcher touches — and `status` is accepted as a plain string so
+ * loosely-shaped/partial callers (owner dashboard rows, test fixtures) can be
+ * passed without an `any` escape hatch.
+ */
+export interface ReconcilableRentRecord {
+  id?: string;
+  status?: string;
+  paymentReference?: RentRecord['paymentReference'];
+  amountDuePaise?: RentRecord['amountDuePaise'];
+  amount?: RentRecord['amount'];
+  tenantName?: RentRecord['tenantName'];
+  bedLabel?: RentRecord['bedLabel'];
+}
+
 export interface BankTransaction {
   id: string;
   date: string;
@@ -10,7 +29,7 @@ export interface BankTransaction {
 
 export interface ReconcileMatch {
   transaction: BankTransaction;
-  rentRecord?: any;
+  rentRecord?: ReconcilableRentRecord;
   confidence: 'exact_utr' | 'amount_match' | 'unmatched';
 }
 
@@ -110,20 +129,20 @@ export function parseBankStatementCsv(csvText: string): BankTransaction[] {
  */
 export function matchBankTransactions(
   transactions: BankTransaction[],
-  rentRecords: any[]
+  rentRecords: ReconcilableRentRecord[]
 ): ReconcileMatch[] {
   const matches: ReconcileMatch[] = [];
   const claimedRecordIds = new Set<string>();
 
   for (const tx of transactions) {
-    let matchedRecord: any = null;
+    let matchedRecord: ReconcilableRentRecord | undefined;
     let confidence: 'exact_utr' | 'amount_match' | 'unmatched' = 'unmatched';
 
     // 1. Exact UTR match (Highest priority)
     if (tx.utr) {
       matchedRecord = rentRecords.find(
         (r) =>
-          !claimedRecordIds.has(r.id) &&
+          !(r.id != null && claimedRecordIds.has(r.id)) &&
           r.status !== 'paid' &&
           r.paymentReference &&
           r.paymentReference.trim().toUpperCase() === tx.utr!.toUpperCase()
@@ -136,7 +155,7 @@ export function matchBankTransactions(
     // 2. Amount match on pending/verify record if no UTR matched
     if (!matchedRecord) {
       matchedRecord = rentRecords.find((r) => {
-        if (claimedRecordIds.has(r.id) || r.status === 'paid') return false;
+        if ((r.id != null && claimedRecordIds.has(r.id)) || r.status === 'paid') return false;
         const dueRupees = r.amountDuePaise ? Math.round(r.amountDuePaise / 100) : r.amount;
         return dueRupees === tx.creditAmount;
       });
@@ -145,7 +164,7 @@ export function matchBankTransactions(
       }
     }
 
-    if (matchedRecord) {
+    if (matchedRecord?.id != null) {
       claimedRecordIds.add(matchedRecord.id);
     }
 

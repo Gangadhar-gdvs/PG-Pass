@@ -39,7 +39,7 @@ export async function uploadPhotoToB2(
   onProgress?.(35);
 
   // 2. Request presigned PUT URL
-  const intentPayload: Record<string, any> = {
+  const intentPayload: Record<string, unknown> = {
     photoType,
     contentType: compressed.blob.type,
     sizeBytes: compressed.sizeBytes,
@@ -81,7 +81,7 @@ export async function uploadPhotoToB2(
   onProgress?.(85);
 
   // 4. Confirm upload
-  const confirmPayload: Record<string, any> = {
+  const confirmPayload: Record<string, unknown> = {
     objectKey,
     photoType,
     rentRecordId,

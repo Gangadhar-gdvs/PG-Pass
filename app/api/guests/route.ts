@@ -5,6 +5,23 @@ import { withRateLimit } from '@/lib/server/api/withRateLimit';
 import { guestsService } from '@/lib/server/services/guests.service';
 import { STAFF_PERMISSIONS, PG_FEATURES } from '@/lib/constants/permissions';
 
+interface CheckInBody {
+  bedId?: string;
+  name?: string;
+  phone?: string;
+  checkInDate?: string;
+  checkOutDate?: string;
+  billingMode?: string;
+  nightlyRatePaise?: number;
+  nightlyRateRupees?: number;
+  flatTotalPaise?: number;
+  flatTotalRupees?: number;
+  amountPaidPaise?: number;
+  amountPaidRupees?: number;
+  idProofType?: string;
+  notes?: string;
+}
+
 // List guest stays (active + past).
 export const GET = withErrorHandler(
   withAuth(
@@ -24,9 +41,9 @@ export const POST = withErrorHandler(
     withRateLimit(
       async (req: NextRequest, ctx: { auth: AuthContext }) => {
         const ownerId = ctx.auth.ownerId || ctx.auth.uid;
-        let body: any;
+        let body: CheckInBody;
         try {
-          body = await req.json();
+          body = (await req.json()) as CheckInBody;
         } catch {
           throw new AppError(400, 'Invalid JSON body');
         }

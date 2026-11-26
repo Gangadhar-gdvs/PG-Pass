@@ -163,7 +163,8 @@ export default function AnalyticsPage() {
           action={
             <button
               onClick={load}
-              className="h-11 px-4 rounded-[8px] bg-[#D97706] text-white text-sm font-semibold"
+              style={{ background: 'var(--accent)' }}
+              className="h-11 px-4 rounded-[8px] text-white text-sm font-semibold"
             >
               Retry
             </button>
@@ -197,7 +198,7 @@ export default function AnalyticsPage() {
   return (
     <div className="max-w-5xl mx-auto space-y-5">
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-[8px] bg-[#FEF3C7] border border-[#FDE68A] text-[#D97706] flex items-center justify-center shrink-0">
+        <div className="w-10 h-10 rounded-[8px] accent-soft-bg accent-text flex items-center justify-center shrink-0">
           <BarChart3 className="w-5 h-5" />
         </div>
         <div>

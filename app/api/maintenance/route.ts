@@ -4,6 +4,7 @@ import { withAuth, AuthContext } from '@/lib/server/api/withAuth';
 import { withRateLimit } from '@/lib/server/api/withRateLimit';
 import { verifyPortalSession } from '@/lib/server/security/portalAuth';
 import { maintenanceService } from '@/lib/server/services/maintenance.service';
+import type { MaintenanceStatus } from '@/types';
 import { STAFF_PERMISSIONS, PG_FEATURES } from '@/lib/constants/permissions';
 
 // Tenant raises a maintenance ticket from the portal (token + PIN auth).
@@ -52,7 +53,7 @@ export const GET = withErrorHandler(
     async (req: NextRequest, ctx: { auth: AuthContext }) => {
       const ownerId = ctx.auth.ownerId || ctx.auth.uid;
       const url = new URL(req.url);
-      const status = url.searchParams.get('status') as any;
+      const status = url.searchParams.get('status') as MaintenanceStatus | null;
       const tickets = await maintenanceService.listForOwner(ownerId, status || undefined);
       return NextResponse.json({ tickets });
     },

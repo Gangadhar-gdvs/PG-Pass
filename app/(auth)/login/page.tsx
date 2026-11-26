@@ -3,18 +3,29 @@
 import React, { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, ShieldCheck, CheckCircle2, Building, Mail, Lock, AlertCircle } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, CheckCircle2, Building, AlertCircle } from 'lucide-react';
 import {
   signInWithPopup,
   GoogleAuthProvider,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  type User,
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { reportClientError } from '@/lib/client/logger';
+import { errorMessage } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import toast from 'react-hot-toast';
+
+/** Narrow an unknown caught value to the Firebase auth error `code` string. */
+function authErrorCode(e: unknown): string {
+  if (e && typeof e === 'object' && 'code' in e) {
+    const c = (e as { code?: unknown }).code;
+    if (typeof c === 'string') return c;
+  }
+  return '';
+}
 
 function LoginFormContent() {
   const router = useRouter();
@@ -38,7 +49,7 @@ function LoginFormContent() {
   // Exchange Firebase ID token for httpOnly session cookie. Runs only AFTER
   // Firebase has verified the user's credentials, so the "log out other device"
   // prompt is shown exclusively to an authenticated user — never before.
-  const establishSession = async (user: any, takeover = false) => {
+  const establishSession = async (user: User, takeover = false) => {
     const idToken = await user.getIdToken();
     const res = await fetch('/api/auth/session', {
       method: 'POST',
@@ -107,24 +118,25 @@ function LoginFormContent() {
       const provider = new GoogleAuthProvider();
       const userCredential = await signInWithPopup(auth, provider);
       await establishSession(userCredential.user);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Google sign-in error:', err);
+      const code = authErrorCode(err);
 
       // Report full technical diagnostics to system logs for admin portal
       reportClientError({
-        message: err.message || 'Google sign-in failed',
-        code: err.code || 'GOOGLE_SIGNIN_ERROR',
+        message: errorMessage(err, 'Google sign-in failed'),
+        code: code || 'GOOGLE_SIGNIN_ERROR',
         route: '/login',
         error: err,
         details: { provider: 'google', action: 'signInWithPopup' },
       });
 
       // Clear, polite, non-technical message for residents and owners
-      if (err.code === 'auth/operation-not-allowed') {
+      if (code === 'auth/operation-not-allowed') {
         setError('Google sign-in is temporarily unavailable. Please sign in with your email or contact support.');
-      } else if (err.code === 'auth/popup-closed-by-user') {
+      } else if (code === 'auth/popup-closed-by-user') {
         setError('Sign-in was cancelled.');
-      } else if (err.code === 'auth/network-request-failed') {
+      } else if (code === 'auth/network-request-failed') {
         setError('Network error. Please check your internet connection.');
       } else {
         setError('Unable to sign in with Google. Please try again or use your email.');
@@ -156,14 +168,15 @@ function LoginFormContent() {
         userCredential = await createUserWithEmailAndPassword(auth, email, password);
       }
       await establishSession(userCredential.user);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Email auth error:', err);
+      const code = authErrorCode(err);
 
       // Report technical diagnostics to system logs
-      if (err.code !== 'auth/wrong-password' && err.code !== 'auth/user-not-found' && err.code !== 'auth/invalid-credential') {
+      if (code !== 'auth/wrong-password' && code !== 'auth/user-not-found' && code !== 'auth/invalid-credential') {
         reportClientError({
-          message: err.message || 'Email authentication failed',
-          code: err.code || 'EMAIL_AUTH_ERROR',
+          message: errorMessage(err, 'Email authentication failed'),
+          code: code || 'EMAIL_AUTH_ERROR',
           route: '/login',
           error: err,
           details: { mode: authMode },
@@ -171,13 +184,13 @@ function LoginFormContent() {
       }
 
       let msg = 'Unable to sign in. Please try again.';
-      if (err.code === 'auth/operation-not-allowed') {
+      if (code === 'auth/operation-not-allowed') {
         msg = 'Email sign-in is temporarily unavailable. Please contact support.';
-      } else if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+      } else if (code === 'auth/user-not-found' || code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
         msg = 'Invalid email or password. Please try again.';
-      } else if (err.code === 'auth/email-already-in-use') {
+      } else if (code === 'auth/email-already-in-use') {
         msg = 'An account with this email already exists. Please sign in instead.';
-      } else if (err.code === 'auth/network-request-failed') {
+      } else if (code === 'auth/network-request-failed') {
         msg = 'Network connection error. Please check your internet connection.';
       }
       setError(msg);
@@ -189,7 +202,7 @@ function LoginFormContent() {
   if (redirecting) {
     return (
       <div className="min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center p-4">
-        <div className="h-9 w-9 rounded-full border-2 border-[#D97706] border-t-transparent animate-spin mb-4" />
+        <div className="h-9 w-9 rounded-full border-2 border-[var(--accent)] border-t-transparent animate-spin mb-4" />
         <span className="text-sm font-semibold text-[#09090B]">Signing you in…</span>
         <span className="text-xs text-[#64748B] mt-1">Loading your dashboard</span>
       </div>
@@ -199,12 +212,12 @@ function LoginFormContent() {
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center p-4 sm:p-6 lg:p-8">
       {/* Main Container Card */}
-      <div className="w-full max-w-4xl bg-white border border-[#E2E8F0] rounded-[14px] shadow-[0_20px_50px_rgba(0,0,0,0.06)] overflow-hidden grid grid-cols-1 md:grid-cols-2">
+      <div className="w-full max-w-4xl app-card border border-[#E2E8F0] rounded-[16px] shadow-[var(--shadow-card)] overflow-hidden grid grid-cols-1 md:grid-cols-2">
         {/* Left Brand Panel (Desktop) */}
         <div className="hidden md:flex flex-col justify-between p-10 bg-[#0F172A] text-white">
           <div>
             <div className="flex items-center gap-2.5">
-              <div className="h-9 w-9 rounded-[8px] bg-[#D97706] flex items-center justify-center text-white shadow-xs">
+              <div className="h-9 w-9 rounded-[8px] accent-bg flex items-center justify-center text-white shadow-xs">
                 <Building className="h-5 w-5" />
               </div>
               <span className="text-xl font-bold tracking-tight text-white">PGPass</span>
@@ -221,15 +234,15 @@ function LoginFormContent() {
 
             <div className="mt-10 space-y-3.5">
               <div className="flex items-center gap-2.5 text-xs font-semibold text-slate-200">
-                <CheckCircle2 className="h-4 w-4 text-[#F59E0B] shrink-0" />
+                <CheckCircle2 className="h-4 w-4 text-[var(--accent-2)] shrink-0" />
                 <span>Zero gateway fee direct UPI settlement</span>
               </div>
               <div className="flex items-center gap-2.5 text-xs font-semibold text-slate-200">
-                <CheckCircle2 className="h-4 w-4 text-[#F59E0B] shrink-0" />
+                <CheckCircle2 className="h-4 w-4 text-[var(--accent-2)] shrink-0" />
                 <span>PIN-protected Resident Pass links</span>
               </div>
               <div className="flex items-center gap-2.5 text-xs font-semibold text-slate-200">
-                <CheckCircle2 className="h-4 w-4 text-[#F59E0B] shrink-0" />
+                <CheckCircle2 className="h-4 w-4 text-[var(--accent-2)] shrink-0" />
                 <span>Anti-fraud UTR deduplication</span>
               </div>
             </div>
@@ -254,7 +267,7 @@ function LoginFormContent() {
                 <span>Back to Home</span>
               </Link>
 
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-[#D97706] bg-[#FEF3C7] px-2.5 py-0.5 rounded-[6px]">
+              <span className="text-[11px] font-semibold uppercase tracking-wider accent-soft-bg px-2.5 py-0.5 rounded-[6px]">
                 Owner & Staff Login
               </span>
             </div>
@@ -365,14 +378,14 @@ function LoginFormContent() {
               <div className="pt-2 text-center text-xs text-[#64748B]">
                 {authMode === 'signin' ? (
                   <span>
-                    Don't have an account?{' '}
+                    Don&apos;t have an account?{' '}
                     <button
                       type="button"
                       onClick={() => {
                         setAuthMode('signup');
                         setError('');
                       }}
-                      className="font-bold text-[#D97706] hover:underline cursor-pointer"
+                      className="font-bold accent-text hover:underline cursor-pointer"
                     >
                       Sign up
                     </button>
@@ -386,7 +399,7 @@ function LoginFormContent() {
                         setAuthMode('signin');
                         setError('');
                       }}
-                      className="font-bold text-[#D97706] hover:underline cursor-pointer"
+                      className="font-bold accent-text hover:underline cursor-pointer"
                     >
                       Sign in
                     </button>
@@ -411,7 +424,7 @@ export default function LoginPage() {
     <Suspense
       fallback={
         <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">
-          <div className="h-8 w-8 rounded-full border-2 border-[#D97706] border-t-transparent animate-spin" />
+          <div className="h-8 w-8 rounded-full border-2 border-[var(--accent)] border-t-transparent animate-spin" />
         </div>
       }
     >

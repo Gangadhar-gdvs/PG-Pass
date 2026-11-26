@@ -3,20 +3,12 @@
 import React from 'react';
 import { Bed, RentRecord } from '@/types';
 import { formatCurrency, getWhatsAppLink } from '@/lib/utils';
-import { Avatar } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   UserPlus,
   Send,
-  Check,
-  Eye,
-  CheckCircle2,
-  Clock,
-  Sparkles,
   Users,
   ChevronRight,
-  ShieldAlert,
 } from 'lucide-react';
 
 export interface RoomData {
@@ -95,9 +87,6 @@ export function RoomCard({
   pgName,
   ownerUpi,
   onAddTenant,
-  onMarkPaid,
-  onVerifyProof,
-  onVacate,
   onSelectBed,
 }: RoomCardProps) {
   const shareCfg = SHARING_CONFIG[room.sharingType] || {

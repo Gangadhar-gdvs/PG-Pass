@@ -7,9 +7,21 @@ import {
   STAFF_PERMISSION_LABELS,
   StaffPermission,
 } from '@/lib/constants/permissions';
-import { formatCurrency } from '@/lib/utils';
 import { UserCog, ShieldCheck, History, Lock, Unlock, Trash2, Star, Loader2, Save } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import type { Expense } from '@/types';
+import { errorMessage } from '@/lib/utils';
 import toast from 'react-hot-toast';
+
+/** Shape of the admin pg-detail history payload (counts + expense soft-delete flags). */
+interface PgDetail {
+  rentRecords?: unknown[];
+  deposits?: unknown[];
+  expenses?: Expense[];
+  maintenance?: unknown[];
+  reviews?: unknown[];
+  logs?: unknown[];
+}
 
 /**
  * Admin per-PG management + history. Admin can act on the owner's behalf:
@@ -17,9 +29,19 @@ import toast from 'react-hot-toast';
  * suspend/reactivate/revoke staff. Also shows full history (rent, deposits,
  * expenses, maintenance, reviews, logs). All actions are admin-gated + logged.
  */
+// Section header — hoisted to module scope (not defined during render) so it has
+// a stable identity and doesn't remount its subtree on every parent render.
+function H({ icon: Icon, label }: { icon: LucideIcon; label: string }) {
+  return (
+    <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#64748B] flex items-center gap-1.5">
+      <Icon className="w-3.5 h-3.5" /> {label}
+    </span>
+  );
+}
+
 export function AdminPgManage({ pg, onChanged }: { pg: SuperAdminPgOverview; onChanged?: () => void }) {
   const ownerId = pg.owner.id;
-  const [detail, setDetail] = useState<any>(null);
+  const [detail, setDetail] = useState<PgDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(true);
   const [busy, setBusy] = useState(false);
 
@@ -33,10 +55,13 @@ export function AdminPgManage({ pg, onChanged }: { pg: SuperAdminPgOverview; onC
   const [permSet, setPermSet] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    setName(pg.owner.name || '');
-    setPhone(pg.owner.phone || '');
-    setUpiId(pg.owner.upiId || '');
-    setLoadingDetail(true);
+    // Defer so setState runs after commit, not in the effect body (cascading-render lint rule).
+    queueMicrotask(() => {
+      setName(pg.owner.name || '');
+      setPhone(pg.owner.phone || '');
+      setUpiId(pg.owner.upiId || '');
+      setLoadingDetail(true);
+    });
     fetch(`/api/admin/pg-detail?ownerId=${encodeURIComponent(ownerId)}`)
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then(setDetail)
@@ -44,7 +69,7 @@ export function AdminPgManage({ pg, onChanged }: { pg: SuperAdminPgOverview; onC
       .finally(() => setLoadingDetail(false));
   }, [ownerId, pg.owner.name, pg.owner.phone, pg.owner.upiId]);
 
-  const post = async (bodyObj: any, okMsg: string) => {
+  const post = async (bodyObj: Record<string, unknown>, okMsg: string) => {
     setBusy(true);
     try {
       const res = await fetch('/api/admin/manage', {
@@ -57,8 +82,8 @@ export function AdminPgManage({ pg, onChanged }: { pg: SuperAdminPgOverview; onC
       toast.success(okMsg);
       onChanged?.();
       return true;
-    } catch (e: any) {
-      toast.error(e.message || 'Action failed');
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, 'Action failed'));
       return false;
     } finally {
       setBusy(false);
@@ -76,11 +101,6 @@ export function AdminPgManage({ pg, onChanged }: { pg: SuperAdminPgOverview; onC
     if (ok) setEditPermsUid(null);
   };
 
-  const H = ({ icon: Icon, label }: { icon: any; label: string }) => (
-    <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#64748B] flex items-center gap-1.5">
-      <Icon className="w-3.5 h-3.5" /> {label}
-    </span>
-  );
 
   return (
     <div className="space-y-3">
@@ -252,10 +272,10 @@ export function AdminPgManage({ pg, onChanged }: { pg: SuperAdminPgOverview; onC
             <HistoryStat label="Deposits" value={detail.deposits?.length || 0} />
             <HistoryStat
               label="Expenses"
-              value={`${detail.expenses?.filter((e: any) => !e.deletedAt).length || 0}`}
+              value={`${detail.expenses?.filter((e) => !e.deletedAt).length || 0}`}
               sub={
-                detail.expenses?.some((e: any) => e.deletedAt)
-                  ? `${detail.expenses.filter((e: any) => e.deletedAt).length} removed`
+                detail.expenses?.some((e) => e.deletedAt)
+                  ? `${detail.expenses.filter((e) => e.deletedAt).length} removed`
                   : undefined
               }
             />

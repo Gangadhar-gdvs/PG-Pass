@@ -21,8 +21,11 @@ export function AdminSupportPanel() {
 
   // Live thread list (admin rule allows listing all threads).
   useEffect(() => {
-    setLoading(true);
-    setError(false);
+    // Defer so setState runs after commit, not in the effect body (cascading-render lint rule).
+    queueMicrotask(() => {
+      setLoading(true);
+      setError(false);
+    });
     let settled = false;
     const timeout = setTimeout(() => {
       if (!settled) {

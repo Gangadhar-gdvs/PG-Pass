@@ -4,7 +4,7 @@ import { AppError } from '../api/withErrorHandler';
 import { GuestStay, Bed } from '@/types';
 import { BED_STATUS } from '@/lib/constants/status';
 import { recordEvent } from './systemLogs.service';
-import { Timestamp } from 'firebase-admin/firestore';
+import { Timestamp, Query, QueryDocumentSnapshot } from 'firebase-admin/firestore';
 
 function nightsBetween(checkIn: string, checkOut: string): number {
   const a = Date.parse(`${checkIn}T00:00:00Z`);
@@ -117,11 +117,11 @@ export class GuestsService {
   }
 
   async list(ownerId: string, status?: 'active' | 'completed', limitCount = 50): Promise<GuestStay[]> {
-    let q: any = adminDb.collection('guest_stays').where('ownerId', '==', ownerId);
+    let q: Query = adminDb.collection('guest_stays').where('ownerId', '==', ownerId);
     if (status) q = q.where('status', '==', status);
     q = q.orderBy('createdAt', 'desc').limit(Math.min(limitCount, 100));
     const snap = await q.get();
-    return snap.docs.map((d: any) => ({ ...d.data(), id: d.id } as GuestStay));
+    return snap.docs.map((d: QueryDocumentSnapshot) => ({ ...d.data(), id: d.id } as GuestStay));
   }
 
   /** Check out a guest: free the bed, mark the stay completed. */

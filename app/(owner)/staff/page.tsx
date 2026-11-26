@@ -8,7 +8,6 @@ import {
   Users,
   UserPlus,
   ShieldCheck,
-  ShieldAlert,
   Phone,
   Mail,
   Trash2,
@@ -24,6 +23,7 @@ import { Drawer } from '@/components/ui/drawer';
 import { Avatar } from '@/components/ui/avatar';
 import { HeaderSkeleton, CardListSkeleton } from '@/components/ui/skeletons';
 import { validatePhone, sanitizeText } from '@/lib/security';
+import { errorMessage } from '@/lib/utils';
 import { OwnerOnlyGuard } from '@/components/owner/OwnerOnlyGuard';
 import { StaffPermissionsEditor } from '@/components/owner/StaffPermissionsEditor';
 import { DEFAULT_STAFF_PERMISSIONS, StaffPermission } from '@/lib/constants/permissions';
@@ -48,7 +48,7 @@ function StaffPageInner() {
   const { ownerId } = useOwnerSession();
 
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
-  const [profile, setProfile] = useState<any>(null);
+  const [profile, setProfile] = useState<{ planTier?: PlanTier } | null>(null);
   const [loading, setLoading] = useState(true);
   const [permsOpenUid, setPermsOpenUid] = useState<string | null>(null);
 
@@ -84,7 +84,15 @@ function StaffPageInner() {
   };
 
   useEffect(() => {
-    if (ownerId) loadData();
+    if (!ownerId) return;
+    // Defer so setState runs after commit, not in the effect body (cascading-render lint rule).
+    let active = true;
+    queueMicrotask(() => {
+      if (active) loadData();
+    });
+    return () => {
+      active = false;
+    };
   }, [ownerId]);
 
   const currentTier: PlanTier = (profile?.planTier as PlanTier) || PLAN_TIER.FREE;
@@ -135,8 +143,8 @@ function StaffPageInner() {
         setSetupLinkInfo({ name: cleanName, link: data.setupLink });
       }
       await loadData();
-    } catch (err: any) {
-      toast.error(err.message || 'Invitation failed');
+    } catch (err: unknown) {
+      toast.error(errorMessage(err, 'Invitation failed'));
     } finally {
       setSubmitting(false);
     }
@@ -164,8 +172,8 @@ function StaffPageInner() {
         `Staff access ${newStatus === ACCOUNT_STATUS.ACTIVE ? 'restored' : 'suspended'}`
       );
       await loadData();
-    } catch (err: any) {
-      toast.error(err.message || 'Could not update status');
+    } catch (err: unknown) {
+      toast.error(errorMessage(err, 'Could not update status'));
     }
   };
 
@@ -186,8 +194,8 @@ function StaffPageInner() {
 
       toast.success('Staff access revoked permanently');
       await loadData();
-    } catch (err: any) {
-      toast.error(err.message || 'Could not revoke staff');
+    } catch (err: unknown) {
+      toast.error(errorMessage(err, 'Could not revoke staff'));
     }
   };
 
@@ -218,7 +226,7 @@ function StaffPageInner() {
           size="md"
           disabled={!canAddStaff}
           onClick={() => setIsInviteOpen(true)}
-          className="bg-[#D97706] hover:bg-[#B45309] text-white text-xs font-semibold"
+          className="accent-bg hover:opacity-90 text-white text-xs font-semibold"
         >
           <UserPlus className="w-4 h-4 mr-1.5" />
           <span>Add Staff Member ({staffList.length}/{currentLimits.maxStaff})</span>
@@ -227,13 +235,13 @@ function StaffPageInner() {
 
       {/* Free Tier Upgrade Banner if maxStaff === 0 */}
       {currentLimits.maxStaff === 0 && (
-        <div className="p-4 rounded-[10px] bg-[#FFFBEB] border border-[#FDE68A] flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-[#D97706] shrink-0 mt-0.5" />
+        <div className="tint-card tint-violet p-4 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 accent-text shrink-0 mt-0.5" />
           <div className="text-xs space-y-1">
-            <span className="font-bold text-[#92400E] block">
+            <span className="font-bold accent-text block">
               Staff Delegation is Locked on Free Tier
             </span>
-            <p className="text-[#B45309] leading-relaxed">
+            <p className="text-[#475569] leading-relaxed">
               Your PG is on the Free tier (1 owner). Upgrade to{' '}
               <strong className="font-semibold">Growth (1 staff seat)</strong> or{' '}
               <strong className="font-semibold">Pro (5 staff seats)</strong> to invite wardens and assistants.
@@ -241,7 +249,7 @@ function StaffPageInner() {
             <div className="pt-1">
               <Link
                 href="/billing"
-                className="inline-flex items-center gap-1 text-xs font-bold text-[#92400E] hover:underline"
+                className="inline-flex items-center gap-1 text-xs font-bold accent-text hover:underline"
               >
                 <span>View SaaS upgrade options</span>
                 <ExternalLink className="w-3 h-3" />
@@ -266,7 +274,7 @@ function StaffPageInner() {
 
       {/* Staff List Table / Cards */}
       {staffList.length === 0 ? (
-        <div className="bg-white border border-[#E2E8F0] rounded-[12px] p-10 text-center space-y-2">
+        <div className="app-card rounded-[16px] p-10 text-center space-y-2">
           <Users className="w-10 h-10 text-[#94A3B8] mx-auto mb-2" />
           <h3 className="text-sm font-bold text-[#09090B]">No Staff Members Added</h3>
           <p className="text-xs text-[#64748B] max-w-sm mx-auto">
@@ -274,7 +282,7 @@ function StaffPageInner() {
           </p>
         </div>
       ) : (
-        <div className="bg-white border border-[#E2E8F0] rounded-[12px] divide-y divide-[#E2E8F0] shadow-xs">
+        <div className="app-card rounded-[16px] divide-y divide-[#E2E8F0]">
           {staffList.map((staff) => {
             const staffUid = staff.uid || staff.id || '';
             const agg = staff.ratingAgg || { count: 0, sum: 0 };
@@ -389,7 +397,7 @@ function StaffPageInner() {
               size="sm"
               variant="solid"
               loading={submitting}
-              className="bg-[#D97706] hover:bg-[#B45309] text-white"
+              className="accent-bg hover:opacity-90 text-white"
             >
               Provision Account
             </Button>

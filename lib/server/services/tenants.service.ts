@@ -9,7 +9,7 @@ import {
   PORTAL_TOKEN_TTL_DAYS,
 } from '@/lib/constants/limits';
 import { generatePortalToken, hashToken } from '../security/tokens';
-import { rentDueDate } from '@/lib/utils';
+import { rentDueDate, tsToMillis } from '@/lib/utils';
 import { env } from '@/lib/env';
 import { Timestamp } from 'firebase-admin/firestore';
 
@@ -280,7 +280,7 @@ export class TenantsService {
     }
 
     // Verify 7-day undo window
-    const deletedTimeMs = tenant.deletedAt.toMillis();
+    const deletedTimeMs = tsToMillis(tenant.deletedAt);
     const daysSinceDelete = (Date.now() - deletedTimeMs) / (1000 * 60 * 60 * 24);
     if (daysSinceDelete > SOFT_DELETE_UNDO_DAYS) {
       throw new AppError(

@@ -1,6 +1,6 @@
 'use client';
-import { RentRecord, Owner, Tenant } from '@/types';
-import { amountInWords } from '@/lib/utils';
+import { RentRecord, Owner } from '@/types';
+import { amountInWords, tsToDate } from '@/lib/utils';
 
 export interface NumberedReceiptData {
   owner: Owner;
@@ -38,7 +38,7 @@ export async function generateNumberedReceipt(data: NumberedReceiptData): Promis
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
   doc.text(`Receipt No: ${receiptNum}  |  Period: ${record.period}`, margin, 27);
-  doc.text(`Date of Confirmation: ${record.confirmedAt ? new Date(record.confirmedAt).toLocaleDateString('en-IN') : 'Verified'}`, margin, 32);
+  doc.text(`Date of Confirmation: ${tsToDate(record.confirmedAt)?.toLocaleDateString('en-IN') ?? 'Verified'}`, margin, 32);
 
   // PG Details Box
   doc.setFillColor(248, 250, 252);

@@ -22,7 +22,7 @@ export class ResidentsService {
 
     // Don't let an existing owner/staff/admin convert into a resident.
     const user = await adminAuth.getUser(uid).catch(() => null);
-    const existingRole = (user?.customClaims as any)?.role;
+    const existingRole = (user?.customClaims as { role?: string } | undefined)?.role;
     if (user?.customClaims?.admin || existingRole === 'owner' || existingRole === 'staff') {
       throw new AppError(403, 'This account is already registered in another role');
     }

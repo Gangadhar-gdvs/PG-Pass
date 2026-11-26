@@ -3,11 +3,12 @@
 import React, { useEffect, useState } from 'react';
 import { getPhotoViewUrl } from '@/lib/client/uploader';
 import { ImageIcon } from 'lucide-react';
+import type { Timestampish } from '@/types';
 
 interface PhotoMeta {
   id: string;
   photoType: string;
-  createdAt?: any;
+  createdAt?: Timestampish;
 }
 
 const TYPE_LABELS: Record<string, string> = {

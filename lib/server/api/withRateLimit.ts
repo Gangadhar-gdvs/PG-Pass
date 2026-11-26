@@ -1,9 +1,11 @@
 import 'server-only';
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '../firebase-admin';
-import { AppError, RouteHandler } from './withErrorHandler';
+import { AppError } from './withErrorHandler';
 import crypto from 'crypto';
 import { Timestamp } from 'firebase-admin/firestore';
+
+type AuthLikeContext = { auth?: { uid?: string } };
 
 export interface RateLimitOptions {
   tier?: 'standard' | 'sensitive';
@@ -64,20 +66,21 @@ function hashIp(req: NextRequest): string {
   return crypto.createHash('sha256').update(ip).digest('hex').substring(0, 16);
 }
 
-export function withRateLimit(
-  handler: (req: NextRequest, ctx: any) => Promise<Response | NextResponse>,
+export function withRateLimit<C>(
+  handler: (req: NextRequest, ctx: C) => Promise<Response | NextResponse>,
   options: RateLimitOptions = {}
-): RouteHandler {
+): (req: NextRequest, ctx: C) => Promise<Response | NextResponse> {
   const tier = options.tier || 'standard';
   const keyType = options.key || 'ip';
   const maxRequests = options.maxRequests ?? (tier === 'sensitive' ? 10 : 100);
   const windowSeconds = options.windowSeconds ?? 60;
 
-  return async (req: NextRequest, ctx: any = {}) => {
+  return async (req: NextRequest, ctx: C) => {
     let identifier = '';
 
-    if (keyType === 'uid' && ctx?.auth?.uid) {
-      identifier = `uid:${ctx.auth.uid}`;
+    const authUid = (ctx as AuthLikeContext | undefined)?.auth?.uid;
+    if (keyType === 'uid' && authUid) {
+      identifier = `uid:${authUid}`;
     } else {
       identifier = `ip:${hashIp(req)}`;
     }

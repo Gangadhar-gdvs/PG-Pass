@@ -9,6 +9,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { ShieldCheck } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { errorMessage } from '@/lib/utils';
 
 /**
  * Per-staff permission toggles. Each staff member's access is independent — the
@@ -50,8 +51,8 @@ export function StaffPermissionsEditor({
       }
       toast.success('Permissions updated');
       onSaved?.(permissions);
-    } catch (e: any) {
-      toast.error(e.message || 'Could not save permissions');
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, 'Could not save permissions'));
     } finally {
       setSaving(false);
     }

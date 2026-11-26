@@ -7,7 +7,8 @@ import { MAX_LIST_LIMIT } from '@/lib/constants/limits';
 import { smsService } from './sms.service';
 import { emailService } from './email.service';
 import { recordEvent } from './systemLogs.service';
-import { Timestamp, FieldValue, Transaction, DocumentReference } from 'firebase-admin/firestore';
+import { errorMessage } from '@/lib/utils';
+import { Timestamp, Transaction, DocumentReference } from 'firebase-admin/firestore';
 
 export interface CreateRentRecordInput {
   tenantId: string;
@@ -241,7 +242,7 @@ export class RentService {
       );
 
       // Update rent record
-      const updatePayload: any = {
+      const updatePayload: Partial<RentRecord> = {
         status: RENT_STATUS.PAID,
         amountPaidPaise: recordData.amountDuePaise,
         receiptNumber: nextSeq,
@@ -322,7 +323,7 @@ export class RentService {
       const newPaid = Math.min(due, alreadyPaid + params.amountPaise);
       const fullyPaid = newPaid >= due;
 
-      const updatePayload: Record<string, any> = {
+      const updatePayload: Partial<RentRecord> = {
         amountPaidPaise: newPaid,
         updatedAt: now,
       };
@@ -384,8 +385,8 @@ export class RentService {
           paymentReference: 'Bulk confirmation',
         });
         confirmed.push(id);
-      } catch (err: any) {
-        failed.push({ id, reason: err?.message || 'Failed' });
+      } catch (err: unknown) {
+        failed.push({ id, reason: errorMessage(err, 'Failed') });
       }
     }
 

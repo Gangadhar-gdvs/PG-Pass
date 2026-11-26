@@ -6,6 +6,7 @@ import {
   onSnapshot,
   orderBy,
   limit,
+  type QueryConstraint,
 } from 'firebase/firestore';
 import { Bed, Tenant, RentRecord, SupportMessage, SupportThread } from '@/types';
 import { config } from './config';
@@ -49,7 +50,7 @@ export function subscribeToOwnerBeds(
     return noop;
   }
 
-  const constraints = [where('ownerId', '==', ownerId)] as any[];
+  const constraints: QueryConstraint[] = [where('ownerId', '==', ownerId)];
   if (propertyId) constraints.push(where('propertyId', '==', propertyId));
   constraints.push(limit(100)); // conforms to firestore.rules boundedList (<=100)
   const q = query(collection(db, 'beds'), ...constraints);
@@ -61,7 +62,7 @@ export function subscribeToOwnerBeds(
         snap.docs
           .map((d) => ({ ...d.data(), id: d.id } as Bed))
           // Hide soft-deleted beds from the live inventory view.
-          .filter((b) => !(b as any).deletedAt)
+          .filter((b) => !b.deletedAt)
       ),
     (error) => {
       // Surface the failure (missing index, permission-denied, unreachable) so
@@ -87,10 +88,10 @@ export function subscribeToOwnerTenants(
   // The server marks an active resident with `deletedAt == null` (there is no
   // `active` boolean written by tenants.service). Filtering on a non-existent
   // `active` field returned nothing, so freshly-added tenants never appeared.
-  const constraints = [
+  const constraints: QueryConstraint[] = [
     where('ownerId', '==', ownerId),
     where('deletedAt', '==', null),
-  ] as any[];
+  ];
   if (propertyId) constraints.push(where('propertyId', '==', propertyId));
   constraints.push(limit(100));
   const q = query(collection(db, 'tenants'), ...constraints);
@@ -121,10 +122,10 @@ export function subscribeToOwnerRentRecords(
     return noop;
   }
 
-  const constraints = [
+  const constraints: QueryConstraint[] = [
     where('ownerId', '==', ownerId),
     where('period', '==', period),
-  ] as any[];
+  ];
   if (propertyId) constraints.push(where('propertyId', '==', propertyId));
   constraints.push(limit(100));
   const q = query(collection(db, 'rent_records'), ...constraints);

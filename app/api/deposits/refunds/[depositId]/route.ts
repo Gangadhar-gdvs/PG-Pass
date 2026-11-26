@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withErrorHandler, AppError } from '@/lib/server/api/withErrorHandler';
+import { withErrorHandler } from '@/lib/server/api/withErrorHandler';
 import { withAuth, AuthContext } from '@/lib/server/api/withAuth';
 import { withRateLimit } from '@/lib/server/api/withRateLimit';
 import { depositsService } from '@/lib/server/services/deposits.service';

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useOwnerSession } from '@/hooks/useOwner';
+import { errorMessage } from '@/lib/utils';
 import { AddPropertyCard } from '@/components/owner/AddPropertyCard';
 import { OwnerOnlyGuard } from '@/components/owner/OwnerOnlyGuard';
 import { PgPhotoGallery } from '@/components/owner/PgPhotoGallery';
@@ -99,8 +100,8 @@ function SettingsPageInner() {
       }
 
       toast.success('Settings updated successfully');
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to update settings');
+    } catch (err: unknown) {
+      toast.error(errorMessage(err, 'Failed to update settings'));
     } finally {
       setSaving(false);
     }
@@ -119,9 +120,9 @@ function SettingsPageInner() {
     <div className="max-w-2xl mx-auto py-8 space-y-5">
       <AddPropertyCard />
 
-      <div className="bg-white border border-[#E2E8F0] rounded-[12px] p-6 sm:p-8 shadow-xs">
+      <div className="app-card rounded-[16px] p-6 sm:p-8">
         <div className="flex items-center gap-3 pb-5 mb-6 border-b border-[#E2E8F0]">
-          <div className="w-10 h-10 rounded-[8px] bg-[#FEF3C7] border border-[#FDE68A] text-[#D97706] flex items-center justify-center shrink-0">
+          <div className="icon-chip accent-text shrink-0">
             <Settings className="w-5 h-5" />
           </div>
           <div>
@@ -135,7 +136,7 @@ function SettingsPageInner() {
         <form onSubmit={handleSave} className="space-y-5">
           <div className="space-y-4">
             <h2 className="text-xs font-bold uppercase tracking-wider text-[#94A3B8] flex items-center gap-1.5">
-              <Building className="w-3.5 h-3.5 text-[#D97706]" />
+              <Building className="w-3.5 h-3.5 accent-text" />
               <span>Property Information</span>
             </h2>
 
@@ -185,7 +186,7 @@ function SettingsPageInner() {
 
           <div className="space-y-4 pt-4 border-t border-[#E2E8F0]">
             <h2 className="text-xs font-bold uppercase tracking-wider text-[#94A3B8] flex items-center gap-1.5">
-              <CreditCard className="w-3.5 h-3.5 text-[#D97706]" />
+              <CreditCard className="w-3.5 h-3.5 accent-text" />
               <span>Rent Collection</span>
             </h2>
 
@@ -237,7 +238,7 @@ function SettingsPageInner() {
             size="lg"
             variant="solid"
             loading={saving}
-            className="w-full bg-[#D97706] hover:bg-[#B45309] text-white"
+            className="w-full accent-bg hover:opacity-90 text-white"
           >
             <Save className="w-4 h-4 mr-2" />
             <span>Save Configuration</span>

@@ -95,34 +95,85 @@ body {
    ========================================================================== */
 
 :root {
-  --accent: #0D9488;        /* default = resident teal */
-  --accent-2: #14B8A6;
-  --accent-soft: #CCFBF1;
-  --accent-tint: #F0FDFA;
-  --accent-ink: #115E59;
+  /* v3 palette — soft violet-forward "premium mobile app" (matches design refs).
+     Each panel keeps its own accent hue but shares the lavender canvas + depth. */
+  --accent: #7C3AED;        /* default = violet */
+  --accent-2: #A78BFA;
+  --accent-soft: #EDE9FE;
+  --accent-tint: #F5F3FF;
+  --accent-ink: #5B21B6;
+
+  /* Shared lavender canvas behind every panel. */
+  --canvas-top: #EEF0FF;
+  --canvas-bottom: #FBFCFF;
+
+  /* Pastel tints for stat tiles / quick-action tiles / soft cards. */
+  --tint-violet: #F1EDFF; --ink-violet: #6D28D9;
+  --tint-mint:   #E7F9F1; --ink-mint:   #0F766E;
+  --tint-peach:  #FFF1E8; --ink-peach:  #C2410C;
+  --tint-sky:    #E8F1FF; --ink-sky:    #1D4ED8;
+  --tint-rose:   #FFEBF0; --ink-rose:   #BE185D;
+  --tint-amber:  #FEF6E0; --ink-amber:  #B45309;
+
+  --radius-2xl: 24px;
   --radius-xl: 20px;
-  --radius-lg: 14px;
-  --shadow-card: 0 2px 8px -2px rgba(15, 23, 42, 0.08), 0 4px 24px -8px rgba(15, 23, 42, 0.10);
-  --shadow-float: 0 10px 40px -10px rgba(15, 23, 42, 0.25);
+  --radius-lg: 16px;
+  /* Layered, soft "3D depth" shadows — soft & clean, no harsh edges. */
+  --shadow-sm:   0 1px 2px rgba(17, 12, 46, 0.04), 0 2px 6px -2px rgba(17, 12, 46, 0.06);
+  --shadow-card: 0 2px 6px -1px rgba(17, 12, 46, 0.05), 0 12px 28px -12px rgba(76, 29, 149, 0.14);
+  --shadow-float:0 18px 48px -14px rgba(76, 29, 149, 0.30);
+  --shadow-hero: 0 20px 50px -18px rgba(91, 33, 182, 0.45);
 }
 
-.theme-resident { --accent: #0D9488; --accent-2: #14B8A6; --accent-soft: #CCFBF1; --accent-tint: #F0FDFA; --accent-ink: #115E59; }
-.theme-owner    { --accent: #D97706; --accent-2: #F59E0B; --accent-soft: #FDE68A; --accent-tint: #FFFBEB; --accent-ink: #92400E; }
-.theme-admin    { --accent: #4F46E5; --accent-2: #6366F1; --accent-soft: #C7D2FE; --accent-tint: #EEF2FF; --accent-ink: #3730A3; }
+/* Per-panel accent hue (canvas + depth stay shared for one cohesive system). */
+.theme-resident { --accent: #0D9488; --accent-2: #2DD4BF; --accent-soft: #CCFBF1; --accent-tint: #F0FDFA; --accent-ink: #115E59; }
+.theme-owner    { --accent: #7C3AED; --accent-2: #A78BFA; --accent-soft: #EDE9FE; --accent-tint: #F5F3FF; --accent-ink: #5B21B6; }
+.theme-admin    { --accent: #4F46E5; --accent-2: #818CF8; --accent-soft: #E0E7FF; --accent-tint: #EEF2FF; --accent-ink: #3730A3; }
 
 /* Gradient header band — bold, colorful top section */
 .app-gradient {
   background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
   color: #fff;
 }
-.app-gradient-tint { background: linear-gradient(180deg, var(--accent-tint) 0%, #FFFFFF 70%); }
+.app-gradient-tint { background: linear-gradient(180deg, var(--canvas-top) 0%, var(--canvas-bottom) 60%); }
+
+/* Rich hero header card (greeting band) — deep gradient + soft glow + big radius. */
+.hero-gradient {
+  background:
+    radial-gradient(120% 120% at 85% -10%, color-mix(in srgb, var(--accent-2) 70%, white) 0%, transparent 55%),
+    linear-gradient(140deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 60%, var(--accent-2)) 100%);
+  color: #fff;
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-hero);
+}
 
 /* Card stack — the primary surface */
 .app-card {
   background: #fff;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-xl);
   box-shadow: var(--shadow-card);
-  border: 1px solid rgba(15, 23, 42, 0.04);
+  border: 1px solid rgba(124, 58, 237, 0.06);
+}
+/* Soft tinted card variants — set --tint / --tint-ink (defaults to violet). */
+.tint-card {
+  background: var(--tint, var(--tint-violet));
+  color: var(--tint-ink, var(--ink-violet));
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid color-mix(in srgb, var(--tint-ink, var(--ink-violet)) 10%, transparent);
+}
+.tint-violet { --tint: var(--tint-violet); --tint-ink: var(--ink-violet); }
+.tint-mint   { --tint: var(--tint-mint);   --tint-ink: var(--ink-mint); }
+.tint-peach  { --tint: var(--tint-peach);  --tint-ink: var(--ink-peach); }
+.tint-sky    { --tint: var(--tint-sky);    --tint-ink: var(--ink-sky); }
+.tint-rose   { --tint: var(--tint-rose);   --tint-ink: var(--ink-rose); }
+.tint-amber  { --tint: var(--tint-amber);  --tint-ink: var(--ink-amber); }
+
+/* Soft raised icon chip (the rounded 3D-ish icon tiles in the refs). */
+.icon-chip {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 2.75rem; height: 2.75rem; border-radius: 14px;
+  background: #fff; box-shadow: var(--shadow-sm);
 }
 
 /* Accent helpers */

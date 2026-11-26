@@ -7,6 +7,8 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Search, MapPin, Building2, Star } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { PgDetailDrawer } from '@/components/resident/PgDetailDrawer';
+import { HeroHeader } from '@/components/ui/dashboard-kit';
+import { errorMessage } from '@/lib/utils';
 
 interface Listing {
   propertyId: string;
@@ -41,7 +43,14 @@ export default function DiscoverPage() {
   }, [q, city]);
 
   useEffect(() => {
-    search();
+    // Defer so setState runs after commit, not in the effect body (cascading-render lint rule).
+    let active = true;
+    queueMicrotask(() => {
+      if (active) search();
+    });
+    return () => {
+      active = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -57,8 +66,8 @@ export default function DiscoverPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || data.message || 'Could not send request');
       toast.success('Join request sent — the PG owner will review it.');
-    } catch (e: any) {
-      toast.error(e.message || 'Could not send request');
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, 'Could not send request'));
     } finally {
       setJoiningId(null);
     }
@@ -66,7 +75,11 @@ export default function DiscoverPage() {
 
   return (
     <div className="space-y-4 pt-4">
-      <h1 className="text-xl font-extrabold text-slate-900 px-1">Find a PG</h1>
+      <HeroHeader
+        eyebrow="Discover"
+        title="Find a PG"
+        subtitle="Browse PGs near you and request to join."
+      />
 
       {/* Search card */}
       <form

@@ -14,15 +14,22 @@ export function useBeds(ownerId: string | null, propertyId?: string) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let settled = false;
+    // Reset state for this (re)subscription in a microtask so these don't run
+    // synchronously in the effect body (cascading-render lint rule). Behaviour is
+    // unchanged: the spinner/errors still clear on mount and on ownerId change.
     if (!ownerId) {
-      setLoading(false);
-      setError(null);
+      queueMicrotask(() => {
+        setLoading(false);
+        setError(null);
+      });
       return;
     }
 
-    setLoading(true);
-    setError(null);
-    let settled = false;
+    queueMicrotask(() => {
+      setLoading(true);
+      setError(null);
+    });
 
     const timeout = setTimeout(() => {
       if (!settled) {

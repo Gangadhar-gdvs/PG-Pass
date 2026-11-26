@@ -7,23 +7,10 @@ import { Input } from '@/components/ui/input';
 import { Dropdown } from '@/components/ui/dropdown';
 import {
   Building,
-  User,
-  CreditCard,
-  Layers,
-  Sparkles,
   Check,
   Plus,
   Minus,
-  Utensils,
-  Wifi,
   Zap,
-  Shirt,
-  Shield,
-  ArrowUpDown,
-  Car,
-  Droplet,
-  Flame,
-  Refrigerator,
   CheckCircle2,
 } from 'lucide-react';
 import {
@@ -36,7 +23,7 @@ import {
   FoodCuisine,
 } from '@/lib/constants/amenities';
 import { Owner } from '@/types';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, errorMessage } from '@/lib/utils';
 import { validateUpi, sanitizeText } from '@/lib/security';
 import toast from 'react-hot-toast';
 
@@ -44,7 +31,7 @@ interface PropertySetupWizardProps {
   initialOwnerPhone: string;
   existingOwner?: Owner | null;
   onCancel?: () => void;
-  onComplete: (ownerData: any) => void;
+  onComplete: (ownerData: Owner) => void;
 }
 
 interface FloorPlan {
@@ -56,7 +43,6 @@ interface FloorPlan {
 export function PropertySetupWizard({
   initialOwnerPhone,
   existingOwner,
-  onCancel,
   onComplete,
 }: PropertySetupWizardProps) {
   const { ownerId, properties, selectedPropertyId } = useOwnerSession();
@@ -296,7 +282,7 @@ export function PropertySetupWizard({
         throw new Error(err.message || 'Failed to save property profile');
       }
 
-      const updatedOwner = await ownerRes.json();
+      const updatedOwner = (await ownerRes.json()) as Owner;
 
       // 2. Build Bed Objects List
       const generatedBeds: Array<{
@@ -353,9 +339,9 @@ export function PropertySetupWizard({
 
       toast.success(`Generated ${generatedBeds.length} beds across ${floors.length} floors!`);
       onComplete(updatedOwner);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      toast.error(err.message || 'Setup encountered an error');
+      toast.error(errorMessage(err, 'Setup encountered an error'));
     } finally {
       setSubmitting(false);
     }
@@ -365,10 +351,13 @@ export function PropertySetupWizard({
     <div className="flex flex-col items-center justify-center py-2 sm:py-4">
       <div className="w-full max-w-3xl bg-white border border-[#E2E8F0] rounded-[14px] shadow-sm overflow-hidden text-left">
         {/* Top Progress Header */}
-        <div className="border-b border-[#E2E8F0] p-6 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent">
+        <div
+          className="border-b border-[#E2E8F0] p-6"
+          style={{ background: 'linear-gradient(to right, color-mix(in srgb, var(--accent) 10%, transparent), color-mix(in srgb, var(--accent) 5%, transparent), transparent)' }}
+        >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-[8px] bg-[#D97706] text-white flex items-center justify-center font-bold">
+              <div className="w-9 h-9 rounded-[8px] text-white flex items-center justify-center font-bold" style={{ background: 'var(--accent)' }}>
                 <Building className="w-5 h-5" />
               </div>
               <div>
@@ -381,7 +370,7 @@ export function PropertySetupWizard({
               </div>
             </div>
             <div className="text-right">
-              <span className="text-[11px] font-mono font-bold text-[#D97706] uppercase tracking-wider block">
+              <span className="text-[11px] font-mono font-bold accent-text uppercase tracking-wider block">
                 Step {step} of 4
               </span>
               <span className="text-xs font-semibold text-[#09090B]">
@@ -399,7 +388,7 @@ export function PropertySetupWizard({
               <div
                 key={s}
                 className={`h-1.5 flex-1 rounded-full transition-all ${
-                  s <= step ? 'bg-[#D97706]' : 'bg-[#E2E8F0]'
+                  s <= step ? 'accent-bg' : 'bg-[#E2E8F0]'
                 }`}
               />
             ))}
@@ -457,9 +446,10 @@ export function PropertySetupWizard({
                     key={cat.id}
                     type="button"
                     onClick={() => setPgCategory(cat.id as PgCategory)}
+                    style={pgCategory === cat.id ? { borderColor: 'var(--accent)', background: 'var(--accent-tint)', boxShadow: 'inset 0 0 0 1px var(--accent)' } : undefined}
                     className={`p-3 rounded-[8px] border text-left transition-all cursor-pointer ${
                       pgCategory === cat.id
-                        ? 'border-[#D97706] bg-[#FEF3C7]/40 ring-1 ring-[#D97706]'
+                        ? ''
                         : 'border-[#CBD5E1] bg-white hover:bg-[#F8FAFC]'
                     }`}
                   >
@@ -485,9 +475,10 @@ export function PropertySetupWizard({
                     key={fp.id}
                     type="button"
                     onClick={() => setFoodPlan(fp.id as FoodPlan)}
+                    style={foodPlan === fp.id ? { borderColor: 'var(--accent)', background: 'var(--accent-tint)', boxShadow: 'inset 0 0 0 1px var(--accent)' } : undefined}
                     className={`p-3 rounded-[8px] border text-left transition-all cursor-pointer ${
                       foodPlan === fp.id
-                        ? 'border-[#D97706] bg-[#FEF3C7]/40 ring-1 ring-[#D97706]'
+                        ? ''
                         : 'border-[#CBD5E1] bg-white hover:bg-[#F8FAFC]'
                     }`}
                   >
@@ -556,16 +547,18 @@ export function PropertySetupWizard({
                   <div
                     key={item.id}
                     onClick={() => togglePgAmenity(item.id)}
+                    style={isSelected ? { borderColor: 'var(--accent)', background: 'var(--accent-tint)' } : undefined}
                     className={`p-3 rounded-[8px] border flex items-center justify-between transition-all cursor-pointer select-none ${
                       isSelected
-                        ? 'border-[#D97706] bg-[#FEF3C7]/40'
+                        ? ''
                         : 'border-[#CBD5E1] bg-white hover:bg-[#F8FAFC]'
                     }`}
                   >
                     <div className="flex items-center gap-2.5">
                       <div
+                        style={isSelected ? { background: 'var(--accent)', borderColor: 'var(--accent)' } : undefined}
                         className={`w-4 h-4 rounded-[4px] border flex items-center justify-center ${
-                          isSelected ? 'bg-[#D97706] border-[#D97706] text-white' : 'border-[#94A3B8]'
+                          isSelected ? 'text-white' : 'border-[#94A3B8]'
                         }`}
                       >
                         {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
@@ -607,9 +600,10 @@ export function PropertySetupWizard({
                 return (
                   <div
                     key={fmt.sharing}
+                    style={isEnabled ? { borderColor: 'var(--accent)', background: 'var(--accent-tint)' } : undefined}
                     className={`p-3.5 rounded-[10px] border transition-all ${
                       isEnabled
-                        ? 'border-[#D97706] bg-[#FEF3C7]/20 shadow-xs'
+                        ? 'shadow-xs'
                         : 'border-[#CBD5E1] bg-[#F8FAFC] opacity-75'
                     }`}
                   >
@@ -624,7 +618,8 @@ export function PropertySetupWizard({
                               [fmt.sharing]: e.target.checked,
                             }))
                           }
-                          className="mt-1 h-4 w-4 rounded border-[#CBD5E1] text-[#D97706] focus:ring-[#D97706] cursor-pointer"
+                          style={{ accentColor: 'var(--accent)' }}
+                          className="mt-1 h-4 w-4 rounded border-[#CBD5E1] cursor-pointer"
                         />
                         <div>
                           <span className="text-xs font-bold text-[#09090B] block">
@@ -656,7 +651,7 @@ export function PropertySetupWizard({
                                   [fmt.sharing]: e.target.value === '' ? '' : Number(e.target.value),
                                 }))
                               }
-                              className="w-full h-8.5 pl-6 pr-2 rounded-[6px] border border-[#CBD5E1] text-xs font-mono font-bold text-[#09090B] bg-white focus:outline-none focus:border-[#D97706] placeholder:font-sans placeholder:font-normal placeholder:text-[#94A3B8]"
+                              className="w-full h-8.5 pl-6 pr-2 rounded-[6px] border border-[#CBD5E1] text-xs font-mono font-bold text-[#09090B] bg-white focus:outline-none focus:border-[color:var(--accent)] placeholder:font-sans placeholder:font-normal placeholder:text-[#94A3B8]"
                             />
                           </div>
                         </div>
@@ -689,7 +684,7 @@ export function PropertySetupWizard({
                   onChange={(e) =>
                     setAcSurcharge(e.target.value === '' ? '' : Number(e.target.value))
                   }
-                  className="w-full h-8.5 pl-8 pr-2 rounded-[6px] border border-[#CBD5E1] text-xs font-mono font-bold text-[#09090B] bg-white focus:outline-none focus:border-[#D97706]"
+                  className="w-full h-8.5 pl-8 pr-2 rounded-[6px] border border-[#CBD5E1] text-xs font-mono font-bold text-[#09090B] bg-white focus:outline-none focus:border-[color:var(--accent)]"
                 />
               </div>
             </div>
@@ -707,9 +702,10 @@ export function PropertySetupWizard({
                       key={am.id}
                       type="button"
                       onClick={() => toggleRoomAmenity(am.id)}
+                      style={isChecked ? { borderColor: 'var(--accent)', background: 'var(--accent-soft)', color: 'var(--accent-ink)' } : undefined}
                       className={`px-3 py-1.5 rounded-[6px] text-xs font-medium border transition-colors flex items-center gap-1.5 cursor-pointer ${
                         isChecked
-                          ? 'border-[#D97706] bg-[#FEF3C7] text-[#92400E] font-bold'
+                          ? 'font-bold'
                           : 'border-[#CBD5E1] bg-white text-[#475569] hover:bg-[#F8FAFC]'
                       }`}
                     >
@@ -890,7 +886,7 @@ export function PropertySetupWizard({
                   <span className="text-[10px] text-[#94A3B8] uppercase tracking-wider block">
                     Total Beds
                   </span>
-                  <span className="font-mono font-bold text-base text-[#F59E0B]">
+                  <span className="font-mono font-bold text-base" style={{ color: 'var(--accent-2)' }}>
                     {totalCalculations.totalBeds} Units
                   </span>
                 </div>

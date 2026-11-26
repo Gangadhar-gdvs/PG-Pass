@@ -35,7 +35,6 @@ export function BedCard({
   onAddTenant,
   onMarkPaid,
   onVerifyProof,
-  onVacate,
   onSelectBed,
 }: BedCardProps) {
   const isVacant = bed.status === 'vacant';

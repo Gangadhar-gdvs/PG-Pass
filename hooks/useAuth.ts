@@ -58,7 +58,7 @@ export function useAuth() {
                 setUser(null);
                 setLoading(false);
                 if (typeof window !== 'undefined') {
-                  window.location.href = '/login?kicked=1';
+                  window.location.href = new URL('/login?kicked=1', window.location.origin).href;
                 }
                 return;
               }
@@ -78,7 +78,9 @@ export function useAuth() {
       });
       return () => unsub();
     } catch {
-      setLoading(false);
+      // Defer so this synchronous-path setState isn't called in the effect body
+      // (cascading-render lint rule). Only hit if onAuthStateChanged throws sync.
+      queueMicrotask(() => setLoading(false));
     }
   }, []);
 

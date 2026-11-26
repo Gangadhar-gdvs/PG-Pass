@@ -1,16 +1,19 @@
 import 'server-only';
 import { NextRequest, NextResponse } from 'next/server';
 import { ZodSchema, ZodError } from 'zod';
-import { AppError, RouteHandler } from './withErrorHandler';
+import { AppError, RouteHandler, RouteContext } from './withErrorHandler';
 
-export function withValidation<T>(
+export function withValidation<T, C extends RouteContext = RouteContext>(
   schema: ZodSchema<T>
 ): (
-  handler: (req: NextRequest, ctx: any) => Promise<Response | NextResponse>
+  handler: (
+    req: NextRequest,
+    ctx: C & { data: T }
+  ) => Promise<Response | NextResponse>
 ) => RouteHandler {
   return (handler) => {
-    return async (req: NextRequest, ctx: any = {}) => {
-      let body: any;
+    return async (req: NextRequest, ctx: RouteContext = {}) => {
+      let body: unknown;
 
       if (req.method === 'GET') {
         const url = new URL(req.url);
@@ -28,7 +31,7 @@ export function withValidation<T>(
         const enhancedCtx = {
           ...ctx,
           data: validatedData,
-        };
+        } as C & { data: T };
         return handler(req, enhancedCtx);
       } catch (err: unknown) {
         if (err instanceof ZodError) {

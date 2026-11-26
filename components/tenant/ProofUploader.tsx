@@ -7,6 +7,7 @@ import { RentRecord } from '@/types';
 import { UploadCloud, CheckCircle2, Camera, RefreshCw } from 'lucide-react';
 import { ProgressBar } from '@/components/ui/progress-bar';
 import toast from 'react-hot-toast';
+import { errorMessage } from '@/lib/utils';
 
 interface ProofUploaderProps {
   rentRecord?: RentRecord | null;
@@ -54,9 +55,9 @@ export function ProofUploader({
       setUploaded(true);
       toast.success('Screenshot securely uploaded to encrypted vault');
       onSuccess(result.photoId);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Proof upload error:', err);
-      toast.error(err.message || 'Upload failed. Please try again.');
+      toast.error(errorMessage(err, 'Upload failed. Please try again.'));
     } finally {
       setUploading(false);
     }

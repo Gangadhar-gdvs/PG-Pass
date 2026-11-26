@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Tenant, Owner, RentRecord } from '@/types';
-import { formatCurrency, validateUtr } from '@/lib/utils';
+import { formatCurrency, validateUtr, errorMessage } from '@/lib/utils';
+import type { RentRecord } from '@/types';
 import { generateNumberedReceipt } from '@/lib/client/receiptPdf';
 import { generateQrDataUrl } from '@/lib/client/qrcode';
 import { buildUpiPayload } from '@/lib/client/upi';
@@ -15,7 +15,6 @@ import {
   ShieldCheck,
   ExternalLink,
   Send,
-  AlertCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { StatusDot } from '@/components/ui/status-dot';
@@ -38,12 +37,12 @@ interface RentStatusCardProps {
     upiMerchantName?: string;
     phone?: string;
   };
-  rentRecord?: any;
+  rentRecord?: RentRecord;
   portalAuth: {
     token: string;
     pin: string;
   };
-  onStatusChange?: (newRecord: any) => void;
+  onStatusChange?: (newRecord: RentRecord) => void;
 }
 
 export function RentStatusCard({
@@ -109,7 +108,7 @@ export function RentStatusCard({
         const confetti = (await import('canvas-confetti')).default;
         confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('Receipt generation error:', e);
       toast.error('Could not generate receipt PDF');
     } finally {
@@ -180,8 +179,8 @@ export function RentStatusCard({
         paymentReference: cleanUtr,
         proofPhotoId,
       });
-    } catch (err: any) {
-      toast.error(err.message || 'Submission failed');
+    } catch (err: unknown) {
+      toast.error(errorMessage(err, 'Submission failed'));
     } finally {
       setSubmittingClaim(false);
     }
@@ -253,14 +252,14 @@ export function RentStatusCard({
             <div className="flex items-center justify-between">
               <span className="text-[#64748B]">Receipt Number:</span>
               <span className="font-mono font-bold text-[#09090B]">
-                REC-{String(rentRecord.receiptNumber || 0).padStart(5, '0')}
+                REC-{String(rentRecord?.receiptNumber || 0).padStart(5, '0')}
               </span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-[#64748B]">Settled For:</span>
               <span className="font-semibold text-[#09090B]">{period}</span>
             </div>
-            {rentRecord.paymentReference && (
+            {rentRecord?.paymentReference && (
               <div className="flex items-center justify-between">
                 <span className="text-[#64748B]">Bank UTR:</span>
                 <span className="font-mono text-[#09090B]">{rentRecord.paymentReference}</span>
@@ -337,6 +336,7 @@ export function RentStatusCard({
               {showQr && (
                 <div className="p-4 bg-[#F8FAFC] border border-[#E2E8F0] rounded-[8px] flex flex-col items-center justify-center text-center">
                   {qrDataUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- dynamic client-generated data-URL QR code; next/image can't optimize a runtime data URL
                     <img
                       src={qrDataUrl}
                       alt="UPI QR Code"

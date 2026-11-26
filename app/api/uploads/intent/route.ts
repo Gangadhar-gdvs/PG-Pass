@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withErrorHandler, AppError } from '@/lib/server/api/withErrorHandler';
 import { withRateLimit } from '@/lib/server/api/withRateLimit';
-import { adminAuth, adminDb } from '@/lib/server/firebase-admin';
+import { adminAuth } from '@/lib/server/firebase-admin';
 import { verifyPortalSession } from '@/lib/server/security/portalAuth';
 import { photosService } from '@/lib/server/services/photos.service';
 import { PhotoType, PHOTO_TYPE } from '@/lib/constants/status';

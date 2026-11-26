@@ -39,7 +39,9 @@ describe('PII Masking & Log Sanitization (DPDP Compliance)', () => {
       },
     };
 
-    const sanitized = sanitizeObject(nested) as any;
+    const sanitized = sanitizeObject(nested) as {
+      meta: { pin: string; details: { clientPhone: string } };
+    };
     expect(sanitized.meta.pin).toBe('[REDACTED]');
     expect(sanitized.meta.details.clientPhone).toBe('******6655');
   });

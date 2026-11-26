@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Shield, Lock, FileText, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Shield } from 'lucide-react';
 
 export const metadata = {
   title: 'Privacy Policy | PG-Pass',
@@ -40,7 +40,7 @@ export default function PrivacyPage() {
           <section className="space-y-2">
             <h2 className="text-base font-bold text-[#09090B]">2. Data Minimization (No Government ID Scans)</h2>
             <p>
-              We operate on strict data minimization principles. <strong>We do not collect or store Aadhaar numbers, PAN card numbers, or scans of government ID cards of tenants.</strong> We only verify that offline identification was sighted by the PG manager (e.g., recorded as "Aadhaar verified offline").
+              We operate on strict data minimization principles. <strong>We do not collect or store Aadhaar numbers, PAN card numbers, or scans of government ID cards of tenants.</strong> We only verify that offline identification was sighted by the PG manager (e.g., recorded as &quot;Aadhaar verified offline&quot;).
             </p>
           </section>
 

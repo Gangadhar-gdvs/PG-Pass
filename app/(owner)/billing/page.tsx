@@ -5,17 +5,12 @@ import { useOwnerSession } from '@/hooks/useOwner';
 import { useBeds } from '@/hooks/useBeds';
 import { PLAN_LIMITS } from '@/lib/constants/limits';
 import { PLAN_TIER, PlanTier } from '@/lib/constants/status';
-import { formatCurrency } from '@/lib/utils';
+import type { Owner } from '@/types';
+import { formatCurrency, errorMessage } from '@/lib/utils';
 import { generateQrDataUrl } from '@/lib/client/qrcode';
 import { buildUpiPayload } from '@/lib/client/upi';
 import {
-  CreditCard,
   CheckCircle2,
-  ShieldCheck,
-  Zap,
-  ArrowUpRight,
-  Clock,
-  Sparkles,
   Users,
   Layers,
   Camera,
@@ -33,7 +28,7 @@ function BillingPageInner() {
   const { ownerId } = useOwnerSession();
   const { beds } = useBeds(ownerId);
 
-  const [profile, setProfile] = useState<any>(null);
+  const [profile, setProfile] = useState<(Owner & { planTier?: PlanTier }) | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Upgrade Modal State
@@ -64,7 +59,6 @@ function BillingPageInner() {
   const currentLimits = PLAN_LIMITS[currentTier] || PLAN_LIMITS.free;
 
   const totalBedsCount = beds.length;
-  const occupiedBedsCount = beds.filter((b) => b.status !== 'vacant').length;
   const bedUsagePercent = Math.min(
     Math.round((totalBedsCount / currentLimits.maxBeds) * 100),
     100
@@ -128,8 +122,8 @@ function BillingPageInner() {
       toast.success('Upgrade request submitted! Admin will activate your tier shortly.');
       setSelectedPlan(null);
       setUtrInput('');
-    } catch (err: any) {
-      toast.error(err.message || 'Submission error');
+    } catch (err: unknown) {
+      toast.error(errorMessage(err, 'Submission error'));
     } finally {
       setSubmitting(false);
     }
@@ -160,7 +154,7 @@ function BillingPageInner() {
 
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold text-[#64748B]">Active Tier:</span>
-          <span className="text-xs uppercase font-extrabold px-3 py-1 rounded-[6px] bg-[#FEF3C7] text-[#D97706] border border-[#FDE68A]">
+          <span className="text-xs uppercase font-extrabold px-3 py-1 rounded-full accent-soft-bg">
             {currentTier} Plan
           </span>
         </div>
@@ -169,10 +163,10 @@ function BillingPageInner() {
       {/* Resource Quota Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {/* Bed Quota Card */}
-        <div className="bg-white border border-[#E2E8F0] rounded-[12px] p-5 shadow-xs space-y-3">
+        <div className="app-card rounded-[16px] p-5 space-y-3">
           <div className="flex items-center justify-between text-xs">
             <span className="text-[#64748B] flex items-center gap-1.5 font-medium">
-              <Layers className="w-4 h-4 text-[#D97706]" />
+              <Layers className="w-4 h-4 accent-text" />
               <span>Bed Inventory</span>
             </span>
             <span className="font-bold text-[#09090B] font-mono-numbers">
@@ -192,7 +186,7 @@ function BillingPageInner() {
         </div>
 
         {/* Staff Allocation */}
-        <div className="bg-white border border-[#E2E8F0] rounded-[12px] p-5 shadow-xs space-y-3">
+        <div className="app-card rounded-[16px] p-5 space-y-3">
           <div className="flex items-center justify-between text-xs">
             <span className="text-[#64748B] flex items-center gap-1.5 font-medium">
               <Users className="w-4 h-4 text-[#10B981]" />
@@ -210,7 +204,7 @@ function BillingPageInner() {
         </div>
 
         {/* Photo Vault */}
-        <div className="bg-white border border-[#E2E8F0] rounded-[12px] p-5 shadow-xs space-y-3">
+        <div className="app-card rounded-[16px] p-5 space-y-3">
           <div className="flex items-center justify-between text-xs">
             <span className="text-[#64748B] flex items-center gap-1.5 font-medium">
               <Camera className="w-4 h-4 text-[#6366F1]" />
@@ -230,17 +224,16 @@ function BillingPageInner() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* FREE TIER */}
         <div
-          className={`bg-white rounded-[12px] p-6 border ${
-            currentTier === PLAN_TIER.FREE
-              ? 'border-[#D97706] ring-1 ring-[#D97706]'
-              : 'border-[#E2E8F0]'
-          } shadow-xs flex flex-col justify-between`}
+          className={`app-card rounded-[16px] p-6 flex flex-col justify-between ${
+            currentTier === PLAN_TIER.FREE ? 'ring-2' : ''
+          }`}
+          style={currentTier === PLAN_TIER.FREE ? { ['--tw-ring-color' as string]: 'var(--accent)' } : undefined}
         >
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-base font-bold text-[#09090B]">Free Tier</h3>
               {currentTier === PLAN_TIER.FREE && (
-                <span className="text-[10px] font-bold text-[#D97706] bg-[#FEF3C7] px-2 py-0.5 rounded-[4px]">
+                <span className="text-[10px] font-bold accent-soft-bg px-2 py-0.5 rounded-full">
                   Active
                 </span>
               )}
@@ -285,17 +278,16 @@ function BillingPageInner() {
 
         {/* GROWTH TIER */}
         <div
-          className={`bg-white rounded-[12px] p-6 border ${
-            currentTier === PLAN_TIER.GROWTH
-              ? 'border-[#D97706] ring-1 ring-[#D97706]'
-              : 'border-[#E2E8F0]'
-          } shadow-xs flex flex-col justify-between relative`}
+          className={`app-card rounded-[16px] p-6 flex flex-col justify-between relative ${
+            currentTier === PLAN_TIER.GROWTH ? 'ring-2' : ''
+          }`}
+          style={currentTier === PLAN_TIER.GROWTH ? { ['--tw-ring-color' as string]: 'var(--accent)' } : undefined}
         >
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-base font-bold text-[#09090B]">Growth</h3>
               {currentTier === PLAN_TIER.GROWTH ? (
-                <span className="text-[10px] font-bold text-[#D97706] bg-[#FEF3C7] px-2 py-0.5 rounded-[4px]">
+                <span className="text-[10px] font-bold accent-soft-bg px-2 py-0.5 rounded-full">
                   Active
                 </span>
               ) : (
@@ -336,7 +328,7 @@ function BillingPageInner() {
               variant={currentTier === PLAN_TIER.GROWTH ? 'outline' : 'solid'}
               disabled={currentTier === PLAN_TIER.GROWTH}
               onClick={() => setSelectedPlan(PLAN_TIER.GROWTH)}
-              className="w-full text-xs bg-[#D97706] hover:bg-[#B45309] text-white"
+              className="w-full text-xs accent-bg hover:opacity-90 text-white"
             >
               {currentTier === PLAN_TIER.GROWTH ? 'Current Plan' : 'Upgrade to Growth'}
             </Button>
@@ -345,17 +337,16 @@ function BillingPageInner() {
 
         {/* PRO TIER */}
         <div
-          className={`bg-white rounded-[12px] p-6 border ${
-            currentTier === PLAN_TIER.PRO
-              ? 'border-[#D97706] ring-1 ring-[#D97706]'
-              : 'border-[#E2E8F0]'
-          } shadow-xs flex flex-col justify-between`}
+          className={`app-card rounded-[16px] p-6 flex flex-col justify-between ${
+            currentTier === PLAN_TIER.PRO ? 'ring-2' : ''
+          }`}
+          style={currentTier === PLAN_TIER.PRO ? { ['--tw-ring-color' as string]: 'var(--accent)' } : undefined}
         >
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-base font-bold text-[#09090B]">Pro Enterprise</h3>
               {currentTier === PLAN_TIER.PRO && (
-                <span className="text-[10px] font-bold text-[#D97706] bg-[#FEF3C7] px-2 py-0.5 rounded-[4px]">
+                <span className="text-[10px] font-bold accent-soft-bg px-2 py-0.5 rounded-full">
                   Active
                 </span>
               )}
@@ -419,9 +410,9 @@ function BillingPageInner() {
                 <button
                   type="button"
                   onClick={() => setBillingCycle('monthly')}
-                  className={`p-3 rounded-[8px] border text-left transition-all ${
+                  className={`p-3 rounded-[10px] border text-left transition-all ${
                     billingCycle === 'monthly'
-                      ? 'border-[#D97706] bg-[#FEF3C7] text-[#92400E]'
+                      ? 'border-transparent accent-soft-bg'
                       : 'border-[#E2E8F0] bg-white text-[#475569]'
                   }`}
                 >
@@ -434,9 +425,9 @@ function BillingPageInner() {
                 <button
                   type="button"
                   onClick={() => setBillingCycle('yearly')}
-                  className={`p-3 rounded-[8px] border text-left transition-all ${
+                  className={`p-3 rounded-[10px] border text-left transition-all ${
                     billingCycle === 'yearly'
-                      ? 'border-[#D97706] bg-[#FEF3C7] text-[#92400E]'
+                      ? 'border-transparent accent-soft-bg'
                       : 'border-[#E2E8F0] bg-white text-[#475569]'
                   }`}
                 >
@@ -457,6 +448,7 @@ function BillingPageInner() {
                 Scan to pay {formatCurrency(selectedAmountRupees)} via any UPI App:
               </span>
               {qrDataUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element -- dynamic client-generated data-URL QR code; next/image can't optimize a runtime data URL
                 <img
                   src={qrDataUrl}
                   alt="Admin UPI QR"
@@ -484,7 +476,7 @@ function BillingPageInner() {
                 placeholder="e.g. 432198765432"
                 value={utrInput}
                 onChange={(e) => setUtrInput(e.target.value)}
-                className="w-full h-10 px-3 rounded-[6px] border border-[#CBD5E1] text-xs font-mono text-[#09090B] placeholder:text-[#94A3B8] focus:outline-none focus:border-[#D97706]"
+                className="w-full h-10 px-3 rounded-[8px] border border-[#CBD5E1] text-xs font-mono text-[#09090B] placeholder:text-[#94A3B8] focus:outline-none focus:border-[color:var(--accent)]"
               />
               <span className="text-[11px] text-[#64748B] block">
                 Found in your GPay, PhonePe, or Paytm payment details.

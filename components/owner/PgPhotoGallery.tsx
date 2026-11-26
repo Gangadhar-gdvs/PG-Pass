@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Dropdown } from '@/components/ui/dropdown';
 import { Camera, Trash2, ImagePlus, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { errorMessage } from '@/lib/utils';
 
 interface GalleryPhoto {
   id: string;
@@ -58,9 +59,13 @@ export function PgPhotoGallery({ propertyId }: { propertyId?: string }) {
 
   // Guard against out-of-order responses / unmount when propertyId changes.
   useEffect(() => {
+    // Defer so setState runs after commit, not in the effect body (cascading-render lint rule).
     let ignore = false;
-    load((ok, list) => {
-      if (!ignore && ok) setPhotos(list);
+    queueMicrotask(() => {
+      if (ignore) return;
+      load((ok, list) => {
+        if (!ignore && ok) setPhotos(list);
+      });
     });
     return () => {
       ignore = true;
@@ -88,8 +93,8 @@ export function PgPhotoGallery({ propertyId }: { propertyId?: string }) {
       toast.success('Photo added to your PG gallery');
       setCaption('');
       await load();
-    } catch (err: any) {
-      toast.error(err.message || 'Upload failed');
+    } catch (err: unknown) {
+      toast.error(errorMessage(err, 'Upload failed'));
     } finally {
       setUploading(false);
     }
@@ -110,7 +115,7 @@ export function PgPhotoGallery({ propertyId }: { propertyId?: string }) {
   return (
     <div className="bg-white border border-[#E2E8F0] rounded-[12px] p-6 sm:p-8 shadow-xs space-y-5">
       <div className="flex items-center gap-3 pb-4 border-b border-[#E2E8F0]">
-        <div className="w-10 h-10 rounded-[8px] bg-[#FEF3C7] border border-[#FDE68A] text-[#D97706] flex items-center justify-center shrink-0">
+        <div className="w-10 h-10 rounded-[8px] accent-soft-bg accent-text flex items-center justify-center shrink-0">
           <Camera className="w-5 h-5" />
         </div>
         <div>
@@ -148,7 +153,7 @@ export function PgPhotoGallery({ propertyId }: { propertyId?: string }) {
             onChange={(e) => setCaption(e.target.value)}
             placeholder='e.g. "Spacious 2-sharing AC room, 1st floor"'
             maxLength={120}
-            className="w-full h-11 px-3 rounded-[8px] border-2 border-slate-200 text-sm focus:border-[#D97706] focus:outline-none"
+            className="w-full h-11 px-3 rounded-[8px] border-2 border-slate-200 text-sm focus:border-[color:var(--accent)] focus:outline-none"
           />
         </div>
       </div>
@@ -160,7 +165,8 @@ export function PgPhotoGallery({ propertyId }: { propertyId?: string }) {
         loading={uploading}
         disabled={photos.length >= PROPERTY_PHOTO_MAX}
         onClick={() => fileRef.current?.click()}
-        className="bg-[#D97706] hover:bg-[#B45309] text-white"
+        style={{ background: 'var(--accent)' }}
+        className="text-white"
       >
         <ImagePlus className="w-4 h-4 mr-1.5" />
         {uploading ? 'Uploading…' : 'Add Photo'}

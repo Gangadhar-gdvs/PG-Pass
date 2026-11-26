@@ -3,6 +3,7 @@ import { withErrorHandler, AppError } from '@/lib/server/api/withErrorHandler';
 import { withAuth, AuthContext } from '@/lib/server/api/withAuth';
 import { withRateLimit } from '@/lib/server/api/withRateLimit';
 import { maintenanceService } from '@/lib/server/services/maintenance.service';
+import type { MaintenanceStatus } from '@/types';
 import { STAFF_PERMISSIONS, PG_FEATURES } from '@/lib/constants/permissions';
 
 const VALID_STATUS = ['open', 'in_progress', 'resolved'];
@@ -32,7 +33,7 @@ export const PATCH = withErrorHandler(
         const ticket = await maintenanceService.updateStatus(
           id,
           ownerId,
-          body.status as any,
+          body.status as MaintenanceStatus,
           ctx.auth.uid,
           body.resolutionNote
         );

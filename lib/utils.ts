@@ -1,6 +1,34 @@
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { config } from './config';
+import type { Timestampish } from '@/types';
+
+/**
+ * Convert a Firestore timestamp / Date / ISO string / epoch number to a `Date`,
+ * or `null` if it can't be parsed. Centralises the `?.toDate?.()` dance so call
+ * sites don't need `any` casts.
+ */
+export function tsToDate(v: Timestampish | null | undefined): Date | null {
+  if (v == null) return null;
+  if (v instanceof Date) return v;
+  if (typeof v === 'object' && typeof v.toDate === 'function') {
+    try { return v.toDate(); } catch { return null; }
+  }
+  if (typeof v === 'string' || typeof v === 'number') {
+    const d = new Date(v);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  if (typeof v === 'object' && typeof v.seconds === 'number') {
+    return new Date(v.seconds * 1000);
+  }
+  return null;
+}
+
+/** Milliseconds since epoch for a timestamp-ish value, or 0 if unparseable. */
+export function tsToMillis(v: Timestampish | null | undefined): number {
+  const d = tsToDate(v);
+  return d ? d.getTime() : 0;
+}
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));

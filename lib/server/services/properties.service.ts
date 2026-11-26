@@ -1,7 +1,7 @@
 import 'server-only';
 import { adminDb } from '../firebase-admin';
 import { AppError } from '../api/withErrorHandler';
-import { Property } from '@/types';
+import { Property, Owner } from '@/types';
 import { Timestamp } from 'firebase-admin/firestore';
 
 /**
@@ -13,7 +13,7 @@ import { Timestamp } from 'firebase-admin/firestore';
  * document is materialized lazily from the legacy Owner fields — no backfill.
  */
 export class PropertiesService {
-  private propertyFromOwner(ownerId: string, owner: any): Property {
+  private propertyFromOwner(ownerId: string, owner: Partial<Owner>): Property {
     return {
       id: ownerId,
       ownerId,
@@ -56,7 +56,7 @@ export class PropertiesService {
     if (!hasPrimary) {
       const ownerDoc = await adminDb.collection('owners').doc(ownerId).get();
       if (ownerDoc.exists) {
-        const primary = this.propertyFromOwner(ownerId, ownerDoc.data());
+        const primary = this.propertyFromOwner(ownerId, ownerDoc.data() as Partial<Owner>);
         // Persist lazily so subsequent reads are consistent.
         await adminDb
           .collection('properties')

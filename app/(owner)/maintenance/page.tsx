@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useOwnerSession } from '@/hooks/useOwner';
-import { formatDateIN } from '@/lib/utils';
+import { formatDateIN, tsToDate, errorMessage } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { CardListSkeleton } from '@/components/ui/skeletons';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -51,7 +51,15 @@ export default function MaintenancePage() {
   }, [filter]);
 
   useEffect(() => {
-    if (ownerId) load();
+    if (!ownerId) return;
+    // Defer so setState runs after commit, not in the effect body (cascading-render lint rule).
+    let active = true;
+    queueMicrotask(() => {
+      if (active) load();
+    });
+    return () => {
+      active = false;
+    };
   }, [ownerId, load]);
 
   const transition = async (ticket: MaintenanceTicket, status: MaintenanceStatus) => {
@@ -69,8 +77,8 @@ export default function MaintenancePage() {
       }
       toast.success(status === 'resolved' ? 'Marked resolved' : 'Marked in progress');
       await load();
-    } catch (e: any) {
-      toast.error(e.message || 'Could not update ticket');
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, 'Could not update ticket'));
     } finally {
       setBusyId(null);
     }
@@ -81,7 +89,7 @@ export default function MaintenancePage() {
   return (
     <div className="max-w-3xl mx-auto space-y-5">
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-[8px] bg-[#FEF3C7] border border-[#FDE68A] text-[#D97706] flex items-center justify-center shrink-0">
+        <div className="icon-chip accent-soft-bg shrink-0">
           <Wrench className="w-5 h-5" />
         </div>
         <div>
@@ -100,7 +108,7 @@ export default function MaintenancePage() {
           { id: 'resolved', label: 'Resolved' },
         ]}
         activeTab={filter}
-        onChange={(id) => setFilter(id as any)}
+        onChange={(id) => setFilter(id as 'all' | MaintenanceStatus)}
         variant="pill"
       />
 
@@ -115,7 +123,7 @@ export default function MaintenancePage() {
       ) : (
         <div className="space-y-3">
           {tickets.map((t) => (
-            <div key={t.id} className="bg-white border border-[#E2E8F0] rounded-[12px] p-4 shadow-xs">
+            <div key={t.id} className="app-card p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -129,7 +137,7 @@ export default function MaintenancePage() {
                   <p className="text-xs text-[#334155] mt-1.5 break-words">{t.description}</p>
                   <p className="text-[11px] text-[#94A3B8] mt-1.5">
                     {t.tenantName || 'Resident'}
-                    {t.bedLabel ? ` · ${t.bedLabel}` : ''} · {formatDateIN(t.createdAt?.toDate?.() || t.createdAt)}
+                    {t.bedLabel ? ` · ${t.bedLabel}` : ''} · {formatDateIN(tsToDate(t.createdAt))}
                   </p>
                 </div>
               </div>

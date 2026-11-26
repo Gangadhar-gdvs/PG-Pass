@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/server/firebase-admin';
 import { storageProvider } from '@/lib/server/storage/provider';
 import { env } from '@/lib/env';
+import { errorMessage } from '@/lib/utils';
 
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
@@ -39,11 +40,11 @@ export async function GET(req: NextRequest) {
       },
       timestamp: new Date().toISOString(),
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     return NextResponse.json(
       {
         status: 'unhealthy',
-        error: err.message,
+        error: errorMessage(err, 'Health check failed'),
         timestamp: new Date().toISOString(),
       },
       { status: 503 }

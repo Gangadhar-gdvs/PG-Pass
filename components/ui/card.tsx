@@ -11,15 +11,15 @@ export function Card({
   ...props
 }: CardProps) {
   const variants = {
-    default: "bg-white border-[#E2E8F0] shadow-[0_1px_3px_0_rgba(0,0,0,0.04),0_1px_2px_-1px_rgba(0,0,0,0.02)]",
+    default: "bg-white border-[rgba(124,58,237,0.06)] shadow-[var(--shadow-card)]",
     muted: "bg-[#F8FAFC] border-[#E2E8F0]",
     flat: "bg-white border-[#E2E8F0]",
-    elevated: "bg-white border-[#E2E8F0] shadow-[0_10px_25px_-5px_rgba(0,0,0,0.05),0_8px_10px_-6px_rgba(0,0,0,0.03)]",
+    elevated: "bg-white border-[rgba(124,58,237,0.06)] shadow-[var(--shadow-float)]",
   };
 
   return (
     <div
-      className={`rounded-[12px] border p-5 transition-all duration-150 ${variants[variant]} ${className}`}
+      className={`rounded-[16px] border p-5 transition-all duration-150 ${variants[variant]} ${className}`}
       {...props}
     >
       {children}

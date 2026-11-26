@@ -1,18 +1,23 @@
 import 'server-only';
 import { NextRequest, NextResponse } from 'next/server';
 import { adminAuth, adminDb } from '../firebase-admin';
-import { AppError, RouteHandler } from './withErrorHandler';
+import { AppError, RouteHandler, RouteContext } from './withErrorHandler';
 import { SESSION_COOKIE_NAME, SESSION_ID_COOKIE_NAME } from '@/lib/constants/limits';
 import { isSessionCurrent } from '../auth/sessionRegistry';
 import { staffHasPermission, pgFeatureEnabled } from '../auth/entitlements';
 import { StaffPermission, PgFeature } from '@/lib/constants/permissions';
 
+export type UserRole = 'owner' | 'staff' | 'admin' | 'tenant' | 'resident';
+
 export interface AuthContext {
   uid: string;
-  role: 'owner' | 'staff' | 'admin' | 'tenant' | 'resident';
+  role: UserRole;
   ownerId?: string;
   email?: string;
 }
+
+/** The route context after `withAuth` injects the verified `auth` object. */
+export type AuthedContext = RouteContext & { auth: AuthContext };
 
 export interface WithAuthOptions {
   roles?: Array<'owner' | 'staff' | 'admin' | 'tenant' | 'resident'>;
@@ -47,11 +52,14 @@ async function getCachedAccountStatus(collectionName: 'owners' | 'staff', id: st
   return status;
 }
 
-export function withAuth(
-  handler: (req: NextRequest, ctx: any) => Promise<Response | NextResponse>,
+export function withAuth<C extends RouteContext = RouteContext>(
+  handler: (
+    req: NextRequest,
+    ctx: C & { auth: AuthContext }
+  ) => Promise<Response | NextResponse>,
   options: WithAuthOptions = {}
 ): RouteHandler {
-  return async (req: NextRequest, ctx: any = {}) => {
+  return async (req: NextRequest, ctx: RouteContext = {}) => {
     // 1. Extract session cookie
     const sessionCookie = req.cookies.get(SESSION_COOKIE_NAME)?.value;
 
@@ -74,9 +82,9 @@ export function withAuth(
 
     const uid = decodedClaims.uid;
     const isAdmin = decodedClaims.admin === true;
-    const role: 'owner' | 'staff' | 'admin' | 'tenant' | 'resident' = isAdmin
+    const role: UserRole = isAdmin
       ? 'admin'
-      : (decodedClaims.role as any) || 'owner';
+      : (decodedClaims.role as UserRole | undefined) || 'owner';
     const ownerId = isAdmin
       ? undefined
       : role === 'owner'
@@ -156,7 +164,7 @@ export function withAuth(
     const enhancedCtx = {
       ...ctx,
       auth: authContext,
-    };
+    } as C & { auth: AuthContext };
 
     return handler(req, enhancedCtx);
   };

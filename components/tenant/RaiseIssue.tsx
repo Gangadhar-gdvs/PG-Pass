@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Dropdown } from '@/components/ui/dropdown';
 import { Wrench } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { errorMessage } from '@/lib/utils';
 
 const CATEGORIES = [
   { value: 'plumbing', label: 'Plumbing' },
@@ -50,8 +51,8 @@ export function RaiseIssue({ portalAuth }: { portalAuth: { token: string; pin: s
       setSubmitted(true);
       setDescription('');
       setOpen(false);
-    } catch (err: any) {
-      toast.error(err.message || 'Could not submit');
+    } catch (err: unknown) {
+      toast.error(errorMessage(err, 'Could not submit'));
     } finally {
       setSubmitting(false);
     }
@@ -88,7 +89,7 @@ export function RaiseIssue({ portalAuth }: { portalAuth: { token: string; pin: s
           />
           <div>
             <label htmlFor="issue-desc" className="text-[11px] font-semibold text-[#64748B] block mb-1">
-              What's the problem?
+              What&apos;s the problem?
             </label>
             <textarea
               id="issue-desc"

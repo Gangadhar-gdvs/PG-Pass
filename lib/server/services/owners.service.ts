@@ -1,10 +1,9 @@
 import 'server-only';
 import { adminDb } from '../firebase-admin';
 import { Owner } from '@/types';
-import { AppError } from '../api/withErrorHandler';
-import { PLAN_LIMITS, FREE_MAX_BEDS, FREE_MAX_PHOTOS, FREE_MAX_STAFF } from '@/lib/constants/limits';
+import { FREE_MAX_BEDS, FREE_MAX_PHOTOS, FREE_MAX_STAFF } from '@/lib/constants/limits';
 import { PLAN_TIER, ACCOUNT_STATUS } from '@/lib/constants/status';
-import { Timestamp } from 'firebase-admin/firestore';
+import { Timestamp, type UpdateData } from 'firebase-admin/firestore';
 
 export class OwnersService {
   async getProfile(ownerId: string): Promise<Owner | null> {
@@ -77,7 +76,7 @@ export class OwnersService {
     // Service-layer bounds (authoritative — holds even if a caller skips Zod):
     // cap string lengths and clamp numeric ranges so bad data can't reach Firestore.
     const cap = (s: string | undefined, n: number) => (s || '').trim().slice(0, n);
-    const clampInt = (v: any, lo: number, hi: number, fallback: number) => {
+    const clampInt = (v: unknown, lo: number, hi: number, fallback: number) => {
       const n = Math.round(Number(v));
       return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : fallback;
     };
@@ -110,7 +109,7 @@ export class OwnersService {
       updatedAt: Timestamp.now(),
     };
 
-    await docRef.update(updateData as any);
+    await docRef.update(updateData as UpdateData<Owner>);
 
     // Mirror public-listing fields onto the PRIMARY property doc (id == ownerId)
     // so PG discovery (which reads `properties`) stays in sync even if the owner

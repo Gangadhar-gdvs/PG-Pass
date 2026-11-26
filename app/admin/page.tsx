@@ -1,26 +1,20 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   ShieldAlert,
   Lock,
-  Mail,
   Search,
-  ExternalLink,
   LogOut,
   Copy,
-  Layers,
-  Building,
   CheckCircle2,
-  Clock,
-  Phone,
-  ArrowRight,
-  ShieldCheck,
-  AlertCircle,
-  Terminal,
   Bug,
   RefreshCw,
   MessageSquare,
+  Building,
+  BedDouble,
+  Users,
+  IndianRupee,
 } from 'lucide-react';
 import { AdminSupportPanel } from '@/components/support/AdminSupportPanel';
 import { AdminPgFeatures } from '@/components/admin/AdminPgFeatures';
@@ -39,15 +33,31 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dropdown } from '@/components/ui/dropdown';
 import { Drawer } from '@/components/ui/drawer';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, errorMessage } from '@/lib/utils';
 import type { SuperAdminPgOverview } from '@/lib/server/services/adminOverview.service';
+import type { SubscriptionRequest } from '@/types';
 import { config } from '@/lib/config';
 import { Avatar } from '@/components/ui/avatar';
-import { StatusDot } from '@/components/ui/status-dot';
 import { DataTable, Column } from '@/components/ui/data-table';
+import { StatTile } from '@/components/ui/dashboard-kit';
 import { Tenant } from '@/types';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
+
+/** A system/error log row returned by /api/admin/logs. */
+interface SystemLog {
+  id: string;
+  level: string;
+  source?: string;
+  code?: string;
+  route?: string;
+  message?: string;
+  createdAt?: string | number;
+  requestId?: string;
+  details?: unknown;
+  stack?: string;
+  userAgent?: string;
+}
 
 export default function SuperAdminPortalPage() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -65,7 +75,7 @@ export default function SuperAdminPortalPage() {
   const [submitting, setSubmitting] = useState(false);
 
   // Platform Telemetry Data
-  const [loadingStats, setLoadingStats] = useState(false);
+  const [, setLoadingStats] = useState(false);
   const [stats, setStats] = useState<{
     allPgs: SuperAdminPgOverview[];
     platformTotalPgs: number;
@@ -81,14 +91,14 @@ export default function SuperAdminPortalPage() {
 
   // Tab State
   const [activeTab, setActiveTab] = useState<'telemetry' | 'upgrades' | 'logs' | 'support'>('telemetry');
-  const [upgradeRequests, setUpgradeRequests] = useState<any[]>([]);
+  const [upgradeRequests, setUpgradeRequests] = useState<SubscriptionRequest[]>([]);
   const [loadingUpgrades, setLoadingUpgrades] = useState(false);
 
   // System & Error Logs State
-  const [systemLogs, setSystemLogs] = useState<any[]>([]);
+  const [systemLogs, setSystemLogs] = useState<SystemLog[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
   const [logFilter, setLogFilter] = useState<string>('all');
-  const [selectedLogForDetails, setSelectedLogForDetails] = useState<any | null>(null);
+  const [selectedLogForDetails, setSelectedLogForDetails] = useState<SystemLog | null>(null);
 
   const loadLogs = async (level = logFilter) => {
     setLoadingLogs(true);
@@ -133,8 +143,8 @@ export default function SuperAdminPortalPage() {
       toast.success('Subscription plan upgraded successfully');
       await loadUpgrades();
       await loadPlatformData();
-    } catch (e: any) {
-      toast.error(e.message || 'Could not approve upgrade');
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, 'Could not approve upgrade'));
     }
   };
 
@@ -152,10 +162,32 @@ export default function SuperAdminPortalPage() {
       if (!res.ok) throw new Error(data.message || 'Status update failed');
       toast.success(`Account status set to ${newStatus}`);
       await loadPlatformData();
-    } catch (e: any) {
-      toast.error(e.message || 'Failed to update account status');
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, 'Failed to update account status'));
     }
   };
+
+  // Declared BEFORE the auth effect + handlers that call it (the compiler flags
+  // use-before-declare on a const arrow). useCallback keeps it stable so the
+  // mount-once auth subscription doesn't need to re-run when it changes.
+  const loadPlatformData = useCallback(async () => {
+    setLoadingStats(true);
+    try {
+      const res = await fetch('/api/admin/overview');
+      if (!res.ok) {
+        throw new Error('Failed to load platform telemetry');
+      }
+      const data = await res.json();
+      setStats(data);
+      if (data.allPgs.length > 0 && !selectedPgId) {
+        setSelectedPgId(data.allPgs[0].owner.id);
+      }
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, 'Failed to load platform telemetry'));
+    } finally {
+      setLoadingStats(false);
+    }
+  }, [selectedPgId]);
 
   // Listen to Firebase Auth state and verify the admin custom claim before
   // treating the session as an admin session.
@@ -186,26 +218,10 @@ export default function SuperAdminPortalPage() {
     });
 
     return () => unsubscribe();
+    // Mount-once auth subscription. `loadPlatformData` is stable (useCallback)
+    // and declared above; it's intentionally not a dep so we don't re-subscribe.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const loadPlatformData = async () => {
-    setLoadingStats(true);
-    try {
-      const res = await fetch('/api/admin/overview');
-      if (!res.ok) {
-        throw new Error('Failed to load platform telemetry');
-      }
-      const data = await res.json();
-      setStats(data);
-      if (data.allPgs.length > 0 && !selectedPgId) {
-        setSelectedPgId(data.allPgs[0].owner.id);
-      }
-    } catch (e: any) {
-      toast.error(e.message || 'Failed to load platform telemetry');
-    } finally {
-      setLoadingStats(false);
-    }
-  };
 
   // Load the next page of PGs (cursor pagination) and append to the directory.
   const loadMorePgs = async () => {
@@ -220,8 +236,8 @@ export default function SuperAdminPortalPage() {
           ? { ...data, allPgs: [...prev.allPgs, ...data.allPgs] }
           : data
       );
-    } catch (e: any) {
-      toast.error(e.message || 'Could not load more PGs');
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, 'Could not load more PGs'));
     } finally {
       setLoadingMore(false);
     }
@@ -259,20 +275,24 @@ export default function SuperAdminPortalPage() {
       }
       setIsAdmin(true);
       toast.success('Admin authenticated successfully');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
+      const code =
+        err && typeof err === 'object' && 'code' in err && typeof (err as { code?: unknown }).code === 'string'
+          ? (err as { code: string }).code
+          : '';
       let msg = 'Authentication failed. Please check your admin credentials.';
       if (
-        err.code === 'auth/invalid-credential' ||
-        err.code === 'auth/wrong-password' ||
-        err.code === 'auth/user-not-found'
+        code === 'auth/invalid-credential' ||
+        code === 'auth/wrong-password' ||
+        code === 'auth/user-not-found'
       ) {
         msg = 'Invalid email or password. Access denied.';
-      } else if (err.code === 'auth/operation-not-allowed') {
+      } else if (code === 'auth/operation-not-allowed') {
         msg = 'Email/Password sign-in is not enabled in Firebase Console. Please enable it in Authentication -> Sign-in method.';
-      } else if (err.code === 'auth/too-many-requests') {
+      } else if (code === 'auth/too-many-requests') {
         msg = 'Too many failed login attempts. Please wait a few minutes.';
-      } else if (err.message) {
+      } else if (err instanceof Error && err.message) {
         msg = err.message;
       }
       setAuthError(msg);
@@ -293,7 +313,7 @@ export default function SuperAdminPortalPage() {
       setEmail('');
       setPassword('');
       toast.success('Admin session ended');
-    } catch (e) {
+    } catch {
       toast.error('Error signing out');
     }
   };
@@ -522,36 +542,13 @@ export default function SuperAdminPortalPage() {
         </button>
       </header>
 
-      {/* Metric Bar (Horizontal Bento Live HUD) */}
-      <div className="border-b border-[#E2E8F0] bg-white px-6 py-3.5 flex items-center gap-8 overflow-x-auto text-xs">
-        <div className="flex items-baseline gap-2">
-          <span className="text-[#64748B] uppercase text-[10px] font-bold">Total PGs:</span>
-          <span className="font-mono text-base font-bold text-[#09090B]">
-            {stats?.platformTotalPgs || 0}
-          </span>
-        </div>
-
-        <div className="flex items-baseline gap-2">
-          <span className="text-[#64748B] uppercase text-[10px] font-bold">Total Beds:</span>
-          <span className="font-mono text-base font-bold text-[#09090B]">
-            {stats?.platformTotalBeds || 0}
-          </span>
-        </div>
-
-        <div className="flex items-baseline gap-2">
-          <span className="text-[#64748B] uppercase text-[10px] font-bold">Active Residents:</span>
-          <span className="font-mono text-base font-bold text-[#10B981]">
-            {stats?.platformTotalResidents || 0}
-          </span>
-        </div>
-
-        <div className="flex items-baseline gap-2">
-          <span className="text-[#64748B] uppercase text-[10px] font-bold">
-            Volume (loaded PGs):
-          </span>
-          <span className="font-mono text-base font-bold text-[#D97706]">
-            {formatCurrency(stats?.platformTotalVolume || 0)}
-          </span>
+      {/* Platform stat tiles (pastel, design-ref style) */}
+      <div className="bg-white px-4 sm:px-6 py-4 border-b border-[#E2E8F0]">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-5xl mx-auto">
+          <StatTile icon={<Building className="h-5 w-5 text-[#6D28D9]" />} tint="violet" label="Total PGs" value={stats?.platformTotalPgs || 0} />
+          <StatTile icon={<BedDouble className="h-5 w-5 text-[#1D4ED8]" />} tint="sky" label="Total Beds" value={stats?.platformTotalBeds || 0} />
+          <StatTile icon={<Users className="h-5 w-5 text-[#0F766E]" />} tint="mint" label="Active Residents" value={stats?.platformTotalResidents || 0} />
+          <StatTile icon={<IndianRupee className="h-5 w-5 text-[#C2410C]" />} tint="peach" label="Volume (loaded)" value={formatCurrency(stats?.platformTotalVolume || 0)} />
         </div>
       </div>
 
@@ -790,7 +787,7 @@ export default function SuperAdminPortalPage() {
                           {log.message}
                         </td>
                         <td className="py-2.5 px-3.5 text-[11px] text-[#64748B] whitespace-nowrap">
-                          {new Date(log.createdAt).toLocaleString('en-IN', {
+                          {new Date(log.createdAt ?? 0).toLocaleString('en-IN', {
                             dateStyle: 'short',
                             timeStyle: 'medium',
                           })}
@@ -1005,7 +1002,7 @@ export default function SuperAdminPortalPage() {
           isOpen={!!selectedLogForDetails}
           onClose={() => setSelectedLogForDetails(null)}
           title={`Error Diagnostics: ${selectedLogForDetails.code || selectedLogForDetails.level.toUpperCase()}`}
-          description={`Captured at ${new Date(selectedLogForDetails.createdAt).toLocaleString('en-IN')}`}
+          description={`Captured at ${new Date(selectedLogForDetails.createdAt ?? 0).toLocaleString('en-IN')}`}
           width="lg"
           footer={
             <Button variant="outline" size="sm" onClick={() => setSelectedLogForDetails(null)}>
@@ -1047,7 +1044,7 @@ export default function SuperAdminPortalPage() {
               </div>
             )}
 
-            {selectedLogForDetails.details && (
+            {selectedLogForDetails.details != null && (
               <div>
                 <span className="text-[11px] font-bold text-[#64748B] uppercase block mb-1">
                   Context / Details Payload

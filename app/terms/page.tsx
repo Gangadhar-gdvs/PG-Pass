@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { ArrowLeft, FileText, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, FileText } from 'lucide-react';
 
 export const metadata = {
   title: 'Terms of Service | PG-Pass',
@@ -33,7 +33,7 @@ export default function TermsPage() {
           <section className="space-y-2">
             <h2 className="text-base font-bold text-[#09090B]">1. Zero-Commission Rent Model</h2>
             <p>
-              PG-Pass is an inventory and record-keeping software tool. <strong>We do not act as an escrow agent, intermediary payment aggregator, or financial fiduciary.</strong> 100% of tenant rent settlements occur directly between the resident and the property owner's bank account via peer-to-peer or merchant UPI. PG-Pass charges 0% transaction commission on rent.
+              PG-Pass is an inventory and record-keeping software tool. <strong>We do not act as an escrow agent, intermediary payment aggregator, or financial fiduciary.</strong> 100% of tenant rent settlements occur directly between the resident and the property owner&apos;s bank account via peer-to-peer or merchant UPI. PG-Pass charges 0% transaction commission on rent.
             </p>
           </section>
 

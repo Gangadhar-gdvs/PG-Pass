@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Drawer } from '@/components/ui/drawer';
 import { formatCurrency } from '@/lib/utils';
 import { buildWaReminderLink } from '@/lib/client/upi';
-import { Send, CheckCircle2, Copy, ArrowRight, Clock, RefreshCw } from 'lucide-react';
+import { Send, CheckCircle2, Copy, ArrowRight, Clock } from 'lucide-react';
 import { Avatar } from '@/components/ui/avatar';
 import toast from 'react-hot-toast';
 
@@ -187,9 +187,10 @@ export function WhatsAppReminderModal({
                   <div
                     key={bed.id}
                     onClick={() => setCurrentIndex(idx)}
+                    style={isSelected ? { borderColor: 'var(--accent)', background: 'var(--accent-tint)' } : undefined}
                     className={`flex items-center justify-between p-3 rounded-[10px] border transition-colors cursor-pointer ${
                       isSelected
-                        ? 'border-[#D97706] bg-[#FFFBEB]'
+                        ? ''
                         : isReminded
                         ? 'border-[#E2E8F0] bg-[#F8FAFC] opacity-75'
                         : 'border-[#E2E8F0] bg-white hover:border-[#CBD5E1]'

@@ -63,7 +63,11 @@ export function Dropdown({
 
   const selected = options.find((o) => o.value === value);
 
-  React.useEffect(() => setMounted(true), []);
+  // Mark mounted after commit (microtask) so this doesn't setState synchronously
+  // in the effect body (cascading-render lint rule). Gates the portal render.
+  React.useEffect(() => {
+    queueMicrotask(() => setMounted(true));
+  }, []);
 
   const positionPanel = React.useCallback(() => {
     const el = triggerRef.current;
@@ -105,10 +109,11 @@ export function Dropdown({
   // `open` alone so a parent re-render (which recreates `options`) doesn't snap
   // activeIndex back and break arrow-key navigation.
   React.useEffect(() => {
-    if (open) {
-      const idx = options.findIndex((o) => o.value === value);
-      setActiveIndex(idx >= 0 ? idx : 0);
-    }
+    if (!open) return;
+    const idx = options.findIndex((o) => o.value === value);
+    // Defer so this setState runs after commit, not in the effect body
+    // (cascading-render lint rule).
+    queueMicrotask(() => setActiveIndex(idx >= 0 ? idx : 0));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 

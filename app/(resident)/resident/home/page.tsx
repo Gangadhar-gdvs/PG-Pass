@@ -6,6 +6,7 @@ import { CardListSkeleton } from '@/components/ui/skeletons';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Building2, ChevronRight, Search } from 'lucide-react';
 import { SupportLink } from '@/components/ui/support-link';
+import { HeroHeader } from '@/components/ui/dashboard-kit';
 
 interface Tenancy {
   tenantId: string;
@@ -44,10 +45,25 @@ export default function ResidentHome() {
   }
 
   return (
-    <div className="space-y-4 pt-4">
-      <h1 className="text-xl font-extrabold text-slate-900 px-1">
-        Hi {resident?.name?.split(' ')[0] || 'there'} 👋
-      </h1>
+    <div className="space-y-4">
+      {/* Gradient greeting band — breaks out of the shell's px-4. The resident
+          layout is a centered phone-column (max-w-2xl) at every width, so the
+          hero stays full-bleed across breakpoints (no md reset). */}
+      <div className="-mx-4 -mt-3">
+        <HeroHeader
+          eyebrow="Resident"
+          title={`Hi ${resident?.name?.split(' ')[0] || 'there'} 👋`}
+          subtitle={tenancies.length > 0 ? 'Welcome back to your PG' : 'Find and join a PG to get started'}
+          right={
+            <Link
+              href="/resident/discover"
+              className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3.5 py-2 text-xs font-bold text-white backdrop-blur-sm press"
+            >
+              <Search className="h-3.5 w-3.5" /> Discover
+            </Link>
+          }
+        />
+      </div>
 
       {tenancies.length === 0 ? (
         <div className="app-card p-6">

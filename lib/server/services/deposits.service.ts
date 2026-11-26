@@ -3,6 +3,7 @@ import { adminDb } from '../firebase-admin';
 import { DepositRecord } from '@/types';
 import { AppError } from '../api/withErrorHandler';
 import { recordEvent } from './systemLogs.service';
+import { tsToMillis } from '@/lib/utils';
 import { Timestamp } from 'firebase-admin/firestore';
 
 export interface RecordDepositInput {
@@ -123,7 +124,7 @@ export class DepositsService {
     if (data.refundStatus === 'issued') throw new AppError(400, 'Refund already marked issued');
 
     const now = Timestamp.now();
-    const update: Record<string, any> = {
+    const update: Record<string, unknown> = {
       refundStatus: 'issued',
       issuedBy: actorUid,
       issuedAt: now,
@@ -157,7 +158,7 @@ export class DepositsService {
       .get();
     return snap.docs
       .map((d) => ({ id: d.id, ...d.data() } as DepositRecord))
-      .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+      .sort((a, b) => tsToMillis(b.createdAt) - tsToMillis(a.createdAt));
   }
 }
 

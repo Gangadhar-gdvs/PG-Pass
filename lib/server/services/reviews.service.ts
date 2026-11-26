@@ -5,6 +5,25 @@ import { recordEvent } from './systemLogs.service';
 import { pgFeatureEnabled } from '../auth/entitlements';
 import { PG_FEATURES } from '@/lib/constants/permissions';
 import { Timestamp } from 'firebase-admin/firestore';
+import { Timestampish } from '@/types';
+import { tsToDate, tsToMillis } from '@/lib/utils';
+
+interface PgReviewRow {
+  id: string;
+  reviewerName?: string;
+  reviewerRole?: string;
+  rating: number;
+  text?: string;
+  updatedAt?: Timestampish;
+}
+
+interface StaffRatingRow {
+  id: string;
+  reviewerName?: string;
+  rating: number;
+  note?: string;
+  updatedAt?: Timestampish;
+}
 
 /**
  * Reviews — two kinds, both write-restricted to people genuinely connected to
@@ -174,14 +193,15 @@ export class ReviewsService {
     if (rows.length > 0 && !(await pgFeatureEnabled(rows[0].ownerId, PG_FEATURES.REVIEWS))) {
       return [];
     }
-    rows.sort((a: any, b: any) => (b.updatedAt?.toMillis?.() || 0) - (a.updatedAt?.toMillis?.() || 0));
-    return rows.map((r: any) => ({
+    const pgRows = rows as PgReviewRow[];
+    pgRows.sort((a, b) => tsToMillis(b.updatedAt) - tsToMillis(a.updatedAt));
+    return pgRows.map((r) => ({
       id: r.id,
       reviewerName: r.reviewerName,
       reviewerRole: r.reviewerRole,
       rating: r.rating,
       text: r.text || '',
-      createdAt: r.updatedAt?.toDate?.()?.toISOString?.() || null,
+      createdAt: tsToDate(r.updatedAt)?.toISOString() || null,
     }));
   }
 
@@ -290,14 +310,14 @@ export class ReviewsService {
       .where('staffUid', '==', staffUid)
       .limit(Math.min(limitCount, 100))
       .get();
-    const rows = snap.docs.map((d) => d.data());
-    rows.sort((a: any, b: any) => (b.updatedAt?.toMillis?.() || 0) - (a.updatedAt?.toMillis?.() || 0));
-    return rows.map((r: any) => ({
+    const rows = snap.docs.map((d) => d.data() as StaffRatingRow);
+    rows.sort((a, b) => tsToMillis(b.updatedAt) - tsToMillis(a.updatedAt));
+    return rows.map((r) => ({
       id: r.id,
       reviewerName: r.reviewerName,
       rating: r.rating,
       note: r.note || '',
-      createdAt: r.updatedAt?.toDate?.()?.toISOString?.() || null,
+      createdAt: tsToDate(r.updatedAt)?.toISOString() || null,
     }));
   }
 }

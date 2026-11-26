@@ -1,9 +1,9 @@
 import 'server-only';
 import { adminDb } from '../firebase-admin';
 import { AppError } from '../api/withErrorHandler';
-import { MaintenanceTicket, MaintenanceCategory, MaintenanceStatus } from '@/types';
+import { MaintenanceTicket, MaintenanceCategory, MaintenanceStatus, Tenant } from '@/types';
 import { MAX_LIST_LIMIT } from '@/lib/constants/limits';
-import { Timestamp } from 'firebase-admin/firestore';
+import { Timestamp, Query, QueryDocumentSnapshot } from 'firebase-admin/firestore';
 
 const VALID_CATEGORIES: MaintenanceCategory[] = [
   'plumbing',
@@ -36,7 +36,7 @@ export class MaintenanceService {
     }
 
     const tenantSnap = await adminDb.collection('tenants').doc(params.tenantId).get();
-    const tenant = tenantSnap.exists ? tenantSnap.data()! : {};
+    const tenant: Partial<Tenant> = tenantSnap.exists ? (tenantSnap.data() as Tenant) : {};
 
     const ref = adminDb.collection('maintenance_tickets').doc();
     const now = Timestamp.now();
@@ -66,13 +66,15 @@ export class MaintenanceService {
     limitCount = 50
   ): Promise<MaintenanceTicket[]> {
     const safeLimit = Math.min(limitCount, MAX_LIST_LIMIT);
-    let q: any = adminDb.collection('maintenance_tickets').where('ownerId', '==', ownerId);
+    let q: Query = adminDb.collection('maintenance_tickets').where('ownerId', '==', ownerId);
 
     if (status) q = q.where('status', '==', status);
     q = q.orderBy('createdAt', 'desc').limit(safeLimit);
 
     const snap = await q.get();
-    return snap.docs.map((d: any) => ({ ...d.data(), id: d.id } as MaintenanceTicket));
+    return snap.docs.map(
+      (d: QueryDocumentSnapshot) => ({ ...d.data(), id: d.id } as MaintenanceTicket)
+    );
   }
 
   async listForTenant(ownerId: string, tenantId: string, limitCount = 20): Promise<MaintenanceTicket[]> {
@@ -102,7 +104,7 @@ export class MaintenanceService {
     if (data.ownerId !== ownerId) throw new AppError(403, 'Unauthorized');
 
     const now = Timestamp.now();
-    const update: Record<string, any> = { status, updatedAt: now };
+    const update: Partial<MaintenanceTicket> = { status, updatedAt: now };
     if (status === 'resolved') {
       update.resolvedBy = actorUid;
       update.resolvedAt = now;

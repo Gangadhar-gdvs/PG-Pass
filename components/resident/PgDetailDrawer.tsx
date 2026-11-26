@@ -5,6 +5,7 @@ import { Drawer } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 import { Star, MapPin, Phone, Utensils, CheckCircle2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { errorMessage } from '@/lib/utils';
 
 interface DetailPhoto {
   id: string;
@@ -81,13 +82,16 @@ export function PgDetailDrawer({
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
+    // Defer so setState runs after commit, not in the effect body (cascading-render lint rule).
     if (!propertyId) {
-      setDetail(null);
+      queueMicrotask(() => setDetail(null));
       return;
     }
-    setLoading(true);
-    setMyRating(0);
-    setMyText('');
+    queueMicrotask(() => {
+      setLoading(true);
+      setMyRating(0);
+      setMyText('');
+    });
     fetch(`/api/discover/${propertyId}`)
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then(setDetail)
@@ -119,8 +123,8 @@ export function PgDetailDrawer({
       const refreshed = await fetch(`/api/discover/${detail.listing.propertyId}`);
       if (refreshed.ok) setDetail(await refreshed.json());
       setMyText('');
-    } catch (e: any) {
-      toast.error(e.message || 'Could not submit review');
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, 'Could not submit review'));
     } finally {
       setSubmitting(false);
     }

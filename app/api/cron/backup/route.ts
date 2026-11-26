@@ -5,6 +5,7 @@ import { adminDb } from '@/lib/server/firebase-admin';
 import { storageProvider } from '@/lib/server/storage/provider';
 import { recordEvent } from '@/lib/server/services/systemLogs.service';
 import { env } from '@/lib/env';
+import { QueryDocumentSnapshot } from 'firebase-admin/firestore';
 import zlib from 'zlib';
 import crypto from 'crypto';
 
@@ -40,7 +41,7 @@ export const POST = withErrorHandler(
       const lines: string[] = [];
       // Firestore QueryDocumentSnapshot cursor; typed loosely to avoid relying
       // on the global FirebaseFirestore namespace.
-      let lastDoc: any = undefined;
+      let lastDoc: QueryDocumentSnapshot | undefined = undefined;
 
       for (;;) {
         let q = adminDb.collection(colName).orderBy('__name__').limit(PAGE);

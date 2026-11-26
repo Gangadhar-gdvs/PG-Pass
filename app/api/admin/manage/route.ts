@@ -7,6 +7,16 @@ import { ownersService } from '@/lib/server/services/owners.service';
 import { recordEvent } from '@/lib/server/services/systemLogs.service';
 import { ownerProfileSchema } from '@/lib/validation';
 import { ACCOUNT_STATUS } from '@/lib/constants/status';
+import type { AccountStatus } from '@/types';
+
+interface ManageBody {
+  action?: string;
+  ownerId?: string;
+  profile?: Record<string, unknown>;
+  staffUid?: string;
+  permissions?: string[];
+  status?: AccountStatus;
+}
 
 /**
  * Admin act-as-owner management. Every action is admin-gated and logged. Lets
@@ -22,9 +32,9 @@ import { ACCOUNT_STATUS } from '@/lib/constants/status';
 export const POST = withErrorHandler(
   withAuth(
     async (req: NextRequest, ctx: { auth: AuthContext }) => {
-      let body: any;
+      let body: ManageBody;
       try {
-        body = await req.json();
+        body = (await req.json()) as ManageBody;
       } catch {
         throw new AppError(400, 'Invalid JSON body');
       }
@@ -91,7 +101,8 @@ export const POST = withErrorHandler(
 
         case 'setStaffStatus': {
           const { staffUid, status } = body;
-          if (!staffUid || ![ACCOUNT_STATUS.ACTIVE, ACCOUNT_STATUS.SUSPENDED].includes(status)) {
+          const validStatuses: AccountStatus[] = [ACCOUNT_STATUS.ACTIVE, ACCOUNT_STATUS.SUSPENDED];
+          if (!staffUid || status === undefined || !validStatuses.includes(status)) {
             throw new AppError(400, 'staffUid and a valid status are required');
           }
           const updated = await staffService.updateStaffStatus(staffUid, '', status, adminUid, 'admin');

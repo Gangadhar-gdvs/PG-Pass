@@ -46,16 +46,24 @@ export const GET = withErrorHandler(
           .get(),
       ]);
 
+      interface StaffDoc {
+        uid?: string;
+        id?: string;
+        name?: string;
+        accountStatus?: string;
+        ratingAgg?: { count?: number; sum?: number };
+      }
       const staff = staffSnap.docs
-        .map((d) => d.data())
-        .filter((s: any) => s.accountStatus !== 'revoked')
-        .map((s: any) => {
-          const agg = s.ratingAgg || { count: 0, sum: 0 };
+        .map((d) => ({ ...(d.data() as StaffDoc), id: d.id }))
+        .filter((s) => s.accountStatus !== 'revoked')
+        .map((s) => {
+          const count = s.ratingAgg?.count ?? 0;
+          const sum = s.ratingAgg?.sum ?? 0;
           return {
             uid: s.uid || s.id,
             name: s.name || 'Staff',
-            ratingAvg: agg.count > 0 ? Math.round((agg.sum / agg.count) * 10) / 10 : 0,
-            ratingCount: agg.count || 0,
+            ratingAvg: count > 0 ? Math.round((sum / count) * 10) / 10 : 0,
+            ratingCount: count,
           };
         });
 
