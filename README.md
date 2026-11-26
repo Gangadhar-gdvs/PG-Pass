@@ -1,40 +1,26 @@
-Owner Panel:
 
-Property and inventory room setup - in this we showing different steps , in mobile view thebui is not good , looks clumsy and nit fit the ui in mobiles, and looks bad alignments and adjustment,
+Owner Panel 
 
-Dont add default cost for sharing type of beds, use placeholders only, user can enter their money, don't add default values 
-4th steps alignment also too clumsy and not good , 
+During adding the resident for the room with bed there is no assin button is showing for assign , only enter will automatically added , but user can't understand enter hits it, because they use Mobile mostly not desktop, so button needed 
 
-After completing this it shows success message of toast but in thebui shows empty even refreshed multiple times, 
-Andnalso top navbat design is good but not it is fixed sticky during scrolling, 
-And aslo bottoms tabs plus symbol is not needed, 
-We need to show the selected tab as floating icon format in the bottom tabs 
-Support chat shiws full page scroll instead if only inside the chat only scrollable nit ful page 
-Stats get error during fetching 
+After adding the resident there is no option to add the amount they paid, and no option to checkout the bed of that resident , 
+And also free tier 20 beds reached still it allow to created and managed more beds instead of disable or no access for create more , 
+And also when i try to copy the resident portal link copy button is not worked and not copied the link and when i click on the link icon it will open the portal , but in the url its shows something undefined, and its shows enter last digits if phone number but i tried to enter first , last , including country with all variants, but always shows invalid pin only, 
 
-In mobile top headers follow apps designs like Swiggy, zomato , modern mobile apps with current themse and colors s 
+Tabs issues:
+Is i click on any other tabs sometimes it will open immediately sometimes it will not open even i click on multipe times also , i don't the issue , and maybe the tabs or ui stuck issues or any other issues 
 
-We are showing unwanted options like rooms setups muktile times and multiple places in a single screen 
+In top after login shows the pg details at left side , i think we can add user profile icon at right side top in them same pg details Row same like as modern mobiles apps format to acces their profile directly from it with uploading the profile pic option also after opening it , 
 
-Admin Panel :
+Stats tab shows 
+Couldn't load analytics, there is problem something message 
+
+The support page shows scrollable whole page , make the support window full page format instead of side padding of it and make the window non scrollable, only inside chat only scrollable, add dates wise seperation like today , yesterday, unread messages, or new messages, delivered, seen , with ticked format , 
+
+All pages header is not sticky, make it header sticky and fixed during scroll, don't change true header format keep current format just make it fixed instead of scrolling 
 
 
-When i login admin credentials in normal login flow also it is logged in and opend pg owner panel even that owner with that credentials is not there, make admin acces can only with admin credentials and only from admin routes, and if admin rotues enters normal logon flow shiw proper message insetad of login to pw owner login, 
+Multiple properties Ui and design showing top also not good , i think we can update this design or placement or ux format or add inside profile to switch accounts etc , better modern approach needed to add 
 
-After click on tthe footer from landing page master admin it will open normal login ui insetad of admin login ui and , after l9gin itnshwos telemetry related error taost messages 
-And the header ui is different compare to owner header ui 
-
-There is no bottoms tabs are there in the admin login, 
-Admin login ui is worst and alignments also in both mobile and website desktop view also ,
-
-Even i added the PGS, the admin panel shows 0 PGS, 
-
-Normal pages issues:
- After logout and reopen that page it shows the previous logged in page, 
-Landing page is worst Ui design and hardcoded fake Values instead of genuine and needed things, there is lots of unwanted stuff is there in the landing page , and 
-
-Tha navigation for for all panels and all roles is not good in the ui , user cannot understand it clearly,
-
-I didn't check the resident UI and its flows because even tthe beds are not created then how can i test it 
-
-And also scrolling issues after loading time or any thing uodated time or changes or creation time ,
+It shows date with arrows in beds tab but when i move to other dates shows same for all dates instead of real that dates data 
+And also make user to select particular date also woth give full calendar open selection instead if only arowos to shift the monthly only 
