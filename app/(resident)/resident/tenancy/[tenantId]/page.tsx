@@ -3,13 +3,13 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { formatCurrency, formatDateIN, errorMessage } from '@/lib/utils';
+import { formatCurrency, formatDateIN, errorMessage, tsToDate } from '@/lib/utils';
 import { HeaderSkeleton, PanelSkeleton } from '@/components/ui/skeletons';
 import { Button } from '@/components/ui/button';
 import { HeroHeader } from '@/components/ui/dashboard-kit';
 import { ArrowLeft, ShieldCheck, Wrench, Star } from 'lucide-react';
 import { RateStaffSection } from '@/components/resident/RateStaffSection';
-import type { Tenant, RentRecord, MaintenanceTicket } from '@/types';
+import type { Tenant, RentRecord, MaintenanceTicket, Notice } from '@/types';
 import toast from 'react-hot-toast';
 
 const STATUS_STYLE: Record<string, string> = {
@@ -36,6 +36,7 @@ export default function TenancyDetail() {
   const params = useParams();
   const tenantId = params.tenantId as string;
   const [data, setData] = useState<TenancyData | null>(null);
+  const [notices, setNotices] = useState<Notice[]>([]);
   const [loading, setLoading] = useState(true);
   const [issueOpen, setIssueOpen] = useState(false);
   const [desc, setDesc] = useState('');
@@ -48,8 +49,15 @@ export default function TenancyDetail() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/resident/tenancy/${tenantId}`);
+      const [res, nRes] = await Promise.all([
+        fetch(`/api/resident/tenancy/${tenantId}`),
+        fetch(`/api/resident/tenancy/${tenantId}/notices`),
+      ]);
       if (res.ok) setData((await res.json()) as TenancyData);
+      if (nRes.ok) {
+        const nd = await nRes.json();
+        setNotices(nd.notices || []);
+      }
     } finally {
       setLoading(false);
     }
@@ -154,6 +162,25 @@ export default function TenancyDetail() {
           </div>
         </div>
       </HeroHeader>
+
+      {/* Notices from the PG owner */}
+      {notices.length > 0 && (
+        <section>
+          <h2 className="text-sm font-extrabold text-slate-900 mb-2 px-1">Notices</h2>
+          <div className="space-y-2">
+            {notices.map((n) => (
+              <div key={n.id} className="app-card p-3.5">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {n.pinned && <span className="text-[10px] font-bold accent-text accent-soft-bg px-1.5 py-0.5 rounded">PINNED</span>}
+                  <h3 className="text-sm font-bold text-slate-900">{n.title}</h3>
+                </div>
+                <p className="mt-1 text-xs text-slate-600 whitespace-pre-wrap break-words">{n.body}</p>
+                <p className="mt-1.5 text-[11px] text-slate-400">{formatDateIN(tsToDate(n.createdAt))}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Rent history */}
       <section>

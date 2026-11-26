@@ -245,6 +245,64 @@ export type MaintenanceCategory =
   | 'other';
 export type MaintenanceStatus = 'open' | 'in_progress' | 'resolved';
 
+/** In-app notice/announcement from an owner to residents and/or staff. */
+export type NoticeAudience = 'all' | 'residents' | 'staff';
+export interface Notice {
+  id: string;
+  ownerId: string;
+  propertyId?: string;
+  title: string;
+  body: string;
+  audience: NoticeAudience; // who sees it
+  roomNumber?: string; // optional: scope to one room's residents
+  pinned?: boolean;
+  publishedAt?: Timestampish; // when it goes live (now or scheduled)
+  expiresAt?: Timestampish | null; // optional auto-hide
+  createdBy: string;
+  createdByName?: string;
+  readBy?: string[]; // uids/tenantIds that have read it
+  deletedAt?: Timestampish | null; // soft-delete
+  createdAt?: Timestampish;
+  updatedAt?: Timestampish;
+}
+
+/** A visitor entry at the PG gate (minimal data, retention-limited). */
+export interface Visitor {
+  id: string;
+  ownerId: string;
+  propertyId?: string;
+  name: string;
+  purpose?: string;
+  visitingResident?: string; // resident name (free text; no linkage required)
+  roomNumber?: string;
+  phone?: string; // optional, minimal collection
+  checkInAt: Timestampish;
+  checkOutAt?: Timestampish | null;
+  status: 'in' | 'out';
+  recordedBy: string;
+  createdAt?: Timestampish;
+}
+
+/** A staff task assigned by the owner (housekeeping, checks, handover, etc.). */
+export type StaffTaskStatus = 'open' | 'done';
+export interface StaffTask {
+  id: string;
+  ownerId: string;
+  propertyId?: string;
+  title: string;
+  note?: string;
+  assignedToUid?: string; // staff uid (unassigned = any staff / general)
+  assignedToName?: string;
+  dueDate?: string; // YYYY-MM-DD
+  status: StaffTaskStatus;
+  completedBy?: string;
+  completedAt?: Timestampish;
+  createdBy: string;
+  deletedAt?: Timestampish | null;
+  createdAt?: Timestampish;
+  updatedAt?: Timestampish;
+}
+
 export interface MaintenanceTicket {
   id: string;
   ownerId: string;

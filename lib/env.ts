@@ -34,6 +34,13 @@ const serverEnvSchema = z.object({
   B2_BACKUP_KEY_ID: z.string().optional(),
   B2_BACKUP_APP_KEY: z.string().optional(),
   BACKUP_ENCRYPTION_KEY: z.string().optional(),
+  // Owner "send rent reminders from my own Gmail" (Gmail API via OAuth). All
+  // three must be set to enable; otherwise the feature is hidden and reminders
+  // fall back to the free WhatsApp flow. SECRETS_ENCRYPTION_KEY (32-byte, any
+  // string — hashed to 32 bytes) encrypts each owner's stored refresh token.
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+  SECRETS_ENCRYPTION_KEY: z.string().optional(),
   CRON_SECRET: z.string().default('dev-cron-secret'),
   LOG_LEVEL: z.enum(['info', 'warn', 'error', 'debug']).default('info'),
   // Optional transactional email (Resend HTTP API). When RESEND_API_KEY is

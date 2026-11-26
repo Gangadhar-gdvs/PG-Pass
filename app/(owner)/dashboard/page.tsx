@@ -109,6 +109,43 @@ export default function OwnerDashboardPage() {
   const [prefillTenant, setPrefillTenant] = useState<{ name: string; phone: string } | null>(null);
   const [guestBed, setGuestBed] = useState<Bed | null>(null);
   const [showReminderModal, setShowReminderModal] = useState(false);
+  const [emailReminding, setEmailReminding] = useState(false);
+
+  // One-button "send rent reminders from the owner's own Gmail". Falls back
+  // gracefully: if Gmail isn't connected, nudge to the WhatsApp flow / Settings.
+  const handleEmailReminders = async () => {
+    if (emailReminding) return;
+    setEmailReminding(true);
+    try {
+      const res = await fetch('/api/rent/send-reminders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ period: selectedPeriod }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (data.code === 'GMAIL_NOT_CONNECTED') {
+          toast.error('Connect your Gmail in Settings to send email reminders.');
+        } else if (data.code === 'GMAIL_UNAVAILABLE') {
+          toast('Email reminders aren’t enabled — use WhatsApp reminders instead.');
+          setShowReminderModal(true);
+        } else {
+          throw new Error(data.error || 'Could not send reminders');
+        }
+        return;
+      }
+      const { sent, skippedCount } = data;
+      if (sent === 0 && skippedCount === 0) {
+        toast('No unpaid residents to remind this month.');
+      } else {
+        toast.success(`Emailed ${sent} reminder${sent === 1 ? '' : 's'}${skippedCount ? ` · ${skippedCount} without email skipped` : ''}`);
+      }
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, 'Could not send email reminders'));
+    } finally {
+      setEmailReminding(false);
+    }
+  };
   const [showBankReconciler, setShowBankReconciler] = useState(false);
   const [proofModalRecord, setProofModalRecord] = useState<{ bed: Bed; record: RentRecord } | null>(null);
   const [activeBedDrawer, setActiveBedDrawer] = useState<Bed | null>(null);
@@ -921,6 +958,8 @@ export default function OwnerDashboardPage() {
         beds={beds}
         rentRecords={rentRecords}
         onRemindAll={() => setShowReminderModal(true)}
+        onEmailReminders={handleEmailReminders}
+        emailReminding={emailReminding}
         summary={summary}
       />
 

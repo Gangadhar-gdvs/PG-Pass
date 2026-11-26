@@ -183,6 +183,71 @@ super-admin; ONE backend for mobile/website/admin.
   - **Deploy note:** when subdomains go live, `admin.pgpass.com` serves this same
     `/admin` console from the one backend (see URL decision above).
 
+## Blueprint roadmap progress (Phase 3 → 4 → 5, in order)
+- 🟢 **Phase 3a — Notices (BUILT).** Owner publishes notices (audience all/
+  residents/staff, pin, optional room scope, expiry) → `notices.service` +
+  `/api/notices` (+`[id]`, + resident viewer route). Owner Notices page (new nav
+  entry) + residents see notices on their tenancy page. Server-only Firestore
+  rule + index added.
+- 🟢 **Phase 3b — Owner Gmail OAuth + one-button auto rent reminders (BUILT).**
+  Owner connects their OWN Gmail (OAuth `gmail.send`, no SDK — raw fetch); refresh
+  token stored AES-256-GCM encrypted (`SECRETS_ENCRYPTION_KEY`). One dashboard
+  button emails all unpaid residents' rent reminders directly from the owner's
+  inbox (Gmail API) — no manual Gmail. Graceful: feature hidden unless
+  `GOOGLE_CLIENT_ID/SECRET/SECRETS_ENCRYPTION_KEY` set; falls back to the WhatsApp
+  flow; residents without an email are skipped + reported. Files:
+  `gmail.service.ts`, `security/secrets.ts`, `/api/owners/gmail/*` (connect/
+  callback/status/disconnect), `/api/rent/send-reminders`, `GmailConnectCard`
+  (Settings), dashboard "Email from my Gmail" button. Env documented in
+  `.env.production.example`. CSRF-protected OAuth (state cookie), invalid-grant →
+  auto-disconnect + reconnect prompt.
+  - **Owner setup (one-time, free):** Google Cloud → OAuth client (Web) + enable
+    Gmail API + redirect URI `.../api/owners/gmail/callback`; set the 3 env vars.
+- 🟢 **Phase 3c — staff tasks (BUILT).** Owner assigns tasks (optional assignee +
+  due date); staff see tasks assigned to them or general; toggle done. `/tasks`
+  page (shared nav, staff-visible). `tasks.service` + `/api/tasks` (+`[id]`).
+  Reminder *scheduling* kept as the one-button Gmail send (user's explicit ask);
+  full cron auto-send is a Phase-6 optional.
+- 🟢 **Phase 4a — Reports + CSV exports (BUILT).** `/reports` page: monthly
+  summary (residents/collected/pending/expenses/net) + CSV downloads (residents/
+  rent/expenses). `reports.service` + `lib/server/export/csv.ts` with
+  **formula-injection protection** (blueprint §14) + RFC-4180 escaping. Replaced
+  the old UNSAFE client-side tenants CSV with the safe server endpoint. Test:
+  `csvExport.test.ts` (4 tests).
+- 🟢 **Phase 4b — Visitors log (BUILT).** Gate check-in/out, minimal data,
+  "inside" count + one-tap checkout. `visitors.service` + `/api/visitors`
+  (+`[id]/checkout`). `/visitors` page (staff-visible).
+- ⚪ **Phase 4 remainder (deferred):** utility/electricity split + inventory/assets
+  — lower value; deferred to prioritize Phase 5 hardening (P0-before-real-use).
+- 🟡 **Phase 5 — hardening (STARTED).** Done so far:
+  - **New security tests (+18):** `adminPermissions` (super/staff rule, admins.manage
+    super-only, suspended blocked), `noticeVisibility` (cross-audience/room/expiry
+    isolation), `secrets` (AES-GCM round-trip + tamper rejection), `csvExport`
+    (injection safety). Total **81 unit tests**.
+  - **Security self-review of all new routes:** every new API route has `withAuth`
+    + ownerId scoping; services re-check `ownerId` on id-addressed mutations
+    (notices/tasks/visitors). Gmail callback is state-cookie CSRF-protected.
+  - 🟢 **Tenant-isolation integration tests (+5):** `tenantIsolation.test.ts` mocks
+    `adminDb` and proves the service-layer `ownerId !== ownerId → 403` guards
+    actually reject cross-tenant access (owner B can't delete owner A's notice,
+    toggle their task, or check out their visitor; missing doc → 404). This tests
+    the REAL enforcement (Admin SDK bypasses Firestore rules), not just the rules.
+  - 🟢 **DPDP resident data-export (BUILT):** `GET /api/resident/export` returns
+    ALL the resident's own data (profile + tenancies + rent/deposits/tickets) as a
+    JSON download, strictly caller-scoped, rate-limited, no tokens/other-residents.
+    "Download my data" button on the resident home (privacy control).
+  - ⚪ **Firestore rules-unit tests BLOCKED:** `@firebase/rules-unit-testing@5`
+    peer-requires `firebase@^12` but the app uses `firebase@13` → ERESOLVE. Not
+    forced (would risk a broken dep). Isolation is instead covered by the
+    service-layer integration tests above (the actual enforcement layer).
+  - 🟢 **Restore procedure + RPO/RTO documented** in `docs/runbook.md` §3 (decrypt
+    → separate project → import → verify → cut over; RPO≈24h, RTO≈hours). Flagged
+    as not-yet-exercised end-to-end — must run on synthetic data before a real pilot.
+  - Still TODO (needs user/infra): Playwright **E2E** golden paths; actually
+    RUNNING the restore on live/synthetic data to confirm RTO.
+- Gate after Phase 3+4+5-partial: lint 0 · typecheck 0 · **86 tests** · build ✓.
+  New server-only Firestore rules + indexes for notices/staff_tasks/visitors.
+
 ## Follow-ups (explicitly deferred, not forgotten)
 - 🔴 **#6 avatar image upload** — the top-bar profile currently shows initials
   (`Avatar name=...`). Owner also asked to upload a profile pic. Needs: a B2

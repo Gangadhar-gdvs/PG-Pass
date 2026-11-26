@@ -18,6 +18,10 @@ import {
   Wallet,
   BedDouble,
   LifeBuoy,
+  Megaphone,
+  ClipboardList,
+  FileText,
+  DoorOpen,
 } from 'lucide-react';
 import { Avatar } from '@/components/ui/avatar';
 import { PropertySwitcher } from '@/components/owner/PropertySwitcher';
@@ -30,8 +34,12 @@ const navLinks = [
   { href: '/tenants', label: 'Residents', icon: Users },
   { href: '/guests', label: 'Guests', icon: BedDouble },
   { href: '/analytics', label: 'Analytics', icon: BarChart3 },
+  { href: '/reports', label: 'Reports', icon: FileText },
   { href: '/expenses', label: 'Expenses', icon: Wallet },
   { href: '/maintenance', label: 'Maintenance', icon: Wrench },
+  { href: '/tasks', label: 'Tasks', icon: ClipboardList },
+  { href: '/visitors', label: 'Visitors', icon: DoorOpen },
+  { href: '/notices', label: 'Notices', icon: Megaphone },
   { href: '/staff', label: 'Wardens & Staff', icon: UserCheck },
   { href: '/billing', label: 'Subscription', icon: CreditCard },
   { href: '/support', label: 'Support', icon: LifeBuoy },
@@ -41,7 +49,7 @@ const navLinks = [
 // Pages a staff/warden must not see — these mutate owner-only data (profile,
 // subscription, staff roster) and are already blocked server-side. Hiding them
 // from the nav keeps the staff console to day-to-day operations only.
-const OWNER_ONLY_HREFS = new Set(['/settings', '/billing', '/staff']);
+const OWNER_ONLY_HREFS = new Set(['/settings', '/billing', '/staff', '/reports']);
 
 export function OwnerShell({
   session,
@@ -160,6 +168,10 @@ export function OwnerShell({
           ]}
           more={visibleFor([
             { href: '/guests', label: 'Guests', icon: BedDouble },
+            { href: '/tasks', label: 'Tasks', icon: ClipboardList },
+            { href: '/visitors', label: 'Visitors', icon: DoorOpen },
+            { href: '/notices', label: 'Notices', icon: Megaphone },
+            { href: '/reports', label: 'Reports', icon: FileText },
             { href: '/expenses', label: 'Expenses', icon: Wallet },
             { href: '/staff', label: 'Staff', icon: UserCheck },
             { href: '/billing', label: 'Billing', icon: CreditCard },

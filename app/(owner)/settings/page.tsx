@@ -6,6 +6,7 @@ import { errorMessage } from '@/lib/utils';
 import { AddPropertyCard } from '@/components/owner/AddPropertyCard';
 import { OwnerOnlyGuard } from '@/components/owner/OwnerOnlyGuard';
 import { PgPhotoGallery } from '@/components/owner/PgPhotoGallery';
+import { GmailConnectCard } from '@/components/owner/GmailConnectCard';
 import { SupportLink } from '@/components/ui/support-link';
 import { Input } from '@/components/ui/input';
 import { HeaderSkeleton, FormSkeleton } from '@/components/ui/skeletons';
@@ -245,6 +246,8 @@ function SettingsPageInner() {
           </Button>
         </form>
       </div>
+
+      <GmailConnectCard />
 
       <PgPhotoGallery propertyId={selectedPropertyId} />
 

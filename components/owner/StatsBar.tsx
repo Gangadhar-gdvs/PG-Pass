@@ -3,7 +3,7 @@
 import React from 'react';
 import { Bed, RentRecord } from '@/types';
 import { formatCurrency } from '@/lib/utils';
-import { Send, CheckCircle2 } from 'lucide-react';
+import { Send, CheckCircle2, Mail } from 'lucide-react';
 import { DonutChart, StatTile } from '@/components/ui/dashboard-kit';
 
 export interface DashboardSummary {
@@ -19,13 +19,16 @@ interface StatsBarProps {
   beds: Bed[];
   rentRecords: RentRecord[];
   onRemindAll: () => void;
+  // Optional one-button "email reminders from the owner's Gmail".
+  onEmailReminders?: () => void;
+  emailReminding?: boolean;
   // Accurate server-computed totals (via Firestore aggregations). When present,
   // the occupancy/potential figures come from here instead of the live bed
   // window, so they're correct for PGs larger than the 100-row cap.
   summary?: DashboardSummary | null;
 }
 
-export function StatsBar({ beds, rentRecords, onRemindAll, summary }: StatsBarProps) {
+export function StatsBar({ beds, rentRecords, onRemindAll, onEmailReminders, emailReminding, summary }: StatsBarProps) {
   // Prefer the server summary for whole-PG totals; fall back to the live window
   // (correct for PGs ≤100 beds, and used while the summary is still loading).
   const totalBeds = summary?.totalBeds ?? beds.length;
@@ -130,14 +133,27 @@ export function StatsBar({ beds, rentRecords, onRemindAll, summary }: StatsBarPr
       </div>
 
       {pendingCount > 0 && (
-        <button
-          type="button"
-          onClick={onRemindAll}
-          className="flex w-full items-center justify-center gap-1.5 rounded-[14px] accent-bg py-2.5 text-xs font-bold text-white shadow-[var(--shadow-sm)] press"
-        >
-          <Send className="h-3.5 w-3.5" />
-          <span>Send 1-Tap Rent Reminders</span>
-        </button>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={onRemindAll}
+            className="flex w-full items-center justify-center gap-1.5 rounded-[14px] accent-bg py-2.5 text-xs font-bold text-white shadow-[var(--shadow-sm)] press"
+          >
+            <Send className="h-3.5 w-3.5" />
+            <span>WhatsApp Reminders</span>
+          </button>
+          {onEmailReminders && (
+            <button
+              type="button"
+              onClick={onEmailReminders}
+              disabled={emailReminding}
+              className="flex w-full items-center justify-center gap-1.5 rounded-[14px] border-2 border-[color:var(--accent)] accent-text py-2.5 text-xs font-bold shadow-[var(--shadow-sm)] press disabled:opacity-60"
+            >
+              <Mail className="h-3.5 w-3.5" />
+              <span>{emailReminding ? 'Sending…' : 'Email from my Gmail'}</span>
+            </button>
+          )}
+        </div>
       )}
     </div>
   );

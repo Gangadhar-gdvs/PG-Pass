@@ -78,27 +78,14 @@ export default function TenantsPage() {
       toast.error('No resident records to export');
       return;
     }
-
-    const baseUrl = typeof window !== 'undefined' ? window.location.origin : config.app.url;
-    const headers = ['Resident Name', 'Phone', 'Room/Bed', 'Move In Date', 'Deposit Paid (INR)', 'Portal Link'];
-    const rows = tenants.map((t) => [
-      `"${t.name}"`,
-      `"${t.phone}"`,
-      `"${t.bedLabel || 'Bed'}"`,
-      `"${t.moveInDate}"`,
-      t.depositPaid || 0,
-      `"${baseUrl}/t/${t.token}"`,
-    ]);
-
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `PGPass_Tenants_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast.success('Exported resident list to CSV');
+    // Trigger a download from the server endpoint, which builds the CSV with
+    // formula-injection protection (blueprint §14) — the old client CSV was unsafe.
+    const a = document.createElement('a');
+    a.href = '/api/reports/export?type=residents';
+    a.download = '';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
 
   const columns: Column<Tenant>[] = [

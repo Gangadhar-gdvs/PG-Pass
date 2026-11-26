@@ -78,6 +78,70 @@ export class ResidentsService {
     }
     return tenant;
   }
+
+  /**
+   * DPDP data-access/portability: gather EVERYTHING this resident's account
+   * holds — profile + every linked tenancy with its rent, deposits and
+   * maintenance tickets. Returns owner-safe fields only (no portal tokens, no
+   * other residents' data). Scoped strictly to the caller's own records.
+   */
+  async exportMyData(uid: string): Promise<Record<string, unknown>> {
+    const resident = await this.getResident(uid);
+    if (!resident) throw new AppError(404, 'Resident profile not found');
+    const tenancies = await this.myTenancies(uid);
+
+    const tenancyExports = await Promise.all(
+      tenancies.map(async (t) => {
+        const [rentSnap, depSnap, ticketSnap] = await Promise.all([
+          adminDb.collection('rent_records').where('tenantId', '==', t.id).limit(100).get(),
+          adminDb.collection('deposits').where('ownerId', '==', t.ownerId).where('tenantId', '==', t.id).limit(100).get(),
+          adminDb.collection('maintenance_tickets').where('ownerId', '==', t.ownerId).where('tenantId', '==', t.id).limit(100).get(),
+        ]);
+        return {
+          pg: t.ownerName || undefined,
+          room: t.roomNumber,
+          bed: t.bedLabel,
+          moveInDate: t.moveInDate,
+          moveOutDate: t.moveOutDate,
+          rentRecords: rentSnap.docs.map((d) => {
+            const r = d.data();
+            return {
+              period: r.period,
+              amountDuePaise: r.amountDuePaise,
+              amountPaidPaise: r.amountPaidPaise,
+              status: r.status,
+              receiptNumber: r.receiptNumber,
+            };
+          }),
+          deposits: depSnap.docs.map((d) => {
+            const x = d.data();
+            return { type: x.type, amountPaise: x.amountPaise, reason: x.reason, refundStatus: x.refundStatus };
+          }),
+          maintenanceTickets: ticketSnap.docs.map((d) => {
+            const x = d.data();
+            return { category: x.category, description: x.description, status: x.status };
+          }),
+        };
+      })
+    );
+
+    return {
+      exportedAt: new Date().toISOString(),
+      note: 'Your PGPass personal data (DPDP data-access request). Portal tokens and other residents’ data are never included.',
+      profile: { name: resident.name, phone: resident.phone, email: resident.email },
+      tenancies: tenancyExports,
+    };
+  }
+
+  /** Resident email for a given phone (if they have a linked account), else null. */
+  async emailForPhone(phone: string): Promise<string | null> {
+    const clean = cleanPhone(phone);
+    if (clean.length !== 10) return null;
+    const snap = await adminDb.collection('residents').where('phone', '==', clean).limit(1).get();
+    if (snap.empty) return null;
+    const email = (snap.docs[0].data().email as string | undefined)?.trim();
+    return email || null;
+  }
 }
 
 export const residentsService = new ResidentsService();

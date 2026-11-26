@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { CardListSkeleton } from '@/components/ui/skeletons';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Building2, ChevronRight, Search } from 'lucide-react';
+import { Building2, ChevronRight, Search, Download } from 'lucide-react';
 import { SupportLink } from '@/components/ui/support-link';
 import { HeroHeader } from '@/components/ui/dashboard-kit';
 
@@ -106,7 +106,22 @@ export default function ResidentHome() {
         </div>
       )}
 
-      <div className="pt-2 flex justify-center">
+      {/* Privacy control: DPDP data-access/export of the resident's own data. */}
+      <div className="pt-2 flex flex-col items-center gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            const a = document.createElement('a');
+            a.href = '/api/resident/export';
+            a.download = '';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+          }}
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900"
+        >
+          <Download className="w-3.5 h-3.5" /> Download my data
+        </button>
         <SupportLink subject="Resident support request" />
       </div>
     </div>

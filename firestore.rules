@@ -77,6 +77,22 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Notices are served through app/api (owner publishes, residents/staff read
+    // via their viewer routes), so no direct client access is needed.
+    match /notices/{noticeId} {
+      allow read, write: if false;
+    }
+
+    // Staff tasks — served via app/api (owner assigns, staff complete).
+    match /staff_tasks/{taskId} {
+      allow read, write: if false;
+    }
+
+    // Visitor log — served via app/api (owner/staff record at the gate).
+    match /visitors/{visitorId} {
+      allow read, write: if false;
+    }
+
     match /expenses/{expenseId} {
       allow get:   if canReadOwnerScope(resource.data.ownerId);
       allow list:  if canReadOwnerScope(resource.data.ownerId) && boundedList();
