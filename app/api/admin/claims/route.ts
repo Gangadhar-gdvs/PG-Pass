@@ -3,6 +3,8 @@ import { withErrorHandler, AppError } from '@/lib/server/api/withErrorHandler';
 import { withAuth, AuthContext } from '@/lib/server/api/withAuth';
 import { withRateLimit } from '@/lib/server/api/withRateLimit';
 import { adminAuth, adminDb } from '@/lib/server/firebase-admin';
+import { invalidateAdminEntitlements } from '@/lib/server/auth/entitlements';
+import { ADMIN_PERMISSIONS } from '@/lib/constants/permissions';
 import { Timestamp } from 'firebase-admin/firestore';
 import { z } from 'zod';
 
@@ -25,17 +27,36 @@ export const POST = withErrorHandler(
       const { targetUid, reason } = grantAdminSchema.parse(body);
 
       // Verify target user exists
-      await adminAuth.getUser(targetUid).catch(() => {
+      const user = await adminAuth.getUser(targetUid).catch(() => {
         throw new AppError(404, 'Target user does not exist in Firebase Auth');
       });
 
-      // Set admin claim
+      // Grant SUPER admin: preserve existing claims + set admin:true, and write
+      // an admin_users doc with role 'super' so they appear in the admin roster
+      // and get full access via the entitlement system.
       await adminAuth.setCustomUserClaims(targetUid, {
+        ...(user.customClaims || {}),
         admin: true,
       });
 
-      // Write mandatory audit log
       const now = Timestamp.now();
+      await adminDb.collection('admin_users').doc(targetUid).set(
+        {
+          id: targetUid,
+          email: (user.email || '').toLowerCase(),
+          name: user.displayName || undefined,
+          role: 'super',
+          permissions: [], // super holds everything implicitly
+          accountStatus: 'active',
+          createdBy: ctx.auth.uid,
+          createdAt: now,
+          updatedAt: now,
+        },
+        { merge: true }
+      );
+      invalidateAdminEntitlements(targetUid);
+
+      // Write mandatory audit log
       await adminDb.collection('audit_logs').add({
         actorUid: ctx.auth.uid,
         actorRole: 'admin',
@@ -53,6 +74,7 @@ export const POST = withErrorHandler(
     },
       { tier: 'sensitive', key: 'uid', maxRequests: 10, windowSeconds: 60 }
     ),
-    { roles: ['admin'] }
+    // Granting super admin is itself super-only.
+    { roles: ['admin'], adminPermission: ADMIN_PERMISSIONS.ADMINS_MANAGE }
   )
 );

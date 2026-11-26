@@ -65,7 +65,24 @@ async function bootstrap() {
   const db = getFirestore(app);
 
   console.log(`Setting custom claim { admin: true } for UID: ${uid}...`);
-  await auth.setCustomUserClaims(uid, { admin: true });
+  const existing = await auth.getUser(uid).catch(() => null);
+  await auth.setCustomUserClaims(uid, { ...(existing?.customClaims || {}), admin: true });
+
+  console.log('Registering super-admin in admin_users...');
+  await db.collection('admin_users').doc(uid).set(
+    {
+      id: uid,
+      email: (existing?.email || '').toLowerCase(),
+      name: existing?.displayName || undefined,
+      role: 'super',
+      permissions: [],
+      accountStatus: 'active',
+      createdBy: 'cli_bootstrap',
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+    },
+    { merge: true }
+  );
 
   console.log('Writing audit log...');
   await db.collection('audit_logs').add({

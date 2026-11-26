@@ -4,8 +4,8 @@ import { adminAuth, adminDb } from '../firebase-admin';
 import { AppError, RouteHandler, RouteContext } from './withErrorHandler';
 import { SESSION_COOKIE_NAME, SESSION_ID_COOKIE_NAME } from '@/lib/constants/limits';
 import { isSessionCurrent } from '../auth/sessionRegistry';
-import { staffHasPermission, pgFeatureEnabled } from '../auth/entitlements';
-import { StaffPermission, PgFeature } from '@/lib/constants/permissions';
+import { staffHasPermission, pgFeatureEnabled, getAdminEntitlements, adminHasPermission } from '../auth/entitlements';
+import { StaffPermission, PgFeature, AdminPermission, AdminRole, ADMIN_PERMISSIONS } from '@/lib/constants/permissions';
 
 export type UserRole = 'owner' | 'staff' | 'admin' | 'tenant' | 'resident';
 
@@ -14,6 +14,9 @@ export interface AuthContext {
   role: UserRole;
   ownerId?: string;
   email?: string;
+  // Admin-only: tier + granted permissions (resolved when role === 'admin').
+  adminRole?: AdminRole;
+  adminPermissions?: AdminPermission[];
 }
 
 /** The route context after `withAuth` injects the verified `auth` object. */
@@ -26,6 +29,10 @@ export interface WithAuthOptions {
   // When set, the PG (owner scope) must have this feature enabled by the admin.
   // Applies to owner + staff callers; admins bypass.
   feature?: PgFeature;
+  // When set, an ADMIN caller must hold this admin permission. Super admins
+  // always pass. Use `ADMIN_PERMISSIONS.ADMINS_MANAGE` for super-only routes
+  // (only super admins hold it, so staff admins are blocked).
+  adminPermission?: AdminPermission;
 }
 
 // In-memory 60s cache for account status to eliminate redundant Firestore queries on every API request
@@ -143,6 +150,32 @@ export function withAuth<C extends RouteContext = RouteContext>(
       }
     }
 
+    // 7.5 Admin tier + permission. For admins we resolve role+permissions from
+    // the admin_users doc (legacy claim-only admins are super by default). A
+    // suspended admin is blocked. If the route requires an adminPermission, a
+    // staff admin must hold it; super admins always pass.
+    let adminRole: AdminRole | undefined;
+    let adminPermissions: AdminPermission[] | undefined;
+    if (isAdmin) {
+      const ent = await getAdminEntitlements(uid);
+      if (ent.accountStatus !== 'active') {
+        throw new AppError(403, 'Admin account is not active', 'ADMIN_SUSPENDED');
+      }
+      adminRole = ent.role;
+      adminPermissions = ent.permissions;
+      if (options.adminPermission) {
+        // ADMINS_MANAGE is super-only by construction (only supers hold it), but
+        // check explicitly for defence in depth.
+        const needsSuper = options.adminPermission === ADMIN_PERMISSIONS.ADMINS_MANAGE;
+        const ok = needsSuper
+          ? ent.role === 'super'
+          : await adminHasPermission(uid, options.adminPermission);
+        if (!ok) {
+          throw new AppError(403, 'You do not have permission to perform this admin action', 'PERMISSION_DENIED');
+        }
+      }
+    }
+
     // 8. Admin-controlled per-PG feature gate (owner + staff; admin bypasses).
     if (options.feature && !isAdmin) {
       const scopeOwnerId = role === 'owner' ? uid : ownerId;
@@ -159,6 +192,8 @@ export function withAuth<C extends RouteContext = RouteContext>(
       role,
       ownerId,
       email: decodedClaims.email,
+      adminRole,
+      adminPermissions,
     };
 
     const enhancedCtx = {

@@ -3,6 +3,8 @@ import { cookies } from 'next/headers';
 import { adminAuth } from '../firebase-admin';
 import { SESSION_COOKIE_NAME, SESSION_ID_COOKIE_NAME } from '@/lib/constants/limits';
 import { isSessionCurrent } from './sessionRegistry';
+import { getAdminEntitlements } from './entitlements';
+import { AdminRole, AdminPermission } from '@/lib/constants/permissions';
 
 export interface ServerUser {
   uid: string;
@@ -10,6 +12,8 @@ export interface ServerUser {
   ownerId?: string;
   email?: string;
   phoneNumber?: string;
+  adminRole?: AdminRole;
+  adminPermissions?: AdminPermission[];
 }
 
 /**
@@ -52,12 +56,24 @@ export async function getServerUser(): Promise<ServerUser | null> {
       if (!current) return null;
     }
 
+    // Admin tier + permissions (for server-gating the admin console nav/pages).
+    let adminRole: AdminRole | undefined;
+    let adminPermissions: AdminPermission[] | undefined;
+    if (isAdmin) {
+      const ent = await getAdminEntitlements(claims.uid);
+      if (ent.accountStatus !== 'active') return null; // suspended admin = signed out
+      adminRole = ent.role;
+      adminPermissions = ent.permissions;
+    }
+
     return {
       uid: claims.uid,
       role,
       ownerId,
       email: claims.email,
       phoneNumber: claims.phone_number,
+      adminRole,
+      adminPermissions,
     };
   } catch {
     return null;

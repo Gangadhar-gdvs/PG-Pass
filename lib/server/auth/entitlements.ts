@@ -1,6 +1,14 @@
 import 'server-only';
 import { adminDb } from '../firebase-admin';
-import { StaffPermission, PgFeature, ALL_STAFF_PERMISSIONS } from '@/lib/constants/permissions';
+import {
+  StaffPermission,
+  PgFeature,
+  ALL_STAFF_PERMISSIONS,
+  AdminPermission,
+  AdminRole,
+  ALL_ADMIN_PERMISSIONS,
+  ADMIN_ROLE,
+} from '@/lib/constants/permissions';
 
 /**
  * Server-side authorization reads with a short in-memory cache (entitlements
@@ -15,6 +23,14 @@ interface CacheEntry<T> {
 const TTL_MS = 60_000;
 const staffPermCache = new Map<string, CacheEntry<StaffPermission[]>>();
 const featureCache = new Map<string, CacheEntry<Record<string, boolean>>>();
+const adminEntCache = new Map<string, CacheEntry<AdminEntitlements>>();
+
+export interface AdminEntitlements {
+  role: AdminRole;
+  permissions: AdminPermission[];
+  accountStatus: string; // 'active' | 'suspended' | ...
+  exists: boolean; // whether an admin_users doc exists for this uid
+}
 
 /** A staff member's granted permissions (empty array if none set). */
 export async function getStaffPermissions(staffUid: string): Promise<StaffPermission[]> {
@@ -69,4 +85,62 @@ export function invalidatePgFeatures(ownerId: string) {
 export async function pgFeatureEnabled(ownerId: string, feature: PgFeature): Promise<boolean> {
   const features = await getPgFeatures(ownerId);
   return features[feature] !== false;
+}
+
+/**
+ * A platform admin's role + granted permissions, from the `admin_users` doc.
+ *
+ * Backward-compat: an account that has the `admin:true` custom claim but NO
+ * `admin_users` doc (i.e. a legacy admin created before this system) is treated
+ * as a SUPER admin with all permissions — so existing admins never lose access.
+ * The migration/claims flow writes real docs going forward.
+ */
+export async function getAdminEntitlements(adminUid: string): Promise<AdminEntitlements> {
+  const now = Date.now();
+  const cached = adminEntCache.get(adminUid);
+  if (cached && cached.expiresAt > now) return cached.value;
+
+  const snap = await adminDb.collection('admin_users').doc(adminUid).get();
+  let value: AdminEntitlements;
+  if (!snap.exists) {
+    // Legacy admin (claim only, no doc) → full super access, fail-safe.
+    value = { role: ADMIN_ROLE.SUPER, permissions: [...ALL_ADMIN_PERMISSIONS], accountStatus: 'active', exists: false };
+  } else {
+    const data = snap.data()!;
+    const role: AdminRole = data.role === ADMIN_ROLE.SUPER ? ADMIN_ROLE.SUPER : ADMIN_ROLE.STAFF;
+    const permissions =
+      role === ADMIN_ROLE.SUPER
+        ? [...ALL_ADMIN_PERMISSIONS] // super implicitly holds everything
+        : ((data.permissions as string[] | undefined) || []).filter((p): p is AdminPermission =>
+            (ALL_ADMIN_PERMISSIONS as string[]).includes(p)
+          );
+    value = {
+      role,
+      permissions,
+      accountStatus: (data.accountStatus as string) || 'active',
+      exists: true,
+    };
+  }
+  adminEntCache.set(adminUid, { value, expiresAt: now + TTL_MS });
+  return value;
+}
+
+export function invalidateAdminEntitlements(adminUid: string) {
+  adminEntCache.delete(adminUid);
+}
+
+/** True if this admin is a super admin (implicit full access + admin management). */
+export async function isSuperAdmin(adminUid: string): Promise<boolean> {
+  const ent = await getAdminEntitlements(adminUid);
+  return ent.role === ADMIN_ROLE.SUPER;
+}
+
+/** True if this admin holds the given permission (super admins always do). */
+export async function adminHasPermission(
+  adminUid: string,
+  permission: AdminPermission
+): Promise<boolean> {
+  const ent = await getAdminEntitlements(adminUid);
+  if (ent.accountStatus !== 'active') return false;
+  return ent.role === ADMIN_ROLE.SUPER || ent.permissions.includes(permission);
 }

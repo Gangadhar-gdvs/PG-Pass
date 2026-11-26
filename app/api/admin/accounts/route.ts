@@ -7,6 +7,7 @@ import { recordEvent } from '@/lib/server/services/systemLogs.service';
 import { ACCOUNT_STATUS } from '@/lib/constants/status';
 import { Timestamp } from 'firebase-admin/firestore';
 import { z } from 'zod';
+import { ADMIN_PERMISSIONS } from '@/lib/constants/permissions';
 
 const accountActionSchema = z.object({
   targetType: z.enum(['owner', 'staff', 'tenant']),
@@ -119,6 +120,6 @@ export const POST = withErrorHandler(
     },
       { tier: 'standard', key: 'uid' }
     ),
-    { roles: ['admin'] }
+    { roles: ['admin'], adminPermission: ADMIN_PERMISSIONS.PLATFORM_VIEW }
   )
 );

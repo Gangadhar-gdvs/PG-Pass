@@ -4,7 +4,7 @@ import { withAuth, AuthContext } from '@/lib/server/api/withAuth';
 import { adminDb } from '@/lib/server/firebase-admin';
 import { recordEvent } from '@/lib/server/services/systemLogs.service';
 import { invalidatePgFeatures } from '@/lib/server/auth/entitlements';
-import { ALL_PG_FEATURES } from '@/lib/constants/permissions';
+import { ALL_PG_FEATURES, ADMIN_PERMISSIONS } from '@/lib/constants/permissions';
 import { Timestamp } from 'firebase-admin/firestore';
 
 // GET /api/admin/features?ownerId=... — current per-PG feature flags (admin).
@@ -21,7 +21,7 @@ export const GET = withErrorHandler(
       for (const f of ALL_PG_FEATURES) resolved[f] = features[f] !== false;
       return NextResponse.json({ ownerId, features: resolved });
     },
-    { roles: ['admin'] }
+    { roles: ['admin'], adminPermission: ADMIN_PERMISSIONS.PG_MANAGE }
   )
 );
 
@@ -71,6 +71,6 @@ export const PATCH = withErrorHandler(
 
       return NextResponse.json({ success: true, ownerId, feature, enabled });
     },
-    { roles: ['admin'] }
+    { roles: ['admin'], adminPermission: ADMIN_PERMISSIONS.PG_MANAGE }
   )
 );

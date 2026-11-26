@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withErrorHandler, AppError } from '@/lib/server/api/withErrorHandler';
 import { withAuth, AuthContext } from '@/lib/server/api/withAuth';
 import { reviewsService } from '@/lib/server/services/reviews.service';
+import { ADMIN_PERMISSIONS } from '@/lib/constants/permissions';
 
 // PATCH /api/admin/reviews — admin hides/unhides an abusive PG review.
 export const PATCH = withErrorHandler(
@@ -21,6 +22,6 @@ export const PATCH = withErrorHandler(
       );
       return NextResponse.json(result);
     },
-    { roles: ['admin'] }
+    { roles: ['admin'], adminPermission: ADMIN_PERMISSIONS.REVIEWS_MODERATE }
   )
 );

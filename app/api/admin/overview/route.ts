@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withErrorHandler } from '@/lib/server/api/withErrorHandler';
 import { withAuth } from '@/lib/server/api/withAuth';
 import { getPlatformOverview } from '@/lib/server/services/adminOverview.service';
+import { ADMIN_PERMISSIONS } from '@/lib/constants/permissions';
 
 // Paginated: ?cursor=<lastOwnerId>&pageSize=50. Platform totals come from the
 // precomputed metrics doc; the per-PG list is a bounded page.
@@ -14,6 +15,6 @@ export const GET = withErrorHandler(
       const overview = await getPlatformOverview(pageSize, cursor);
       return NextResponse.json(overview);
     },
-    { roles: ['admin'] }
+    { roles: ['admin'], adminPermission: ADMIN_PERMISSIONS.PLATFORM_VIEW }
   )
 );

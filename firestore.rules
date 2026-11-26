@@ -152,6 +152,10 @@ service cloud.firestore {
     match /support_flags/{flagId}       { allow get, list: if isAdmin() && boundedList(); allow write: if false; }
     match /metrics/{date}               { allow get: if isAdmin(); allow list, write: if false; }
 
+    // Admin roster (who is an admin + their permissions). Read/written only via
+    // the Admin SDK (super-admin-gated API). Never exposed to any client.
+    match /admin_users/{adminUid}       { allow read, write: if false; }
+
     // Strictly server-only internal collections
     match /portal_tokens/{token}        { allow read, write: if false; }
     match /portal_lockouts/{token}      { allow read, write: if false; }

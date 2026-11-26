@@ -15,10 +15,12 @@ import {
   BedDouble,
   Users,
   IndianRupee,
+  ShieldCheck,
 } from 'lucide-react';
 import { AdminSupportPanel } from '@/components/support/AdminSupportPanel';
 import { AdminPgFeatures } from '@/components/admin/AdminPgFeatures';
 import { AdminPgManage } from '@/components/admin/AdminPgManage';
+import { AdminUsersPanel } from '@/components/admin/AdminUsersPanel';
 import { IdleLogout } from '@/components/auth/IdleLogout';
 import { clearLocalData } from '@/lib/client/localData';
 import {
@@ -90,7 +92,9 @@ export default function SuperAdminPortalPage() {
   const [selectedPgId, setSelectedPgId] = useState<string | null>(null);
 
   // Tab State
-  const [activeTab, setActiveTab] = useState<'telemetry' | 'upgrades' | 'logs' | 'support'>('telemetry');
+  const [activeTab, setActiveTab] = useState<'telemetry' | 'upgrades' | 'logs' | 'support' | 'admins'>('telemetry');
+  // Current admin's own tier + permissions (gates which tabs show).
+  const [me, setMe] = useState<{ adminRole?: 'super' | 'staff'; permissions: string[] } | null>(null);
   const [upgradeRequests, setUpgradeRequests] = useState<SubscriptionRequest[]>([]);
   const [loadingUpgrades, setLoadingUpgrades] = useState(false);
 
@@ -167,6 +171,29 @@ export default function SuperAdminPortalPage() {
     }
   };
 
+  // Load the signed-in admin's own tier + permissions (ungated endpoint) so the
+  // console knows which tabs to show. A staff admin without `platform.view`
+  // still gets a usable console scoped to what they CAN do.
+  const loadMe = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/me');
+      if (res.ok) {
+        const data = await res.json();
+        const meData = { adminRole: data.adminRole, permissions: data.permissions || [] };
+        setMe(meData);
+        // Land on a tab the admin can actually see.
+        const can = (p: string) => meData.adminRole === 'super' || meData.permissions.includes(p);
+        if (can('platform.view')) setActiveTab('telemetry');
+        else if (can('subscriptions.manage')) setActiveTab('upgrades');
+        else if (can('support.manage')) setActiveTab('support');
+        else if (can('logs.view')) setActiveTab('logs');
+        else if (meData.adminRole === 'super') setActiveTab('admins');
+      }
+    } catch {
+      /* non-fatal; tabs just fall back to defaults */
+    }
+  }, []);
+
   // Declared BEFORE the auth effect + handlers that call it (the compiler flags
   // use-before-declare on a const arrow). useCallback keeps it stable so the
   // mount-once auth subscription doesn't need to re-run when it changes.
@@ -206,6 +233,7 @@ export default function SuperAdminPortalPage() {
         }
         setIsAdmin(admin);
         if (admin) {
+          await loadMe();
           await loadPlatformData();
         } else {
           setStats(null);
@@ -513,6 +541,9 @@ export default function SuperAdminPortalPage() {
     },
   ];
 
+  // A super admin sees everything; a staff admin sees only what they're granted.
+  const can = (perm: string) => me?.adminRole === 'super' || !!me?.permissions.includes(perm);
+
   return (
     <div className="theme-admin min-h-screen app-gradient-tint text-slate-900 flex flex-col font-sans">
       <IdleLogout role="admin" redirectTo="/admin" />
@@ -555,72 +586,84 @@ export default function SuperAdminPortalPage() {
       {/* Admin Navigation Tabs — horizontally scrollable on small screens so all
           tabs remain reachable without wrapping or clipping. */}
       <div className="border-b border-[#E2E8F0] bg-white px-4 sm:px-6 flex items-center gap-5 sm:gap-6 text-xs font-semibold overflow-x-auto whitespace-nowrap no-scrollbar">
-        <button
-          type="button"
-          onClick={() => setActiveTab('telemetry')}
-          className={`py-3 border-b-2 transition-colors cursor-pointer ${
-            activeTab === 'telemetry'
-              ? 'border-[#D97706] text-[#D97706]'
-              : 'border-transparent text-[#64748B] hover:text-[#09090B]'
-          }`}
-        >
-          PG Directory & Telemetry
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setActiveTab('upgrades');
-            loadUpgrades();
-          }}
-          className={`py-3 border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${
-            activeTab === 'upgrades'
-              ? 'border-[#D97706] text-[#D97706]'
-              : 'border-transparent text-[#64748B] hover:text-[#09090B]'
-          }`}
-        >
-          <span>SaaS Upgrade Requests</span>
-          {upgradeRequests.length > 0 && (
-            <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-[#FEF3C7] text-[#D97706] font-bold">
-              {upgradeRequests.length}
-            </span>
-          )}
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setActiveTab('logs');
-            loadLogs();
-          }}
-          className={`py-3 border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${
-            activeTab === 'logs'
-              ? 'border-[#D97706] text-[#D97706]'
-              : 'border-transparent text-[#64748B] hover:text-[#09090B]'
-          }`}
-        >
-          <Bug className="w-3.5 h-3.5" />
-          <span>System & Error Logs</span>
-          {systemLogs.filter((l) => l.level === 'error').length > 0 && (
-            <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-[#FEE2E2] text-[#DC2626] font-bold">
-              {systemLogs.filter((l) => l.level === 'error').length}
-            </span>
-          )}
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('support')}
-          className={`py-3 border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${
-            activeTab === 'support'
-              ? 'border-[#D97706] text-[#D97706]'
-              : 'border-transparent text-[#64748B] hover:text-[#09090B]'
-          }`}
-        >
-          <MessageSquare className="w-3.5 h-3.5" />
-          <span>Owner Support</span>
-        </button>
+        {/* Tabs are gated by the signed-in admin's permissions (super sees all). */}
+        {can('platform.view') && (
+          <button
+            type="button"
+            onClick={() => setActiveTab('telemetry')}
+            className="py-3 border-b-2 transition-colors cursor-pointer"
+            style={activeTab === 'telemetry' ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : { borderColor: 'transparent', color: '#64748B' }}
+          >
+            PG Directory & Telemetry
+          </button>
+        )}
+        {can('subscriptions.manage') && (
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('upgrades');
+              loadUpgrades();
+            }}
+            className="py-3 border-b-2 transition-colors cursor-pointer flex items-center gap-1.5"
+            style={activeTab === 'upgrades' ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : { borderColor: 'transparent', color: '#64748B' }}
+          >
+            <span>SaaS Upgrade Requests</span>
+            {upgradeRequests.length > 0 && (
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] accent-soft-bg font-bold">
+                {upgradeRequests.length}
+              </span>
+            )}
+          </button>
+        )}
+        {can('logs.view') && (
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('logs');
+              loadLogs();
+            }}
+            className="py-3 border-b-2 transition-colors cursor-pointer flex items-center gap-1.5"
+            style={activeTab === 'logs' ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : { borderColor: 'transparent', color: '#64748B' }}
+          >
+            <Bug className="w-3.5 h-3.5" />
+            <span>System & Error Logs</span>
+            {systemLogs.filter((l) => l.level === 'error').length > 0 && (
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-[#FEE2E2] text-[#DC2626] font-bold">
+                {systemLogs.filter((l) => l.level === 'error').length}
+              </span>
+            )}
+          </button>
+        )}
+        {can('support.manage') && (
+          <button
+            type="button"
+            onClick={() => setActiveTab('support')}
+            className="py-3 border-b-2 transition-colors cursor-pointer flex items-center gap-1.5"
+            style={activeTab === 'support' ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : { borderColor: 'transparent', color: '#64748B' }}
+          >
+            <MessageSquare className="w-3.5 h-3.5" />
+            <span>Owner Support</span>
+          </button>
+        )}
+        {me?.adminRole === 'super' && (
+          <button
+            type="button"
+            onClick={() => setActiveTab('admins')}
+            className="py-3 border-b-2 transition-colors cursor-pointer flex items-center gap-1.5"
+            style={activeTab === 'admins' ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : { borderColor: 'transparent', color: '#64748B' }}
+          >
+            <ShieldCheck className="w-3.5 h-3.5" />
+            <span>Admins</span>
+          </button>
+        )}
       </div>
 
       {/* Main Content Area */}
-      {activeTab === 'support' ? (
+      {activeTab === 'admins' ? (
+        <div className="flex-1 p-4 sm:p-6 overflow-y-auto w-full">
+          <AdminUsersPanel />
+        </div>
+      ) : activeTab === 'support' ? (
         <AdminSupportPanel />
       ) : activeTab === 'upgrades' ? (
         <div className="flex-1 p-6 overflow-y-auto max-w-5xl mx-auto w-full space-y-4 text-left">

@@ -4,6 +4,7 @@ import { withAuth, AuthContext } from '@/lib/server/api/withAuth';
 import { withRateLimit } from '@/lib/server/api/withRateLimit';
 import { subscriptionsService } from '@/lib/server/services/subscriptions.service';
 import { adminDb } from '@/lib/server/firebase-admin';
+import { ADMIN_PERMISSIONS } from '@/lib/constants/permissions';
 
 export const GET = withErrorHandler(
   withAuth(
@@ -17,7 +18,7 @@ export const GET = withErrorHandler(
       const requests = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       return NextResponse.json({ requests });
     },
-    { roles: ['admin'] }
+    { roles: ['admin'], adminPermission: ADMIN_PERMISSIONS.SUBSCRIPTIONS_MANAGE }
   )
 );
 
@@ -43,6 +44,6 @@ export const POST = withErrorHandler(
       },
       { tier: 'standard', key: 'uid' }
     ),
-    { roles: ['admin'] }
+    { roles: ['admin'], adminPermission: ADMIN_PERMISSIONS.SUBSCRIPTIONS_MANAGE }
   )
 );

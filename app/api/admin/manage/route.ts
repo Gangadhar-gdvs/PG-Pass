@@ -8,6 +8,7 @@ import { recordEvent } from '@/lib/server/services/systemLogs.service';
 import { ownerProfileSchema } from '@/lib/validation';
 import { ACCOUNT_STATUS } from '@/lib/constants/status';
 import type { AccountStatus } from '@/types';
+import { ADMIN_PERMISSIONS } from '@/lib/constants/permissions';
 
 interface ManageBody {
   action?: string;
@@ -120,6 +121,6 @@ export const POST = withErrorHandler(
           throw new AppError(400, `Unknown action: ${action}`);
       }
     },
-    { roles: ['admin'] }
+    { roles: ['admin'], adminPermission: ADMIN_PERMISSIONS.PG_MANAGE }
   )
 );

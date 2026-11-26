@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withErrorHandler } from '@/lib/server/api/withErrorHandler';
 import { withAuth } from '@/lib/server/api/withAuth';
 import { fetchSystemLogs } from '@/lib/server/services/systemLogs.service';
+import { ADMIN_PERMISSIONS } from '@/lib/constants/permissions';
 
 export const GET = withErrorHandler(
   withAuth(
@@ -15,6 +16,6 @@ export const GET = withErrorHandler(
       const logs = await fetchSystemLogs(limit, level, category);
       return NextResponse.json({ logs });
     },
-    { roles: ['admin'] }
+    { roles: ['admin'], adminPermission: ADMIN_PERMISSIONS.LOGS_VIEW }
   )
 );

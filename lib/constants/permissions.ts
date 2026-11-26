@@ -49,6 +49,60 @@ export const STAFF_PERMISSION_LABELS: Record<StaffPermission, string> = {
   [STAFF_PERMISSIONS.VIEW_ANALYTICS]: 'View analytics',
 };
 
+// ---------------------------------------------------------------------------
+// ADMIN roles & permissions (platform operators).
+//
+//  * ADMIN_ROLE: a 'super' admin has implicit full access AND is the only one
+//    who can manage other admins. A 'staff' admin is scoped to the explicit
+//    `permissions` array on their `admin_users` doc.
+//  * ADMIN_PERMISSIONS: super-admin-assigned, per-admin. Enforced server-side in
+//    withAuth({ adminPermission }). Super admins bypass every check.
+//  * `admins.manage` (create/edit/suspend admins, assign permissions) is
+//    SUPER-ONLY — never grantable to a staff admin.
+// ---------------------------------------------------------------------------
+
+export const ADMIN_ROLE = {
+  SUPER: 'super',
+  STAFF: 'staff',
+} as const;
+export type AdminRole = (typeof ADMIN_ROLE)[keyof typeof ADMIN_ROLE];
+
+export const ADMIN_PERMISSIONS = {
+  PLATFORM_VIEW: 'platform.view', // dashboards, PG directory, accounts, per-PG detail
+  PG_MANAGE: 'pg.manage', // act-as-owner edits, per-PG feature flags, suspend/reactivate
+  SUBSCRIPTIONS_MANAGE: 'subscriptions.manage', // approve/reject plan upgrades
+  SUPPORT_MANAGE: 'support.manage', // reply to owner support chats
+  REVIEWS_MODERATE: 'reviews.moderate', // hide/unhide reviews
+  LOGS_VIEW: 'logs.view', // system log viewer
+  ADMINS_MANAGE: 'admins.manage', // SUPER-ONLY: create/edit/suspend admins + perms
+} as const;
+
+export type AdminPermission = (typeof ADMIN_PERMISSIONS)[keyof typeof ADMIN_PERMISSIONS];
+
+export const ALL_ADMIN_PERMISSIONS: AdminPermission[] = Object.values(ADMIN_PERMISSIONS);
+
+// Permissions a SUPER admin may grant to a staff admin. `admins.manage` is
+// deliberately excluded — only a super admin can ever manage admins.
+export const GRANTABLE_ADMIN_PERMISSIONS: AdminPermission[] = ALL_ADMIN_PERMISSIONS.filter(
+  (p) => p !== ADMIN_PERMISSIONS.ADMINS_MANAGE
+);
+
+// Sensible default for a newly-created staff admin: read-only platform + support.
+export const DEFAULT_ADMIN_PERMISSIONS: AdminPermission[] = [
+  ADMIN_PERMISSIONS.PLATFORM_VIEW,
+  ADMIN_PERMISSIONS.SUPPORT_MANAGE,
+];
+
+export const ADMIN_PERMISSION_LABELS: Record<AdminPermission, string> = {
+  [ADMIN_PERMISSIONS.PLATFORM_VIEW]: 'View platform & PG directory',
+  [ADMIN_PERMISSIONS.PG_MANAGE]: 'Manage PGs (edit, features, suspend)',
+  [ADMIN_PERMISSIONS.SUBSCRIPTIONS_MANAGE]: 'Approve plan upgrades',
+  [ADMIN_PERMISSIONS.SUPPORT_MANAGE]: 'Reply to owner support',
+  [ADMIN_PERMISSIONS.REVIEWS_MODERATE]: 'Moderate reviews',
+  [ADMIN_PERMISSIONS.LOGS_VIEW]: 'View system logs',
+  [ADMIN_PERMISSIONS.ADMINS_MANAGE]: 'Manage admins (super only)',
+};
+
 export const PG_FEATURES = {
   DISCOVERY: 'discovery', // public listing in PG search
   REVIEWS: 'reviews', // accept resident/guest/staff reviews

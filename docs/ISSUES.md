@@ -148,21 +148,40 @@ super-admin; ONE backend for mobile/website/admin.
   `app/api/**` backend. Entry points stay split: `/login` (owner+staff),
   `/resident/login` (residents), `/admin` (admins). Role resolved server-side from
   custom claims. Do NOT fork auth or backend. Mobile is the PWA of the same app.
-- ✅ **Separate URLs = subdomains, ONE app (decided):** `app.pgpass.com` (owner/
-  resident) + `admin.pgpass.com` (admin), served from a single Next.js deploy with
-  one backend; `proxy.ts` routes by hostname. **To wire up at deploy time** (DNS +
-  middleware host check). Preferred over two deployments — keeps "same backend".
-- ⚪ **Tiered admin permissions — DEFERRED (decision: after UI review).** Today
-  `admin` is a single boolean claim (`admin:true`) → every admin has full access;
-  no super-vs-sub distinction. **Planned model (not built yet):**
-  - Claim: `admin:true` + `adminRole: 'super' | 'staff'`.
-  - New `admin_users` collection with `permissions[]` (e.g. `pg.suspend`,
-    `support.reply`, `reviews.moderate`, `subscriptions.approve`, `logs.view`,
-    `admins.manage`). `admins.manage` is super-admin-only.
-  - Super-admin-only UI to create/edit admins + assign permissions.
-  - Enforce via `withAuth({ adminPermission })` on admin routes — mirrors the
-    existing per-staff `permission` pattern (reuse it).
-  - Migration: existing `admin:true` accounts become `adminRole:'super'`.
+- 🟢 **Separate URLs = env-driven hostname routing (BUILT).** `proxy.ts`
+  (Next 16 middleware) reads `ADMIN_HOST`:
+  - On the admin host → rewrites `/` to `/admin` (URL bar stays clean, no `/admin`
+    shown); `/admin` on the MAIN host redirects to `/login` (admin blocked there).
+  - `ADMIN_HOST` UNSET → single-host path-based `/admin` (local dev + combined deploy).
+  - **No custom domain yet (user is on *.vercel.app):** two ways to get a separate
+    admin URL — (A) deploy the SAME repo as a 2nd Vercel project with
+    `ADMIN_HOST=<that-project>.vercel.app` → its root opens admin login; or (B)
+    keep `/admin` for now and set `ADMIN_HOST=admin.yourdomain.com` later (zero code
+    change). Documented in `.env.production.example`.
+- 🟢 **Root flow (BUILT):** first-ever visit to `/` → landing (+ sets `pgp_seen`
+  cookie, 1yr); returning visitor → redirect to `/login` (which role-routes an
+  existing session to the right dashboard). Verified live: 1st=200+cookie, 2nd=307→/login.
+- 🟢 **Tiered admin permissions — BUILT.** Super admin (full access + the only
+  one who manages admins) + staff admins scoped to granted permissions. Shipped:
+  - `ADMIN_ROLE` (super/staff) + `ADMIN_PERMISSIONS` (platform.view, pg.manage,
+    subscriptions.manage, support.manage, reviews.moderate, logs.view,
+    admins.manage) in `lib/constants/permissions.ts`.
+  - `admin_users` collection (server-only in `firestore.rules`) + entitlement
+    reads/cache in `entitlements.ts` (`getAdminEntitlements`, `adminHasPermission`,
+    `isSuperAdmin`). **Legacy `admin:true`-without-doc = super by default** (no
+    existing admin loses access); bootstrap + claims route now write a `super` doc.
+  - `withAuth({ adminPermission })` enforces per-route; suspended admins blocked;
+    super bypasses. All 12 gates across 9 admin routes set (platform.view / pg.manage
+    / subscriptions.manage / support.manage / reviews.moderate / logs.view).
+  - `adminUsers.service.ts` + `/api/admin/admins` (+ `[adminUid]`): super-only
+    create/list/set-permissions/suspend-reactivate. `/api/admin/me` returns the
+    caller's tier+perms. Suspend drops the claim + revokes tokens immediately.
+  - Admin console: tabs gated by permission; super-only **Admins** tab with the
+    create-admin form + per-admin permission toggles + suspend/reactivate
+    (`components/admin/AdminUsersPanel.tsx`). Admin tab accent fixed amber→indigo.
+  - Gate: lint 0 · typecheck 0 · 63 tests · build ✓.
+  - **Deploy note:** when subdomains go live, `admin.pgpass.com` serves this same
+    `/admin` console from the one backend (see URL decision above).
 
 ## Follow-ups (explicitly deferred, not forgotten)
 - 🔴 **#6 avatar image upload** — the top-bar profile currently shows initials

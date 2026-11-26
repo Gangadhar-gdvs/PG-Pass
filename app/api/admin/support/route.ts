@@ -3,6 +3,7 @@ import { withErrorHandler, AppError } from '@/lib/server/api/withErrorHandler';
 import { withAuth, AuthContext } from '@/lib/server/api/withAuth';
 import { withRateLimit } from '@/lib/server/api/withRateLimit';
 import { supportService } from '@/lib/server/services/support.service';
+import { ADMIN_PERMISSIONS } from '@/lib/constants/permissions';
 
 // Admin lists all support threads (most recent first).
 export const GET = withErrorHandler(
@@ -11,7 +12,7 @@ export const GET = withErrorHandler(
       const threads = await supportService.listThreads();
       return NextResponse.json({ threads });
     },
-    { roles: ['admin'] }
+    { roles: ['admin'], adminPermission: ADMIN_PERMISSIONS.SUPPORT_MANAGE }
   )
 );
 
@@ -39,6 +40,6 @@ export const POST = withErrorHandler(
       },
       { tier: 'standard', key: 'uid' }
     ),
-    { roles: ['admin'] }
+    { roles: ['admin'], adminPermission: ADMIN_PERMISSIONS.SUPPORT_MANAGE }
   )
 );
