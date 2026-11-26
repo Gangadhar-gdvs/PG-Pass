@@ -193,11 +193,20 @@ via `<Illustration name width />`. Heroes on dashboards/auth/landing; `clipboard
 states; `shield-orbit` for security/privacy; `bell-cta` for reminders/CTA.
 
 ## 5. Navigation
-- **Mobile**: sticky `glass-bar` top bar (Logo left; bell + avatar right) and the
-  `BottomTabBar` (glass, rounded top, labelled icons, violet active marker, centre
-  gradient FAB with white halo, "More" sheet of 3D tiles).
-- **Desktop (md+)**: floating glass sidebar (Owner) with gradient active pill; admin uses
-  the same header + pill tabs.
+- **Home only gets the app bar** (owner `/dashboard`, resident `/resident/home`): PG switcher with an
+  inline dropdown on the left, avatar on the right → `/profile` (owner full profile page).
+- **Every other page owns its header:** `PageHeader` is a compact frosted bar that stays pinned
+  (`sticky`, below the notch) while the page scrolls. On phones its `actions` render just below the
+  bar (they scroll away); from `sm` up they sit inside it. Optional `back={{ href, label }}`.
+- Shell `<main>` uses `overflow-x-clip`, **never** `overflow-x-hidden` (that makes it a scroll
+  container and silently breaks sticky headers).
+- **Bottom tab bar:** solid white, fills to the screen edge (`viewportFit: 'cover'` + safe-area
+  padding), labelled icons with a violet underline marker, and a 56px gradient centre button that
+  stays inside the bar. Content pads `pb-[calc(6rem+env(safe-area-inset-bottom))]`.
+- **Desktop (md+):** floating glass sidebar; its identity block links to `/profile`.
+- **Sign-in screens** (`AuthShell`, admin login) must fit one phone screen with no scrolling
+  (checked at 390×664 and 360×640): headline + form on phones; description, bullets and 3D scene
+  from `md` up; size with `100dvh`, not `100vh`.
 
 ## 6. Don'ts
 - No `bg-white` page wrappers, grey `border-[#E2E8F0]` boxes, `rounded-[6px]` corners,

@@ -20,6 +20,7 @@ const PROTECTED_PREFIXES = [
   '/rent',
   '/staff',
   '/billing',
+  '/profile',
   '/utilities',
   '/inventory',
 ];

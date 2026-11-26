@@ -219,7 +219,7 @@ function LoginFormContent() {
       illustration="hero-landing"
       footnote="Secure httpOnly session cookies"
     >
-      <div className="space-y-5">
+      <div className="space-y-3.5 sm:space-y-5">
         {isExpired && (
           <InfoBanner tone="warning" title="Session expired" description="Your session has expired. Please sign in to continue." />
         )}
@@ -251,7 +251,7 @@ function LoginFormContent() {
               </>
             )}
           </h2>
-          <p className="mt-1 text-[13px] font-medium text-muted">
+          <p className="mt-1 hidden sm:block text-[13px] font-medium text-muted">
             Sign in with Google or your email to access your PG dashboard.
           </p>
         </div>
@@ -298,7 +298,7 @@ function LoginFormContent() {
         )}
 
         {/* Fallback: Email & Password */}
-        <form onSubmit={handleEmailAuth} className="space-y-4">
+        <form onSubmit={handleEmailAuth} className="space-y-3 sm:space-y-4">
           <Input
             type="email"
             label="Email address"
@@ -327,10 +327,11 @@ function LoginFormContent() {
           </Button>
         </form>
 
-        <div className="text-center text-[13px] font-medium text-muted">
+        {/* One compact row on phones: account switch (left) + resident sign-in (right). */}
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 text-[13px] font-medium text-muted">
           {authMode === 'signin' ? (
             <span>
-              Don&apos;t have an account?{' '}
+              New here?{' '}
               <button
                 type="button"
                 onClick={() => {
@@ -344,7 +345,7 @@ function LoginFormContent() {
             </span>
           ) : (
             <span>
-              Already have an account?{' '}
+              Have an account?{' '}
               <button
                 type="button"
                 onClick={() => {
@@ -357,19 +358,17 @@ function LoginFormContent() {
               </button>
             </span>
           )}
+          <Link
+            href="/resident/login"
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-info-bg/80 px-3.5 font-bold text-info-ink press"
+          >
+            <span className="hidden min-[380px]:inline-flex">
+              <Icon3D name="home-blue" size={20} />
+            </span>
+            Resident login
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
         </div>
-
-        <Link
-          href="/resident/login"
-          className="flex items-center gap-3 rounded-2xl tint-card tint-sky px-4 py-3 press"
-        >
-          <Icon3D name="home-blue" size={34} />
-          <span className="min-w-0 flex-1">
-            <span className="block text-sm font-bold text-ink">Staying at a PG?</span>
-            <span className="block text-xs font-medium text-ink-2/75">Resident sign-in is over here</span>
-          </span>
-          <ArrowRight className="h-4 w-4 text-brand" />
-        </Link>
       </div>
       {confirmDialogEl}
     </AuthShell>

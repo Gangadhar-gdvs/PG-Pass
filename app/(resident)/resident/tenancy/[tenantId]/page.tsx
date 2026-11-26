@@ -12,6 +12,7 @@ import { Badge, type BadgeProps } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
 import {
   HeroHeader,
+  PageHeader,
   StatTile,
   InfoBanner,
   QuickActionGrid,
@@ -262,13 +263,15 @@ export default function TenancyDetail() {
     .slice(0, 3);
 
   return (
-    <div className="space-y-5 pt-2">
-      <Link
-        href="/resident/home"
-        className="inline-flex h-11 items-center gap-1.5 rounded-full border border-white bg-white/75 px-4 text-[13px] font-bold text-ink-2 shadow-[0_6px_16px_-10px_rgba(70,40,160,0.4)] hover:text-brand-700 press"
-      >
-        <ArrowLeft className="w-4 h-4" /> My PGs
-      </Link>
+    <div className="space-y-5">
+      <PageHeader
+        back={{ href: '/resident/home', label: 'Back to My PGs' }}
+        icon="building"
+        tint="violet"
+        title="My"
+        highlight="Tenancy"
+        subtitle={[tenant.roomNumber && `Room ${tenant.roomNumber}`, tenant.bedLabel && `Bed ${tenant.bedLabel}`].filter(Boolean).join(' · ') || 'Your PG'}
+      />
 
       <HeroHeader
         variant="light"

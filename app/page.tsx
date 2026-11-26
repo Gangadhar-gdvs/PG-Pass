@@ -73,7 +73,7 @@ export default function LandingPage() {
   };
 
   return (
-    <div id="top" className="min-h-screen overflow-x-hidden text-ink pb-28 md:pb-0">
+    <div id="top" className="min-h-screen overflow-x-clip text-ink pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-0">
       {/* ===================== TOP BAR ===================== */}
       <header
         className="sticky top-0 z-40 px-4 sm:px-6"

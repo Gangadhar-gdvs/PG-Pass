@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { BottomTabBar } from '@/components/ui/bottom-tab-bar';
 import { IdleLogout } from '@/components/auth/IdleLogout';
@@ -15,6 +15,9 @@ import { Home, Search, LogOut, ChevronDown, Compass } from 'lucide-react';
 export function ResidentShell({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
+  // Only Home gets the app bar; other pages show their own sticky PageHeader.
+  const isHome = pathname === '/resident/home';
   const [profileOpen, setProfileOpen] = useState(false);
 
   const signOut = () => {
@@ -28,7 +31,8 @@ export function ResidentShell({ children }: { children: React.ReactNode }) {
     <div className="theme-resident min-h-screen flex flex-col">
       <IdleLogout role="resident" redirectTo="/resident/login" />
 
-      {/* Top bar — logo left, profile right (reference layout) */}
+      {/* Top bar — logo left, profile right (reference layout). Home only. */}
+      {isHome && (
       <header
         className="sticky top-0 z-30 glass-bar"
         style={{ paddingTop: 'max(0.6rem, env(safe-area-inset-top))', paddingBottom: '0.6rem' }}
@@ -56,8 +60,14 @@ export function ResidentShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </header>
+      )}
 
-      <main className="flex-1 overflow-x-hidden px-4 pt-2 pb-28 max-w-2xl mx-auto w-full">
+      {/* overflow-x-CLIP keeps sticky page headers working (hidden would not). */}
+      <main
+        className={`flex-1 overflow-x-clip px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] max-w-2xl mx-auto w-full ${
+          isHome ? 'pt-2' : 'pt-[max(0.5rem,env(safe-area-inset-top))]'
+        }`}
+      >
         <div className="animate-fade-up">{children}</div>
       </main>
 

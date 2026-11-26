@@ -35,6 +35,9 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  // Draw under the notch / home indicator so fixed bars can fill the screen
+  // edge-to-edge; they pad themselves with env(safe-area-inset-*).
+  viewportFit: "cover",
 };
 
 export default function RootLayout({

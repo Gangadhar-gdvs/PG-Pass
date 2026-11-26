@@ -5,6 +5,7 @@ import { adminDb } from '@/lib/server/firebase-admin';
 import { RENT_STATUS, ACCOUNT_STATUS } from '@/lib/constants/status';
 import { rentDueDate } from '@/lib/utils';
 import { Timestamp, QueryDocumentSnapshot } from 'firebase-admin/firestore';
+import { rentBillEligibility } from '@/lib/rentEligibility';
 
 export const POST = withErrorHandler(
   withCronAuth(async (_req: NextRequest) => {
@@ -60,6 +61,7 @@ export const POST = withErrorHandler(
     let generatedCount = 0;
     let processedTenants = 0;
     let skippedNoRent = 0;
+    let skippedNotResident = 0;
     const PAGE = 300;
     // Firestore QueryDocumentSnapshot cursor; typed loosely to avoid the global
     // FirebaseFirestore namespace.
@@ -96,12 +98,28 @@ export const POST = withErrorHandler(
       const bedRentById = new Map<string, number | undefined>(
         bedSnaps.map((s) => [s.id, s.exists ? (s.data()?.rentAmountPaise as number | undefined) : undefined])
       );
+      const bedById = new Map<string, { status?: string; tenantId?: string | null } | undefined>(
+        bedSnaps.map((s) => [s.id, s.exists ? (s.data() as { status?: string; tenantId?: string | null }) : undefined])
+      );
 
       for (const tenantDoc of page.docs) {
         processedTenants++;
         const tenant = tenantDoc.data();
         const docId = `${tenantDoc.id}_${nextPeriod}`;
         if (existsById.get(docId)) continue; // already generated
+
+        // Moved-out residents keep their doc (deletedAt stays null), so check
+        // they still occupy the bed before billing the next month.
+        const eligibility = rentBillEligibility({
+          tenantId: tenantDoc.id,
+          tenant: { moveOutDate: tenant.moveOutDate },
+          bed: tenant.bedId ? bedById.get(tenant.bedId) : undefined,
+          nextPeriod,
+        });
+        if (!eligibility.bill) {
+          skippedNotResident++;
+          continue;
+        }
 
         // No invented default: the rent must come from the tenant's bed. If it
         // can't be determined, SKIP (and count it) rather than fabricating a
@@ -158,6 +176,7 @@ export const POST = withErrorHandler(
       processedTenants,
       generatedRentRecords: generatedCount,
       skippedNoRent, // tenants whose rent couldn't be determined (no bill made)
+      skippedNotResident, // moved out / bed vacant or re-let (no bill made)
       staleClaimsFound: staleCount,
     });
   })

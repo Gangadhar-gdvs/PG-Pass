@@ -209,6 +209,8 @@ privilege: **admin 15 min · owner/staff 30 min · resident 60 min**
 | `deposits` | Ledger (installment/deduction/refund); **refund lifecycle** (pending→issued) |
 | `expenses` | Record/list operating costs; monthly totals; **soft-delete** (kept for audit, excluded from lists + totals) |
 | `maintenance` | Tenant-raised tickets; owner triage (open→in_progress→resolved) |
+| `utilities` | Utility bills: dry-run **preview**, draft with frozen per-resident allocation (pure maths in `lib/utilitySplit.ts`), **apply to rent** (one txn, idempotent), **void** (reverses charges, audit log). Owner-only |
+| `assets` | Room/common-area inventory: create, edit (append-only `history`), soft-delete; summary via `lib/assets.ts` |
 | `photos` | **Private** tenant photos: B2 upload intent/confirm (magic-byte + SHA-256), presigned view URLs, per-tenant gallery. **Public PG gallery:** categorized public-read photos (`property_photos`), count-capped, cover-photo denormalized onto the property for search |
 | `reviews` | **PG reviews** (verified tenant/guest/staff only, 1–5★ + text, auto-public, admin-hideable) + **staff ratings** (resident → individual warden); aggregates (`reviewAgg`/`ratingAgg`) maintained transactionally; eligibility + feature-gate enforced |
 | `support` | Owner↔admin live chat (`support_threads` + `messages`), unread counters, per-owner threads (never merged) |
@@ -239,6 +241,8 @@ session), `entitlements` (cached per-staff permissions + per-PG feature flags),
 - `/deposits/[tenantId]` `GET POST` · `/deposits/refunds` `GET` · `/deposits/refunds/[depositId]` `PATCH`
 - `/expenses` `GET POST` · `/expenses/[id]` `DELETE`
 - `/maintenance` `GET POST` · `/maintenance/[id]` `PATCH`
+- `/utilities` `GET POST` · `/utilities/preview` `POST` · `/utilities/[id]` `GET` · `/utilities/[id]/apply` `POST` · `/utilities/[id]/void` `POST` (**owner-only**)
+- `/assets` `GET POST` · `/assets/[id]` `GET PATCH DELETE` (read: owner/staff; write: staff need `manage_beds`)
 - `/analytics` `GET` · `/staff` `GET POST` · `/staff/[staffUid]` `PATCH DELETE PUT` (PUT = set permissions)
 - `/billing/upgrade` `POST` · `/flags` `POST`
 - `/photos` `GET` · `/photos/[photoId]/url` `GET` · `/uploads/intent` `POST` · `/uploads/confirm` `POST`
@@ -293,6 +297,8 @@ owner's **primary** property, so legacy single-PG data needs no migration).
 | `deposits` | ownerId, propertyId, tenantId, type(installment/deduction/refund), amountPaise, `refundStatus` |
 | `expenses` | ownerId, propertyId, category, amountPaise, period, vendor, **`deletedAt`** (soft-delete) |
 | `maintenance_tickets` | ownerId, propertyId, tenantId, category, description, status |
+| `utility_bills` | ownerId, propertyId, type, provider, period, scope(room/property), roomNumber, `label`, `totalPaise`, `meter`{previous,current,units,reset}, rule(equal/occupancy_days/custom), **`allocations[]`** (per resident: days, weight, `sharePaise`, `roundingPaise`, status pending/applied/skipped/reversed, skipReason, rentRecordId), status(draft/partial/applied/void), `history[]`, `dedupeKey` (server-only), **`deletedAt`** (set on void) |
+| `assets` | ownerId, propertyId, location(room/common), roomNumber, name, category, quantity, condition(good/fair/damaged/missing), purchaseDate, warrantyUntil, notes, **`history[]`** (append-only), **`deletedAt`** |
 | `movein_photos` | ownerId, propertyId, tenantId, photoType, objectKey, sha256 (**private**; metadata only, bytes in B2) |
 | `property_photos` | ownerId, propertyId, category, caption, sharingType, `publicUrl` (**public-read**), objectKey — PG gallery for discovery |
 | `pg_reviews` | id=`{propertyId}_{reviewerUid}`, ownerId, propertyId, reviewerRole, rating(1–5), text, `hidden` (admin). **Public get** |
@@ -362,6 +368,32 @@ receipts scope to the selected property; "add property" in Settings.
 net-revenue analytics.
 
 **Maintenance** — tenants raise issues from the portal; owner triages to resolved.
+
+**Utilities & transparent split** (`/utilities`, owner-only) — record an
+electricity/water/gas/internet bill for a month, for one room or the whole PG,
+with optional meter readings (a lower current reading is rejected unless the
+meter is flagged reset). Split **equally**, **by days stayed** (move-in and
+move-out day both count) or by **custom** amounts that must add up exactly. The
+sheet shows a live per-resident preview (days, share, +1-paisa rounding) before
+saving. Rounding: floor each exact share, then hand the leftover paise 1 each to
+the largest remainders (ties → name order), so the total always equals the bill.
+Duplicates (same property + room/whole-PG + type + month) are rejected with 409
+unless the earlier bill was voided. **Apply to rent** appends a line item
+(`Electricity · Room 101 · Nov 2026`, `kind:'utility'`, `utilityBillId`) to each
+resident's `{tenantId}_{period}` rent record and raises `amountDuePaise`; a paid
+record goes back to `pending` with its payments kept. Residents with **no rent
+record** for that month, or with a payment **awaiting verification**, are skipped
+with a reason and picked up by re-applying (never double-charged). **Void**
+removes the line from untouched records, appends a negative
+`utility_reversal` line where payments exist, soft-deletes the bill, writes
+`audit_logs` + a system event, and reports any overpayment (never auto-marks paid).
+
+**Room inventory** (`/inventory`, staff-visible) — per-room and common-area
+checklist: name, category, quantity, condition, purchase/warranty dates, notes.
+Every condition/quantity/detail change and delete appends to the item's history.
+Summary: counts by condition, damaged/missing "needs attention", warranties
+ending within 30 days. Staff edits require the `manage_beds` permission
+(labelled "Manage beds & room inventory").
 
 **Staff** — invite warden (scoped custom claims + shareable setup link),
 suspend/reactivate, **soft-revoke** (record kept), and **per-staff permission

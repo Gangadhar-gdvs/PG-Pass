@@ -172,9 +172,12 @@ export function BottomTabBar({
   return (
     <>
       <nav className="md:hidden fixed inset-x-0 bottom-0 z-40" aria-label="Primary">
+        {/* Solid bar that fills to the very bottom edge (incl. the home-indicator
+            safe area) — no translucent gap below it. The centre action sits
+            INSIDE the bar (no overflowing halo). */}
         <div
-          className="relative flex items-end justify-around rounded-t-[30px] border-t border-white bg-[rgba(252,250,255,0.86)] px-1.5 pt-2.5 shadow-[0_-12px_34px_-14px_rgba(70,40,160,0.32)] backdrop-blur-xl"
-          style={{ paddingBottom: 'calc(0.35rem + env(safe-area-inset-bottom))' }}
+          className="relative flex items-center justify-around rounded-t-[26px] border-t border-[#EEE8FD] bg-white px-1.5 pt-2 shadow-[0_-10px_30px_-14px_rgba(70,40,160,0.30)]"
+          style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
         >
           {leftTabs.map(renderTab)}
 
@@ -184,10 +187,10 @@ export function BottomTabBar({
                 type="button"
                 onClick={onCenter}
                 aria-label={center.label}
-                className="relative -mt-9 grid h-[66px] w-[66px] place-items-center rounded-full bg-[image:var(--grad-brand)] text-white ring-[7px] ring-white/90 shadow-[0_14px_30px_-8px_rgba(106,43,234,0.7),0_0_0_12px_rgba(206,186,255,0.35)] press"
+                className="relative grid h-14 w-14 place-items-center rounded-full bg-[image:var(--grad-brand)] text-white shadow-[0_10px_20px_-8px_rgba(106,43,234,0.65),inset_0_1px_0_rgba(255,255,255,0.35)] ring-4 ring-brand-50 press"
               >
-                <span aria-hidden className="absolute inset-x-3 top-1.5 h-1/3 rounded-full bg-white/25 blur-[2px]" />
-                <CenterIcon className="relative h-7 w-7" strokeWidth={2.6} />
+                <span aria-hidden className="absolute inset-x-3 top-1 h-1/3 rounded-full bg-white/25 blur-[2px]" />
+                <CenterIcon className="relative h-6 w-6" strokeWidth={2.6} />
               </button>
             </div>
           )}

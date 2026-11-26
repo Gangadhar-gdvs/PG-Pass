@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { ArrowRight, ChevronRight } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ChevronRight } from 'lucide-react';
 import { Icon3D, IconBubble, IconTile, type Icon3DName, type Tint } from '@/components/brand/Icon3D';
 import { Illustration, type IllustrationName } from '@/components/brand/Illustration';
 
@@ -191,8 +191,11 @@ export function PageHeader({
   highlight,
   subtitle,
   actions,
+  back,
   className = '',
 }: {
+  /** Optional back link shown as a round button at the start of the bar. */
+  back?: { href: string; label: string };
   /** 3D icon name (rendered in a pastel IconTile) or any node (e.g. a GlyphTile). */
   icon?: Icon3DName | React.ReactNode;
   tint?: Tint;
@@ -203,20 +206,43 @@ export function PageHeader({
   actions?: React.ReactNode;
   className?: string;
 }) {
+  // Each page owns its header: a compact frosted bar that stays pinned (below
+  // the notch) while the page scrolls. On phones the page actions sit just
+  // under it and scroll away, keeping the pinned bar slim; from `sm` up they
+  // live inside the bar.
   return (
-    <header className={`flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between ${className}`}>
-      <div className="flex items-center gap-3.5 min-w-0">
-        {icon && (isIconName(icon) ? <IconTile icon={icon} tint={tint} size={54} /> : <span className="shrink-0">{icon}</span>)}
-        <div className="min-w-0">
-          <h1 className="text-[22px] sm:text-[26px] font-extrabold leading-tight tracking-[-0.025em] text-ink">
+    <>
+      <header
+        className={`sticky z-30 top-[calc(env(safe-area-inset-top)+0.5rem)] flex items-center gap-3 rounded-[22px] border border-white/90 glass-bar px-3 py-2.5 shadow-[0_12px_28px_-16px_rgba(70,40,160,0.45)] sm:gap-3.5 sm:px-4 sm:py-3 ${className}`}
+      >
+        {back && (
+          <Link
+            href={back.href}
+            aria-label={back.label}
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-white bg-white text-ink-2 shadow-[0_6px_14px_-8px_rgba(70,40,160,0.4)] hover:text-brand-700 press"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+        )}
+        {icon &&
+          (isIconName(icon) ? (
+            <IconTile icon={icon} tint={tint} size={44} className="sm:!h-12 sm:!w-12" />
+          ) : (
+            <span className="shrink-0">{icon}</span>
+          ))}
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate text-[19px] sm:text-[23px] font-extrabold leading-tight tracking-[-0.025em] text-ink">
             {title}
             {highlight && <span className="text-gradient"> {highlight}</span>}
           </h1>
-          {subtitle && <p className="mt-0.5 text-[13px] sm:text-sm text-muted font-medium">{subtitle}</p>}
+          {subtitle && (
+            <p className="truncate text-[12.5px] sm:text-[13.5px] font-medium text-muted">{subtitle}</p>
+          )}
         </div>
-      </div>
-      {actions && <div className="flex flex-wrap items-center gap-2 sm:justify-end">{actions}</div>}
-    </header>
+        {actions && <div className="hidden shrink-0 items-center gap-2 sm:flex">{actions}</div>}
+      </header>
+      {actions && <div className="flex flex-wrap items-center gap-2 sm:hidden">{actions}</div>}
+    </>
   );
 }
 

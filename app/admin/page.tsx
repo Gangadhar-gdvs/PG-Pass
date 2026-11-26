@@ -209,8 +209,8 @@ function AdminBottomNav({
   return (
     <nav className="md:hidden fixed inset-x-0 bottom-0 z-40" aria-label="Admin sections">
       <div
-        className="glass-bar relative flex items-end rounded-t-[30px] border-t border-white px-1.5 pt-2.5 shadow-[0_-12px_34px_-14px_rgba(70,40,160,0.32)]"
-        style={{ paddingBottom: 'calc(0.35rem + env(safe-area-inset-bottom))' }}
+        className="relative flex items-end rounded-t-[26px] border-t border-[#EEE8FD] bg-white px-1.5 pt-2 shadow-[0_-10px_30px_-14px_rgba(70,40,160,0.30)]"
+        style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
       >
         {center ? (
           <>
@@ -221,10 +221,10 @@ function AdminBottomNav({
                 onClick={() => onSelect('telemetry')}
                 aria-label={center.short}
                 aria-current={centerActive ? 'page' : undefined}
-                className="relative -mt-9 grid h-[66px] w-[66px] place-items-center rounded-full bg-[image:var(--grad-brand)] text-white ring-[7px] ring-white/90 shadow-[0_14px_30px_-8px_rgba(106,43,234,0.7),0_0_0_12px_rgba(206,186,255,0.35)] press"
+                className="relative grid h-12 w-12 place-items-center rounded-full bg-[image:var(--grad-brand)] text-white shadow-[0_10px_20px_-8px_rgba(106,43,234,0.65),inset_0_1px_0_rgba(255,255,255,0.35)] ring-4 ring-brand-50 press"
               >
-                <span aria-hidden="true" className="absolute inset-x-3 top-1.5 h-1/3 rounded-full bg-white/25 blur-[2px]" />
-                <LayoutGrid className="relative h-7 w-7" strokeWidth={2.6} />
+                <span aria-hidden="true" className="absolute inset-x-2.5 top-1 h-1/3 rounded-full bg-white/25 blur-[2px]" />
+                <LayoutGrid className="relative h-6 w-6" strokeWidth={2.6} />
               </button>
               <span
                 aria-hidden="true"
@@ -580,28 +580,32 @@ export default function SuperAdminPortalPage() {
     const signedInButNotAdmin = !!currentUser && !isAdmin;
     return (
       <div
-        className="theme-admin flex min-h-screen flex-col items-center justify-center px-4 pb-10 text-ink"
-        style={{ paddingTop: 'max(2rem, env(safe-area-inset-top))' }}
+        className="theme-admin flex min-h-[100dvh] flex-col items-center justify-center px-4 text-ink sm:pb-10"
+        style={{
+          paddingTop: 'max(0.75rem, env(safe-area-inset-top))',
+          paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))',
+        }}
       >
         <div className="w-full max-w-md animate-pop">
-          <div className="mb-5 flex justify-center">
-            <Logo size={44} />
+          <div className="mb-3 flex justify-center sm:mb-5">
+            <Logo size={38} />
           </div>
 
-          <div className="app-card relative overflow-hidden p-6 sm:p-8">
+          <div className="app-card relative overflow-hidden p-5 sm:p-8">
             <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-20 h-52 w-52 rounded-full bg-brand-200/50 blur-3xl" />
             <div className="relative">
-              <Illustration name="hero-admin" width={280} priority float className="mx-auto block" />
+              {/* Phones: a smaller scene so the whole form fits one screen. */}
+              <Illustration name="hero-admin" width={280} priority float className="mx-auto block w-[118px] sm:w-[280px]" />
 
               <div className="mt-2 text-center">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-[image:var(--grad-brand)] px-3.5 py-1.5 text-[13px] font-bold text-white shadow-[var(--shadow-brand)]">
+                <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-[image:var(--grad-brand)] px-3.5 py-1.5 text-[13px] font-bold text-white shadow-[var(--shadow-brand)]">
                   <ShieldCheck className="h-4 w-4" aria-hidden="true" />
                   Admin Panel
                 </span>
-                <h1 className="mt-3 text-[24px] font-extrabold leading-tight tracking-[-0.025em] text-ink sm:text-[26px]">
+                <h1 className="mt-1 sm:mt-3 text-[24px] font-extrabold leading-tight tracking-[-0.025em] text-ink sm:text-[26px]">
                   PGPass <span className="text-gradient">Super Admin</span>
                 </h1>
-                <p className="mt-1.5 text-sm font-medium leading-relaxed text-muted">
+                <p className="mt-1.5 hidden sm:block text-sm font-medium leading-relaxed text-muted">
                   Sign in with your authorized admin email and password.
                 </p>
               </div>
@@ -611,7 +615,7 @@ export default function SuperAdminPortalPage() {
                   tone="danger"
                   title="Not an admin account"
                   description="You are signed in, but this account is not an authorized administrator. The admin console is restricted to provisioned admin accounts."
-                  className="mt-5 text-left"
+                  className="mt-4 sm:mt-5 text-left"
                 >
                   <div className="grid grid-cols-2 divide-x divide-white/70">
                     <Link
@@ -631,7 +635,7 @@ export default function SuperAdminPortalPage() {
                 </InfoBanner>
               )}
 
-              <form onSubmit={handleAuthSubmit} className="mt-6 space-y-4">
+              <form onSubmit={handleAuthSubmit} className="mt-4 space-y-3 sm:mt-6 sm:space-y-4">
                 <Input
                   label="Admin Email Address"
                   type="email"
@@ -664,7 +668,7 @@ export default function SuperAdminPortalPage() {
                 </Button>
               </form>
 
-              <div className="mt-6 flex items-center justify-between gap-3 border-t border-line pt-3 text-xs">
+              <div className="mt-4 sm:mt-6 flex items-center justify-between gap-3 border-t border-line pt-3 text-xs">
                 <span className="font-semibold text-muted">Authorized personnel only</span>
                 <Link href="/" className="inline-flex min-h-11 items-center font-bold text-brand-700 hover:underline">
                   Return Home

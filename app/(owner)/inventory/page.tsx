@@ -64,8 +64,14 @@ async function readError(res: Response, fallback: string): Promise<string> {
 
 function historyText(h: AssetHistoryEntry): { title: string; icon: Icon3DName; tint: Tint } {
   switch (h.action) {
-    case 'created':
-      return { title: `Added · ${h.toQuantity ?? ''} ${h.toCondition ? ASSET_CONDITION_LABELS[h.toCondition] : ''}`.trim(), icon: 'check', tint: 'mint' };
+    case 'created': {
+      const bad = h.toCondition === 'damaged' || h.toCondition === 'missing';
+      return {
+        title: `Added · qty ${h.toQuantity ?? '—'}${h.toCondition ? ` · ${ASSET_CONDITION_LABELS[h.toCondition]}` : ''}`,
+        icon: bad ? 'alert' : 'check',
+        tint: bad ? 'peach' : 'mint',
+      };
+    }
     case 'condition':
       return {
         title: `${h.fromCondition ? ASSET_CONDITION_LABELS[h.fromCondition] : '—'} → ${h.toCondition ? ASSET_CONDITION_LABELS[h.toCondition] : '—'}`,

@@ -23,6 +23,8 @@ export const OWNER_SCOPED = [
   'guest_stays',
   'properties',
   'staff_ratings',
+  'utility_bills',
+  'assets',
 ] as const;
 
 /** get: anyone (signed out too). list: anyone with limit ≤ 100. */

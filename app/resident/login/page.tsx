@@ -126,7 +126,7 @@ export default function ResidentLoginPage() {
       illustration="hero-resident"
       footnote="Your data stays private to you and your PG"
     >
-      <div className="theme-resident space-y-5">
+      <div className="theme-resident space-y-3.5 sm:space-y-5">
         <div>
           <h2 className="text-[24px] font-extrabold tracking-[-0.025em] text-ink">
             {mode === 'signup' ? (
@@ -139,17 +139,17 @@ export default function ResidentLoginPage() {
               </>
             )}
           </h2>
-          <p className="mt-1 text-[13px] font-medium text-muted">Access your PG, payments and issues.</p>
+          <p className="mt-1 hidden sm:block text-[13px] font-medium text-muted">Access your PG, payments and issues.</p>
         </div>
 
         {mode === 'signup' && (
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             <Input label="Your name" leading={<User />} value={name} onChange={(e) => setName(e.target.value)} disabled={busy} />
             <PhoneInput label="Phone (links you to your PG)" value={phone} onChange={setPhone} disabled={busy} />
           </div>
         )}
 
-        <form onSubmit={handleEmail} className="space-y-4">
+        <form onSubmit={handleEmail} className="space-y-3 sm:space-y-4">
           <Input label="Email" type="email" leading={<Mail />} placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required disabled={busy} />
           <Input label="Password" type="password" leading={<Lock />} placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required disabled={busy} />
           <Button type="submit" variant="solid" size="full" loading={busy} className="!h-12 text-[15px]">

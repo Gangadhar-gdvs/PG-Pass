@@ -55,8 +55,8 @@ const TYPE_VISUAL: Record<UtilityType, { icon: Icon3DName; tint: Tint }> = {
 
 const STATUS_META: Record<UtilityBillStatus, { label: string; badge: NonNullable<BadgeProps['variant']> }> = {
   draft: { label: 'Not applied', badge: 'pending' },
-  partial: { label: 'Partly applied', badge: 'verify' },
-  applied: { label: 'Applied to rent', badge: 'paid' },
+  partial: { label: 'Partial', badge: 'verify' },
+  applied: { label: 'Applied', badge: 'paid' },
   void: { label: 'Voided', badge: 'vacant' },
 };
 
@@ -616,7 +616,13 @@ function BillDetailDrawer({
       if (!res.ok) throw new Error(await readError(res, 'Could not void the bill'));
       const data = await res.json();
       const credits: Array<{ tenantName: string; paise: number }> = data.result?.credits || [];
+      const covered: string[] = data.result?.covered || [];
       toast.success('Bill voided and charges reversed');
+      if (covered.length > 0) {
+        toast(`${covered.join(', ')}: rent is now fully covered by payments already made — confirm it to issue the receipt.`, {
+          duration: 7000,
+        });
+      }
       if (credits.length > 0) {
         toast(`Overpaid now: ${credits.map((c) => `${c.tenantName} ${rupeeText(c.paise)}`).join(', ')} — refund or adjust next month.`, {
           duration: 7000,
@@ -947,22 +953,22 @@ function UtilitiesView() {
                   <ActivityRow
                     icon={tv.icon}
                     tint={tv.tint}
-                    title={
-                      <>
-                        {UTILITY_TYPE_LABELS[b.type]} · {b.scope === 'room' ? `Room ${b.roomNumber}` : 'Whole PG'}
-                      </>
-                    }
-                    subtitle={`${UTILITY_RULE_LABELS[b.rule]} · ${b.allocations.length} resident${b.allocations.length === 1 ? '' : 's'}${
-                      b.provider ? ` · ${b.provider}` : ''
-                    }`}
-                    trailing={
-                      <span className="flex flex-col items-end gap-1">
-                        <span className={`font-mono-numbers text-[14.5px] font-extrabold ${b.status === 'void' ? 'text-faint line-through' : 'text-ink'}`}>
-                          {rupeeText(b.totalPaise)}
-                        </span>
-                        <Badge variant={m.badge} dot>
+                    title={b.scope === 'room' ? `Room ${b.roomNumber}` : 'Whole PG'}
+                    subtitle={
+                      <span className="flex min-w-0 items-center gap-1.5 pt-0.5">
+                        <Badge variant={m.badge} dot className="shrink-0">
                           {m.label}
                         </Badge>
+                        <span className="truncate">
+                          {UTILITY_TYPE_LABELS[b.type]} · {UTILITY_RULE_LABELS[b.rule]} · {b.allocations.length} resident
+                          {b.allocations.length === 1 ? '' : 's'}
+                          {b.provider ? ` · ${b.provider}` : ''}
+                        </span>
+                      </span>
+                    }
+                    trailing={
+                      <span className={`font-mono-numbers text-[14.5px] font-extrabold ${b.status === 'void' ? 'text-faint line-through' : 'text-ink'}`}>
+                        {rupeeText(b.totalPaise)}
                       </span>
                     }
                     onClick={() => setOpenId(b.id)}

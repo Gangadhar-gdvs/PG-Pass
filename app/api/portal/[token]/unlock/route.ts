@@ -61,7 +61,11 @@ export const POST = withErrorHandler(
           period: r.period,
           roomNumber: r.roomNumber,
           bedLabel: r.bedLabel,
-          lineItems: r.lineItems || [],
+          // Explicit DTO: only what a resident needs to see (no internal ids/kinds).
+          lineItems: ((r.lineItems || []) as Array<{ label?: string; amountPaise?: number }>).map((li) => ({
+            label: li.label ?? '',
+            amountPaise: li.amountPaise ?? 0,
+          })),
           amountDuePaise: r.amountDuePaise,
           amountPaidPaise: r.amountPaidPaise || 0,
           status: r.status,

@@ -25,6 +25,7 @@ import {
   Plus,
   Zap,
   Package,
+  UserRound,
 } from 'lucide-react';
 import { Avatar } from '@/components/ui/avatar';
 import { PropertySwitcher } from '@/components/owner/PropertySwitcher';
@@ -88,6 +89,7 @@ export function OwnerShell({
   };
 
   const displayPhone = session.phoneNumber || '+91 Owner';
+  const isHome = pathname === '/dashboard';
   // Prefer the person's name for avatar initials; fall back to the phone.
   const avatarName = user?.displayName || displayPhone;
 
@@ -145,13 +147,19 @@ export function OwnerShell({
             </div>
 
             <div className="space-y-3 border-t border-line pt-4">
-              <div className="flex items-center gap-2.5 px-1">
+              <Link
+                href="/profile"
+                aria-current={pathname === '/profile' ? 'page' : undefined}
+                className={`flex items-center gap-2.5 rounded-2xl px-1.5 py-1.5 transition-colors hover:bg-brand-50 press ${
+                  pathname === '/profile' ? 'bg-brand-50' : ''
+                }`}
+              >
                 <Avatar name={avatarName} src={avatarUrl} size="md" />
                 <div className="min-w-0 flex-1">
                   <span className="block truncate text-[13px] font-bold text-ink">{isStaff ? 'Warden / Staff' : 'PG Owner'}</span>
-                  <span className="block truncate font-mono-numbers text-[11.5px] font-medium text-muted">{displayPhone}</span>
+                  <span className="block truncate text-[11.5px] font-semibold text-brand-700">View profile</span>
                 </div>
-              </div>
+              </Link>
               <button
                 type="button"
                 onClick={signOut}
@@ -164,13 +172,20 @@ export function OwnerShell({
           </div>
         </aside>
 
-        {/* Main column. On mobile a sticky top bar (logo + notices + profile)
-            gives fixed-header behaviour; desktop uses the sidebar. */}
+        {/* Main column. Only the home dashboard gets the app top bar (PG switcher +
+            profile); every other page shows its own sticky PageHeader. Desktop
+            uses the sidebar. */}
         <div className="flex-1 flex flex-col min-w-0 max-w-7xl w-full">
-          <OwnerTopBar onSignOut={signOut} avatarUrl={avatarUrl} avatarName={avatarName} />
+          {isHome && <OwnerTopBar avatarUrl={avatarUrl} avatarName={avatarName} />}
 
-          {/* `pb-28` on mobile reserves room for the fixed bottom nav + FAB. */}
-          <main className="flex-1 overflow-x-hidden px-4 sm:px-6 lg:px-8 pt-2 pb-28 md:py-7 w-full">
+          {/* overflow-x-CLIP (not hidden): `hidden` turns <main> into a scroll
+              container, which silently breaks position:sticky page headers.
+              Bottom padding clears the fixed tab bar + home-indicator inset. */}
+          <main
+            className={`flex-1 overflow-x-clip px-4 sm:px-6 lg:px-8 pb-[calc(6rem+env(safe-area-inset-bottom))] md:py-7 w-full ${
+              isHome ? 'pt-2' : 'pt-[max(0.5rem,env(safe-area-inset-top))]'
+            }`}
+          >
             <div className="animate-fade-up">{children}</div>
           </main>
         </div>
@@ -198,14 +213,23 @@ export function OwnerShell({
             navLinks.filter((l) => !['/dashboard', '/tenants', '/analytics'].includes(l.href))
           )}
           footer={
-            <button
-              type="button"
-              onClick={signOut}
-              className="flex w-full items-center justify-center gap-1.5 rounded-full border border-[#EEE8FD] bg-white py-3 text-sm font-bold text-ink-2 shadow-[0_6px_14px_-10px_rgba(70,40,160,0.4)] transition-colors hover:bg-danger-bg hover:text-danger-ink press"
-            >
-              <LogOut className="h-4 w-4" />
-              <span>Sign Out</span>
-            </button>
+            <div className="grid grid-cols-2 gap-2.5">
+              <Link
+                href="/profile"
+                className="flex items-center justify-center gap-1.5 rounded-full border border-[#EEE8FD] bg-white py-3 text-sm font-bold text-brand-700 shadow-[0_6px_14px_-10px_rgba(70,40,160,0.4)] press"
+              >
+                <UserRound className="h-4 w-4" />
+                <span>My Profile</span>
+              </Link>
+              <button
+                type="button"
+                onClick={signOut}
+                className="flex items-center justify-center gap-1.5 rounded-full border border-[#EEE8FD] bg-white py-3 text-sm font-bold text-ink-2 shadow-[0_6px_14px_-10px_rgba(70,40,160,0.4)] transition-colors hover:bg-danger-bg hover:text-danger-ink press"
+              >
+                <LogOut className="h-4 w-4" />
+                <span>Sign Out</span>
+              </button>
+            </div>
           }
         />
       </div>

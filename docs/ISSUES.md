@@ -117,6 +117,22 @@ headline cards). Spec: `docs/design-system.md`.
 - ✅ Gates: typecheck 0 · lint 0 · 86 tests · build ✓. All 24 routes screenshotted at 390px
   (and key ones at 1280px) against a seeded emulator: no horizontal overflow, no console errors.
 
+### Owner feedback round (27 Nov 2026) — navigation & mobile fit
+- 🟢 **Top bar only on Home.** The shared logo bar is gone from inner pages; the dashboard bar now has
+  the PG switcher (inline dropdown, no bottom sheet) on the left and the avatar on the right, which
+  opens the new **`/profile`** page (identity + photo, live bed stats, PG details, rent rules, plan,
+  properties with switching, edit + sign out). Sidebar identity block and the More sheet link to it too.
+- 🟢 **Every page has its own sticky header.** `PageHeader` is now a pinned frosted bar (verified: stays
+  at the top after scrolling 900px). Root cause it didn't work before: shells used
+  `overflow-x-hidden`, which turns `<main>` into a scroll container and breaks `position: sticky` —
+  now `overflow-x-clip`. Resident tenancy page got a sticky header with a back button.
+- 🟢 **Bottom bar gap + overflowing centre button.** Root cause of the gap: no `viewportFit: 'cover'`,
+  so `env(safe-area-inset-bottom)` was always 0 and the page stopped short of the home indicator. Bar is
+  now solid, fills to the edge, and the 56px centre button sits inside the bar (also on the admin
+  console's own bottom nav).
+- 🟢 **Sign-in screens scrolled on phones.** Owner/staff, resident and admin logins now fit one screen
+  with no scrolling — measured at 390×664 and 360×640 (button visible, page height = screen height).
+
 ### Bugs found during the redesign QA (not UI — logged, not changed)
 - 🟢 **Fixed:** `/tenants` + bed drawer read `tenant.depositPaid`, server writes `depositPaidPaise` → deposits showed ₹0
   (the drawer fell back to showing the monthly rent as the deposit). New `depositPaidRupees()` in `lib/utils`
@@ -296,8 +312,29 @@ super-admin; ONE backend for mobile/website/admin.
 - 🟢 **Phase 4b — Visitors log (BUILT).** Gate check-in/out, minimal data,
   "inside" count + one-tap checkout. `visitors.service` + `/api/visitors`
   (+`[id]/checkout`). `/visitors` page (staff-visible).
-- ⚪ **Phase 4 remainder (deferred):** utility/electricity split + inventory/assets
-  — lower value; deferred to prioritize Phase 5 hardening (P0-before-real-use).
+- 🟢 **Phase 4 remainder — utilities split + room inventory (BUILT).** `/utilities`
+  (owner-only): bills per room/whole PG, meter readings, equal / days-stayed /
+  custom split with exact largest-remainder paise rounding, live preview, 409 on
+  duplicates, idempotent "apply to rent" (line items on `{tenantId}_{period}`),
+  void with append-only reversal + audit log. `/inventory` (staff-visible, writes
+  need `manage_beds`): per-room/common assets with append-only condition history.
+  `utilities.service`, `assets.service`, pure `lib/utilitySplit.ts` +
+  `lib/assets.ts`; rules + indexes added. Tests: `utilitySplit`, `utilitiesService`,
+  `assets` (+53). Decision: a resident with no rent record for the bill's month
+  (or a payment awaiting verification) is **skipped with a reason**, never given an
+  invented rent bill; re-applying picks them up.
+  - 🟢 **Fixed: cron generated next-month rent for moved-out residents.** `/api/cron/metrics`
+    selected `tenants where deletedAt == null`, but move-out keeps `deletedAt` null (past residents
+    stay listed) and only sets `moveOutDate` + vacates the bed — so moved-out residents were billed
+    every month, priced from a bed that may now be someone else's. Now each tenant passes the pure
+    `rentBillEligibility()` (`lib/rentEligibility.ts`): no bill if they moved out before the period
+    starts, or their bed is vacant / assigned to another resident (covers legacy move-outs without a
+    date). Skips are reported as `skippedNotResident`. Tests: `rentEligibility.test.ts` (5).
+  - 🟢 **Fixed: portal unlock returned raw `lineItems`** (internal `kind`/`utilityBillId` reached
+    residents). Now mapped to the `{ label, amountPaise }` DTO.
+  - ⚪ **Utilities/inventory follow-ups (blueprint scope beyond the MVP, not defects):** bill evidence
+    photo upload + resident dispute flow; asset issue/return movements + stock alerts; meter rollover
+    maximum (the "reset" option assumes a new meter starting at 0).
 - 🟡 **Phase 5 — hardening (STARTED).** Done so far:
   - **New security tests (+18):** `adminPermissions` (super/staff rule, admins.manage
     super-only, suspended blocked), `noticeVisibility` (cross-audience/room/expiry

@@ -105,6 +105,38 @@ npm test            # vitest unit tests
 npm run build       # production build
 ```
 
+### Testing
+
+| Suite | Command | Needs |
+|---|---|---|
+| Unit (`tests/unit`) | `npm test` | nothing — no emulator |
+| Firestore rules (`tests/rules`) | `npm run test:rules` | Firebase CLI; boots a throwaway Firestore emulator via `emulators:exec` |
+| …against an emulator you already run | `npm run test:rules:running` | emulator on `127.0.0.1:8080` (or `FIRESTORE_EMULATOR_HOST`) |
+| E2E golden paths (`e2e/`, Playwright) | `npm run test:e2e` | the local stack below already running |
+| Backup → restore drill | `npm run restore:drill` | emulator running (see `docs/runbook.md` §3) |
+
+The rules suite uses its own `demo-rules-*` project ids, so it never touches app
+data. `tests/rules/collections.ts` classifies every `match` in `firestore.rules`;
+adding a collection to the rules without classifying it fails the suite.
+
+**E2E local stack** (Playwright starts nothing; it uses the system Chrome, so no
+browser download):
+
+```bash
+firebase emulators:start --only auth,firestore --project demo-pgpass
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=demo-pgpass \
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/dummy-service-account.json \
+NEXT_PUBLIC_APP_URL=http://localhost:5000 \
+  npx next dev -p 5000 -H localhost
+npm run test:e2e        # E2E_BASE_URL overrides http://localhost:5000
+```
+
+`e2e/global-setup.ts` wipes and reseeds its own `e2e-*` owner/admin/resident and
+"E2E Lotus Residency" data in the `demo-pgpass` emulator on every run (it never
+touches other seed data). Reports, traces and saved sessions go to
+`node_modules/.cache/pgpass-e2e/`. Tests marked `test.fixme` document known app
+bugs — remove the marker once the bug is fixed.
+
 ---
 
 ## 📂 Project Structure
