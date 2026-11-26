@@ -16,7 +16,7 @@
 export const STAFF_PERMISSIONS = {
   COLLECT_RENT: 'collect_rent', // record/confirm payments, reminders
   MANAGE_TENANTS: 'manage_tenants', // add/move residents, deposits
-  MANAGE_BEDS: 'manage_beds', // bed inventory
+  MANAGE_BEDS: 'manage_beds', // bed inventory + room inventory/assets (/inventory)
   MANAGE_GUESTS: 'manage_guests', // guest check-in/out
   MANAGE_MAINTENANCE: 'manage_maintenance', // resolve tickets
   MANAGE_EXPENSES: 'manage_expenses', // log expenses
@@ -41,7 +41,7 @@ export const DEFAULT_STAFF_PERMISSIONS: StaffPermission[] = [
 export const STAFF_PERMISSION_LABELS: Record<StaffPermission, string> = {
   [STAFF_PERMISSIONS.COLLECT_RENT]: 'Collect & confirm rent',
   [STAFF_PERMISSIONS.MANAGE_TENANTS]: 'Manage residents & deposits',
-  [STAFF_PERMISSIONS.MANAGE_BEDS]: 'Manage bed inventory',
+  [STAFF_PERMISSIONS.MANAGE_BEDS]: 'Manage beds & room inventory',
   [STAFF_PERMISSIONS.MANAGE_GUESTS]: 'Manage guest stays',
   [STAFF_PERMISSIONS.MANAGE_MAINTENANCE]: 'Handle maintenance issues',
   [STAFF_PERMISSIONS.MANAGE_EXPENSES]: 'Log expenses',

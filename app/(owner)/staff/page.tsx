@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useOwnerSession } from '@/hooks/useOwner';
 import { PLAN_LIMITS } from '@/lib/constants/limits';
-import { PLAN_TIER, PlanTier, ACCOUNT_STATUS } from '@/lib/constants/status';
+import { PlanTier, ACCOUNT_STATUS } from '@/lib/constants/status';
 import {
   UserPlus,
   ShieldCheck,
@@ -28,7 +28,7 @@ import { HeaderSkeleton, CardListSkeleton, ListSkeleton } from '@/components/ui/
 import { PageHeader, SectionCard, InfoBanner } from '@/components/ui/dashboard-kit';
 import { GlyphTile, IconBubble } from '@/components/brand/Icon3D';
 import { validatePhone, sanitizeText } from '@/lib/security';
-import { errorMessage } from '@/lib/utils';
+import { errorMessage, ownerPlanTier } from '@/lib/utils';
 import { OwnerOnlyGuard } from '@/components/owner/OwnerOnlyGuard';
 import { StaffPermissionsEditor } from '@/components/owner/StaffPermissionsEditor';
 import {
@@ -38,6 +38,8 @@ import {
 } from '@/lib/constants/permissions';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
+import { copyText } from '@/lib/client/clipboard';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 interface StaffMember {
   uid: string;
@@ -56,7 +58,8 @@ function StaffPageInner() {
   const { ownerId } = useOwnerSession();
 
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
-  const [profile, setProfile] = useState<{ planTier?: PlanTier } | null>(null);
+  const [askConfirm, confirmDialogEl] = useConfirm();
+  const [profile, setProfile] = useState<{ plan?: PlanTier; planTier?: PlanTier } | null>(null);
   const [loading, setLoading] = useState(true);
   const [permsOpenUid, setPermsOpenUid] = useState<string | null>(null);
 
@@ -103,7 +106,7 @@ function StaffPageInner() {
     };
   }, [ownerId]);
 
-  const currentTier: PlanTier = (profile?.planTier as PlanTier) || PLAN_TIER.FREE;
+  const currentTier: PlanTier = ownerPlanTier(profile);
   const currentLimits = PLAN_LIMITS[currentTier] || PLAN_LIMITS.free;
   const canAddStaff = staffList.length < currentLimits.maxStaff;
 
@@ -186,9 +189,12 @@ function StaffPageInner() {
   };
 
   const handleRevoke = async (staff: StaffMember) => {
-    if (!confirm(`Are you sure you want to permanently revoke access for ${staff.name}?`)) {
-      return;
-    }
+    const ok = await askConfirm({
+      title: 'Revoke staff access?',
+      message: `${staff.name} will immediately lose access to this PG. This can't be undone from here.`,
+      confirmLabel: 'Revoke access',
+    });
+    if (!ok) return;
 
     try {
       const res = await fetch(`/api/staff/${staff.uid}`, {
@@ -504,9 +510,9 @@ function StaffPageInner() {
                 type="button"
                 variant="solid"
                 className="flex-1"
-                onClick={() => {
-                  navigator.clipboard?.writeText(setupLinkInfo.link);
-                  toast.success('Setup link copied');
+                onClick={async () => {
+                  if (await copyText(setupLinkInfo.link)) toast.success('Setup link copied');
+                  else toast.error('Could not copy — long-press or select the text to copy it manually');
                 }}
               >
                 <Copy className="h-4 w-4" />
@@ -527,6 +533,7 @@ function StaffPageInner() {
           </div>
         )}
       </Drawer>
+      {confirmDialogEl}
     </div>
   );
 }

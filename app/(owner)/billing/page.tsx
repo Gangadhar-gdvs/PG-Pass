@@ -6,7 +6,7 @@ import { useBeds } from '@/hooks/useBeds';
 import { PLAN_LIMITS } from '@/lib/constants/limits';
 import { PLAN_TIER, PlanTier } from '@/lib/constants/status';
 import type { Owner } from '@/types';
-import { formatCurrency, errorMessage } from '@/lib/utils';
+import { formatCurrency, errorMessage, ownerPlanTier } from '@/lib/utils';
 import { generateQrDataUrl } from '@/lib/client/qrcode';
 import { buildUpiPayload } from '@/lib/client/upi';
 import { Check, Camera, Sparkles, ArrowRight } from 'lucide-react';
@@ -189,7 +189,7 @@ function BillingPageInner() {
     if (ownerId) load();
   }, [ownerId]);
 
-  const currentTier: PlanTier = (profile?.planTier as PlanTier) || PLAN_TIER.FREE;
+  const currentTier: PlanTier = ownerPlanTier(profile);
   const currentLimits = PLAN_LIMITS[currentTier] || PLAN_LIMITS.free;
 
   const totalBedsCount = beds.length;

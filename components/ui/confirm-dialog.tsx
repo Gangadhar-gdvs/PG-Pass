@@ -132,3 +132,47 @@ export function ConfirmDialog({
     </div>
   );
 }
+
+export interface ConfirmOptions {
+  title: string;
+  message: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  tone?: 'danger' | 'default';
+}
+
+/**
+ * Promise-based confirmation in the app's own dialog (replaces the browser's
+ * unstyled `window.confirm`). Render `dialog` once in the component, then:
+ *
+ *   const [confirm, dialog] = useConfirm();
+ *   if (!(await confirm({ title: 'Remove photo?', message: '…' }))) return;
+ */
+export function useConfirm() {
+  const [pending, setPending] = React.useState<(ConfirmOptions & { resolve: (ok: boolean) => void }) | null>(null);
+
+  const confirm = React.useCallback(
+    (opts: ConfirmOptions) => new Promise<boolean>((resolve) => setPending({ ...opts, resolve })),
+    []
+  );
+
+  const settle = (ok: boolean) => {
+    pending?.resolve(ok);
+    setPending(null);
+  };
+
+  const dialog = (
+    <ConfirmDialog
+      open={pending !== null}
+      title={pending?.title ?? ''}
+      message={pending?.message ?? ''}
+      confirmLabel={pending?.confirmLabel}
+      cancelLabel={pending?.cancelLabel}
+      tone={pending?.tone ?? 'danger'}
+      onConfirm={() => settle(true)}
+      onCancel={() => settle(false)}
+    />
+  );
+
+  return [confirm, dialog] as const;
+}

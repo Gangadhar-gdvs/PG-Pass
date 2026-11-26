@@ -20,6 +20,8 @@ const PROTECTED_PREFIXES = [
   '/rent',
   '/staff',
   '/billing',
+  '/utilities',
+  '/inventory',
 ];
 
 // Which host serves the ADMIN console. Set `ADMIN_HOST` in the admin deployment

@@ -116,8 +116,19 @@ export function ProofUploader({
         </div>
       ) : (
         <div
-          onClick={() => fileInputRef.current?.click()}
-          className="group cursor-pointer rounded-[22px] border-2 border-dashed border-brand-200 bg-brand-50/70 p-5 text-center transition-colors hover:border-brand-300 hover:bg-white"
+          role="button"
+          tabIndex={uploading ? -1 : 0}
+          aria-label="Take a photo or select a payment screenshot"
+          aria-disabled={uploading || undefined}
+          onClick={() => !uploading && fileInputRef.current?.click()}
+          onKeyDown={(e) => {
+            if (e.target !== e.currentTarget || uploading) return;
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault(); // also keeps Enter from submitting the surrounding claim form
+              fileInputRef.current?.click();
+            }
+          }}
+          className="group cursor-pointer rounded-[22px] border-2 border-dashed border-brand-200 bg-brand-50/70 p-5 text-center transition-colors hover:border-brand-300 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
         >
           <IconBubble
             icon={<Camera className="h-6 w-6 text-brand" />}
@@ -134,7 +145,7 @@ export function ProofUploader({
 
           {uploading && (
             <div className="mt-3.5 space-y-1.5">
-              <ProgressBar value={progress} color="amber" height="sm" />
+              <ProgressBar value={progress} height="sm" />
               <span className="block text-[11.5px] font-semibold text-brand-700">
                 Encrypting & uploading to private storage... {progress}%
               </span>

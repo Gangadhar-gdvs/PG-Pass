@@ -33,6 +33,20 @@ interface BedCardProps {
  * Round white 44px icon button used on pastel bed tiles / rows (the kit has no
  * icon-only button). `title` doubles as the accessible name.
  */
+/**
+ * Keyboard activation for clickable tiles/rows (Enter / Space), ignoring key
+ * events that bubble up from buttons inside the tile.
+ */
+export function activateOnKey(handler: () => void) {
+  return (e: React.KeyboardEvent<HTMLElement>) => {
+    if (e.target !== e.currentTarget) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handler();
+    }
+  };
+}
+
 export function TileIconButton({
   title,
   onClick,
@@ -105,10 +119,16 @@ export function BedCard({
     window.open(link, '_blank');
   };
 
+  const openTile = () => (onSelectBed ? onSelectBed(bed) : isVacant ? onAddTenant(bed) : undefined);
+
   return (
     <div
-      onClick={() => onSelectBed ? onSelectBed(bed) : isVacant ? onAddTenant(bed) : undefined}
-      className={`tint-card tint-${tint} @container group relative flex h-full cursor-pointer flex-col gap-2.5 p-3 text-left press lift ${
+      role="button"
+      tabIndex={0}
+      aria-label={`Bed ${bed.bedLabel}${isVacant ? ', vacant' : bed.tenantName ? `, ${bed.tenantName}` : ''} — open details`}
+      onClick={openTile}
+      onKeyDown={activateOnKey(openTile)}
+      className={`tint-card tint-${tint} @container group relative flex h-full cursor-pointer flex-col gap-2.5 p-3 text-left press lift focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${
         isVacant ? 'border-dashed border-line-strong' : ''
       }`}
     >
@@ -204,7 +224,9 @@ export function BedCard({
               </TileIconButton>
             )}
 
-            {!isPaid && (
+            {/* Rent actions only when there IS a bill this month (guests are billed
+                via guest stays; "No bill" beds have nothing to remind or mark). */}
+            {!isPaid && !isGuest && !noBill && rentRecord && (
               <>
                 <TileIconButton
                   title="Send WhatsApp Reminder"

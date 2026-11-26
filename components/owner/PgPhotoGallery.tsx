@@ -13,6 +13,7 @@ import { GlyphTile, IconBubble } from '@/components/brand/Icon3D';
 import { Camera, Trash2, ImagePlus } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { errorMessage } from '@/lib/utils';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 interface GalleryPhoto {
   id: string;
@@ -38,6 +39,7 @@ const CATEGORY_LABELS: Record<string, string> = {
  */
 export function PgPhotoGallery({ propertyId }: { propertyId?: string }) {
   const [photos, setPhotos] = useState<GalleryPhoto[]>([]);
+  const [askConfirm, confirmDialogEl] = useConfirm();
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [category, setCategory] = useState<string>('exterior');
@@ -105,7 +107,12 @@ export function PgPhotoGallery({ propertyId }: { propertyId?: string }) {
   };
 
   const remove = async (id: string) => {
-    if (!confirm('Remove this photo from your public gallery?')) return;
+    const ok = await askConfirm({
+      title: 'Remove this photo?',
+      message: 'It will be removed from your public PG gallery.',
+      confirmLabel: 'Remove photo',
+    });
+    if (!ok) return;
     try {
       const res = await fetch(`/api/properties/photos/${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Delete failed');
@@ -239,6 +246,7 @@ export function PgPhotoGallery({ propertyId }: { propertyId?: string }) {
           ))}
         </div>
       )}
+      {confirmDialogEl}
     </section>
   );
 }

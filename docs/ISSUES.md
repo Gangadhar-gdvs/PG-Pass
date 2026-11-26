@@ -118,19 +118,56 @@ headline cards). Spec: `docs/design-system.md`.
   (and key ones at 1280px) against a seeded emulator: no horizontal overflow, no console errors.
 
 ### Bugs found during the redesign QA (not UI — logged, not changed)
-- 🔴 `/tenants` + bed drawer read `tenant.depositPaid`, server writes `depositPaidPaise` → deposits show ₹0.
-- 🔴 `/billing` reads `profile.planTier`, server writes `plan` → a Pro owner shows "Free Plan · 30/20 beds".
-- 🔴 `/admin` resident table shows `tenant.monthlyRent`, which tenant creation never writes → ₹0/month.
-- 🔴 `lib/config.ts isConfigured()` returns false for project id `pgpass-demo`, so the documented
-  emulator setup disables every client listener (use `demo-pgpass` locally).
-- 🔴 Local emulator session writes fail with "Could not load the default credentials" because the
-  Admin SDK uses `preferRest`; workaround: point `GOOGLE_APPLICATION_CREDENTIALS` at a dummy SA key.
-- 🔴 RoomCard: guest beds fall through to the "Due" badge and show the WhatsApp reminder button.
-- 🔴 Bed tiles/rows are click-only `div`s — not keyboard-operable.
-- 🔴 BankCsvReconciler says "drop it here" but has no drag-and-drop handler.
-- 🔴 WhatsAppReminderModal doesn't await `navigator.clipboard.writeText` (toast shows even on failure).
-- ⚪ `PropertySetupWizard` accepts `onCancel` but never uses it; staff revoke + PG photo delete still use
-  `window.confirm()` instead of `ConfirmDialog`.
+- 🟢 **Fixed:** `/tenants` + bed drawer read `tenant.depositPaid`, server writes `depositPaidPaise` → deposits showed ₹0
+  (the drawer fell back to showing the monthly rent as the deposit). New `depositPaidRupees()` in `lib/utils`
+  (paise first, legacy rupee field as fallback); drawer shows "of ₹X agreed" when short of `securityDepositPaise`;
+  Residents deposit column now sorts on `depositPaidPaise`.
+- 🟢 **Fixed:** `/billing` **and `/staff`** read `profile.planTier`, server writes `plan` → a Pro owner saw "Free Plan"
+  and "Staff delegation is locked on Free tier". New `ownerPlanTier()` in `lib/utils` (`plan`, legacy `planTier` alias, Free fallback).
+- 🟢 **Fixed:** `/admin` resident list/table showed `tenant.monthlyRent`, which tenant creation never writes → ₹0/month.
+  Rent is now taken from the tenant's bed (already loaded); "Default rent" (also never written on owners) falls back
+  to the PG's bed rent range. The "Monthly Rent" column sorts correctly.
+- 🟢 **Fixed: admin console sign-in always failed** — the `/admin` form POSTed `{ idToken }` without `mode`, which
+  `/api/auth/session` treats as a background refresh and rejects when the browser has no session id
+  ("No active session to refresh"). Now sends `mode: 'login'` (admins are exempt from single-session, so no takeover prompt).
+- ✅ Tests: `tests/unit/ownerFieldReaders.test.ts` (9). Verified in the browser against a seeded emulator
+  (Pro owner, deposits in paise): Deposits Held ₹22,000, Pro plan shown, staff unlocked, drawer "₹5,000 of ₹7,500 agreed",
+  admin rents ₹7,500–₹11,000 per bed, admin form sign-in succeeds.
+- 🟢 **Fixed:** `lib/config.ts isConfigured()` returned false for the documented emulator project id
+  `pgpass-demo`, disabling every client listener locally. Emulator mode (`NEXT_PUBLIC_USE_EMULATORS=true`)
+  now always counts as configured.
+- 🟢 **Fixed:** local emulator writes failed with "Could not load the default credentials" — the Admin
+  SDK's `preferRest` transport demands Google ADC even against the emulator. `preferRest` is now only
+  enabled for real Firebase (`lib/server/firebase-admin.ts`). Root cause proven in isolation
+  (emulator, no credentials: REST fails, gRPC works); no dummy key needed any more.
+- 🟢 **Fixed:** guest beds showed "Due" + the WhatsApp reminder (RoomCard) and Remind/Mark-Paid
+  (BedCard). Guests are billed via guest stays: both now show a "Guest" badge and no rent actions;
+  rent actions only appear when a bill exists for the month.
+- 🟢 **Fixed (found while fixing the above): "Mark Paid" on a bed with no rent record showed a false
+  "Bed X marked as Paid" success** and flipped the drawer to Paid without saving anything. It now
+  tells the owner there's no bill this month (dashboard `handleMarkPaid`).
+- 🟢 **Fixed:** bed tiles/rows are now keyboard-operable (`role="button"`, focusable, Enter/Space,
+  descriptive aria-label, focus ring; inner buttons don't double-trigger). Verified: Tab + Enter opens the drawer.
+- 🟢 **Fixed:** BankCsvReconciler drop zone now accepts dragged CSV files (drag-over highlight + hint);
+  picker and drop share one `processFile`; re-picking the same file works. Verified with a real drop event.
+- 🟢 **Fixed:** "copied" toasts showed even when copying failed — not just WhatsAppReminderModal but also
+  the Residents portal link, staff setup link, admin resident link and the resident's UPI-ID copy. All now
+  use `copyText()` (`lib/client/clipboard.ts`: awaited Clipboard API + execCommand fallback) and only
+  confirm on success.
+- 🟢 **Fixed:** `PropertySetupWizard` ignored `onCancel`, so an owner who opened "Room Setup" could not
+  leave without finishing. It now shows "Cancel setup" (hero) + "Cancel" (step 1) when re-opened.
+- 🟢 **Fixed:** every native browser dialog replaced with the styled `ConfirmDialog` via a new
+  promise-based `useConfirm()` hook — staff revoke, PG photo delete, admin revoke-staff, admin
+  suspend/reactivate account, and the single-session "log in here?" takeover on owner + resident login.
+  No `window.confirm/alert/prompt` remain in the app.
+- 🟢 **Fixed:** Settings saved a fake placeholder phone (`9876543210`) when the owner had none, and had no
+  phone field at all. Now a validated `PhoneInput` field; nothing fake is ever persisted.
+- 🟢 **Fixed:** Expenses "This Month" total stayed stale after deleting an expense (server total now
+  re-synced quietly after delete).
+- 🟢 **Fixed:** resident ProofUploader drop zone was click-only — now keyboard-operable (Enter/Space;
+  doesn't submit the surrounding claim form). Upload progress uses the brand colour.
+- 🟢 **Fixed:** avatar initials showed "+O" for owners without a name/phone (`+91 Owner`); initials now
+  ignore non-letter tokens and the shell prefers the signed-in user's display name.
 
 ## UI redesign v3 (superseded by v4 above — match design-ref screenshots: violet gradients, 3D depth, soft/clean)
 - 🟢 **Design foundation** — `app/globals.css` v3 tokens: lavender canvas, violet
@@ -173,7 +210,8 @@ headline cards). Spec: `docs/design-system.md`.
 - 🟢 Grids are responsive: admin StatTiles `grid-cols-2 sm:grid-cols-4`; StatsBar
   tiles `grid-cols-2`; quick-actions `grid-cols-3`; bed-grid filter bar keeps
   `overflow-x-auto`.
-- ⚠️ **Authenticated dashboard interiors (owner/resident/admin) not screenshotted**
+- 🟢 *(Superseded by v4: all authenticated routes were screenshotted against seeded emulators.)*
+  ~~**Authenticated dashboard interiors (owner/resident/admin) not screenshotted**~~
   — the local Firestore emulator's gRPC transport won't load default credentials
   for the session-write path (a known emulator/`preferRest` quirk, NOT a prod bug;
   prod has real creds). Those pages compile/typecheck/lint clean and use the same
@@ -290,11 +328,15 @@ super-admin; ONE backend for mobile/website/admin.
   New server-only Firestore rules + indexes for notices/staff_tasks/visitors.
 
 ## Follow-ups (explicitly deferred, not forgotten)
-- 🔴 **#6 avatar image upload** — the top-bar profile currently shows initials
-  (`Avatar name=...`). Owner also asked to upload a profile pic. Needs: a B2
-  upload intent/confirm for an `owner_avatar` photo type + storing
-  `avatarUrl` on the owner doc + rendering it in `Avatar`. Deferred to keep the
-  layout change focused; no data model exists for it yet.
+- 🟢 **#6 avatar image upload — BUILT.** Private storage (never a public URL): client compresses to
+  ≤512px WebP (EXIF stripped) → presigned PUT into `pending/{ownerId}/avatar/` → `POST /api/owners/avatar`
+  confirm checks key ownership (strict UUID pattern, no path tricks), size ≤1 MB and magic bytes → moves
+  to `avatar/{ownerId}/`, stores `owners.avatarKey`, deletes the previous picture → UI only receives
+  short-lived presigned GET URLs (`GET /api/owners/avatar`); `DELETE` removes it. Change/remove from the
+  mobile profile sheet and Settings (`OwnerAvatarEditor`); every avatar updates live. `Avatar` gained
+  `src` with initials fallback (also when a URL expires). Data inventory updated. Tests:
+  `tests/unit/ownerAvatar.test.ts` (7). Not exercised against real object storage locally (no MinIO/B2
+  in this environment) — verify one upload on staging.
 
 ## Notes / decisions
 - **Stack decision:** keep Next.js 16 + Firebase + B2 (production-grade, ₹0).

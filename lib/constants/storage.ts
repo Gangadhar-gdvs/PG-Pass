@@ -6,6 +6,7 @@ export const STORAGE_PREFIX = {
   ID_PROOF: 'id_proof/',
   AGREEMENT: 'agreement/',
   PROPERTY: 'property/', // PG gallery photos — PUBLIC-read, shown in discovery
+  AVATAR: 'avatar/', // owner profile pictures — PRIVATE, served via short-lived presigned GET
 } as const;
 
 // PG gallery photo categories (owner tags each uploaded photo).

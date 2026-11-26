@@ -20,6 +20,7 @@ import { InfoBanner } from '@/components/ui/dashboard-kit';
 import { AuthShell, AuthLoader } from '@/components/brand/AuthShell';
 import { Icon3D } from '@/components/brand/Icon3D';
 import toast from 'react-hot-toast';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 /** Narrow an unknown caught value to the Firebase auth error `code` string. */
 function authErrorCode(e: unknown): string {
@@ -48,6 +49,7 @@ function LoginFormContent() {
   // takes over. Keeps a full-screen loader on top of the (now stale) login form
   // so the user never stares at the old page during the server round-trip.
   const [redirecting, setRedirecting] = useState(false);
+  const [askConfirm, confirmDialogEl] = useConfirm();
 
   // Exchange Firebase ID token for httpOnly session cookie. Runs only AFTER
   // Firebase has verified the user's credentials, so the "log out other device"
@@ -70,11 +72,12 @@ function LoginFormContent() {
     if (res.status === 409) {
       const data = await res.json().catch(() => ({}));
       if (data.code === 'ACTIVE_SESSION_EXISTS' && !takeover) {
-        const proceed =
-          typeof window !== 'undefined' &&
-          window.confirm(
-            'This account is already signed in on another device. Only one active session is allowed.\n\nLog in here and sign out the other device?'
-          );
+        const proceed = await askConfirm({
+          title: 'Signed in on another device',
+          message: 'Only one active session is allowed. Log in here and sign out the other device?',
+          confirmLabel: 'Log in here',
+          tone: 'default',
+        });
         if (!proceed) {
           // User chose to stay logged out here; the other device remains active.
           throw new Error('Sign-in cancelled — the other device is still active.');
@@ -368,6 +371,7 @@ function LoginFormContent() {
           <ArrowRight className="h-4 w-4 text-brand" />
         </Link>
       </div>
+      {confirmDialogEl}
     </AuthShell>
   );
 }

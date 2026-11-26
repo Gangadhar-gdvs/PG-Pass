@@ -17,6 +17,7 @@ import { errorMessage } from '@/lib/utils';
 import { ArrowRight, Lock, Mail, User } from 'lucide-react';
 import { AuthShell } from '@/components/brand/AuthShell';
 import toast from 'react-hot-toast';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 export default function ResidentLoginPage() {
   const router = useRouter();
@@ -26,6 +27,7 @@ export default function ResidentLoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
+  const [askConfirm, confirmDialogEl] = useConfirm();
 
   // After Firebase auth: (optionally) register as resident, then mint session.
   const finish = async (idToken: string, isNew: boolean) => {
@@ -65,11 +67,12 @@ export default function ResidentLoginPage() {
     if (res.status === 409) {
       const data = await res.json().catch(() => ({}));
       if (data.code === 'ACTIVE_SESSION_EXISTS' && !takeover) {
-        const proceed =
-          typeof window !== 'undefined' &&
-          window.confirm(
-            'This account is already signed in on another device. Only one active session is allowed.\n\nLog in here and sign out the other device?'
-          );
+        const proceed = await askConfirm({
+          title: 'Signed in on another device',
+          message: 'Only one active session is allowed. Log in here and sign out the other device?',
+          confirmLabel: 'Log in here',
+          tone: 'default',
+        });
         if (!proceed) throw new Error('Sign-in cancelled — the other device is still active.');
         return mintSession(idToken, true);
       }
@@ -179,6 +182,7 @@ export default function ResidentLoginPage() {
           {mode === 'signup' ? 'Already have an account? Login' : 'New here? Create an account'}
         </button>
       </div>
+      {confirmDialogEl}
     </AuthShell>
   );
 }

@@ -14,6 +14,7 @@ import { ProgressBar } from '@/components/ui/progress-bar';
 import { SectionHeader } from '@/components/ui/dashboard-kit';
 import { Illustration } from '@/components/brand/Illustration';
 import toast from 'react-hot-toast';
+import { copyText } from '@/lib/client/clipboard';
 
 interface WhatsAppReminderModalProps {
   isOpen: boolean;
@@ -116,10 +117,10 @@ export function WhatsAppReminderModal({
     }
   };
 
-  const handleCopyMessage = (bed: Bed) => {
+  const handleCopyMessage = async (bed: Bed) => {
     const message = getReminderMessage(bed);
-    navigator.clipboard.writeText(message);
-    toast.success('Reminder message copied to clipboard');
+    if (await copyText(message)) toast.success('Reminder message copied to clipboard');
+    else toast.error('Could not copy — long-press or select the text to copy it manually');
   };
 
   const currentBed = pendingItems[currentIndex] || pendingItems[0];

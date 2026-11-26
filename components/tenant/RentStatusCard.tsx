@@ -22,6 +22,7 @@ import { InfoBanner, KeyValue } from '@/components/ui/dashboard-kit';
 import { Icon3D, IconTile } from '@/components/brand/Icon3D';
 import { ProofUploader } from './ProofUploader';
 import toast from 'react-hot-toast';
+import { copyText } from '@/lib/client/clipboard';
 
 interface RentStatusCardProps {
   tenant: {
@@ -81,9 +82,12 @@ export function RentStatusCard({
     rentRecord?.monthYear ||
     new Date().toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
 
-  const handleCopyUpi = () => {
+  const handleCopyUpi = async () => {
     if (!pg.upiId) return;
-    navigator.clipboard.writeText(pg.upiId);
+    if (!(await copyText(pg.upiId))) {
+      toast.error('Could not copy — long-press or select the text to copy it manually');
+      return;
+    }
     setCopiedUpi(true);
     toast.success('UPI ID copied to clipboard');
     setTimeout(() => setCopiedUpi(false), 2000);

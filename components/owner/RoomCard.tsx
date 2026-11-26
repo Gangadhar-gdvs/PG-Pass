@@ -6,7 +6,7 @@ import { formatCurrency, getWhatsAppLink } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge, type BadgeProps } from '@/components/ui/badge';
 import { IconTile, type Tint } from '@/components/brand/Icon3D';
-import { TileIconButton } from './BedCard';
+import { TileIconButton, activateOnKey } from './BedCard';
 import {
   UserPlus,
   Send,
@@ -176,8 +176,12 @@ export function RoomCard({
           return (
             <div
               key={bed.id}
+              role="button"
+              tabIndex={0}
+              aria-label={`Bed ${bed.bedLabel}${isVacant ? ', vacant' : bed.tenantName ? `, ${bed.tenantName}` : ''} — open details`}
               onClick={() => (onSelectBed ? onSelectBed(bed) : isVacant ? onAddTenant(bed) : undefined)}
-              className={`tint-card tint-${tint} group/bed relative flex min-h-14 cursor-pointer items-center justify-between gap-2 py-2 pl-2.5 pr-2 press ${
+              onKeyDown={activateOnKey(() => (onSelectBed ? onSelectBed(bed) : isVacant ? onAddTenant(bed) : undefined))}
+              className={`tint-card tint-${tint} group/bed relative flex min-h-14 cursor-pointer items-center justify-between gap-2 py-2 pl-2.5 pr-2 press focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${
                 isVacant ? 'border-dashed border-line-strong' : ''
               }`}
             >
@@ -226,7 +230,9 @@ export function RoomCard({
                 ) : (
                   <>
                     {/* Status Pill */}
-                    {isPaid ? (
+                    {isGuest ? (
+                      <Badge variant="cyan" dot>Guest</Badge>
+                    ) : isPaid ? (
                       <Badge variant="paid" dot>Paid</Badge>
                     ) : isVerify ? (
                       <Badge variant="verify" dot>Verify</Badge>
@@ -237,7 +243,7 @@ export function RoomCard({
                     )}
 
                     {/* Quick WhatsApp Reminder — only when there's a due bill this month */}
-                    {!isPaid && !isVerify && !noBill && bed.tenantPhone && (
+                    {!isGuest && !isPaid && !isVerify && !noBill && bed.tenantPhone && (
                       <TileIconButton
                         title="Send WhatsApp Reminder"
                         className="text-success-ink"

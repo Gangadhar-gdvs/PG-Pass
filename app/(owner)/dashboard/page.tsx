@@ -7,7 +7,7 @@ import { useTenants } from '@/hooks/useTenants';
 import {
   subscribeToOwnerRentRecords,
 } from '@/lib/firestore';
-import { getCurrentPeriod, formatCurrency, getWhatsAppLink, errorMessage } from '@/lib/utils';
+import { getCurrentPeriod, formatCurrency, getWhatsAppLink, errorMessage, depositPaidRupees } from '@/lib/utils';
 import { Bed, Owner, RentRecord } from '@/types';
 import { StatsBar, StatsRow } from '@/components/owner/StatsBar';
 import {
@@ -62,6 +62,7 @@ import {
   Undo2,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { copyText } from '@/lib/client/clipboard';
 
 /** Loading state shaped like the owner home (hero · stats · period · panels · rooms). */
 function OwnerHomeSkeleton() {
@@ -427,11 +428,14 @@ export default function OwnerDashboardPage() {
         const data = await res.json();
         if (!res.ok) throw new Error(data.message || 'Confirmation failed');
         toast.success(`Bed ${bed.bedLabel} marked Paid! Receipt REC-${String(data.record.receiptNumber).padStart(5, '0')} issued.`);
+        if (activeBedDrawer?.id === bed.id) {
+          setActiveBedDrawer({ ...activeBedDrawer, status: 'paid' });
+        }
       } else {
-        toast.success(`Bed ${bed.bedLabel} marked as Paid`);
-      }
-      if (activeBedDrawer?.id === bed.id) {
-        setActiveBedDrawer({ ...activeBedDrawer, status: 'paid' });
+        // No persisted rent record for this month (e.g. a guest bed, or no bill
+        // generated yet). Previously this showed a false "marked as Paid"
+        // success without saving anything — tell the owner the truth instead.
+        toast.error(`There's no rent bill for bed ${bed.bedLabel} this month, so there's nothing to mark as paid.`);
       }
     } catch (err: unknown) {
       toast.error(errorMessage(err, 'Failed to update status'));
@@ -1203,7 +1207,13 @@ export default function OwnerDashboardPage() {
                     icon="wallet-sm"
                     tint="violet"
                     label="Security Deposit"
-                    value={formatCurrency(activeTenant?.depositPaid || activeBedDrawer.monthlyRent)}
+                    value={formatCurrency(depositPaidRupees(activeTenant))}
+                    caption={
+                      activeTenant?.securityDepositPaise &&
+                      depositPaidRupees(activeTenant) < activeTenant.securityDepositPaise / 100
+                        ? `of ${formatCurrency(activeTenant.securityDepositPaise / 100)} agreed`
+                        : undefined
+                    }
                   />
                 </div>
 
@@ -1333,27 +1343,9 @@ export default function OwnerDashboardPage() {
                         variant="soft"
                         onClick={async () => {
                           const url = `${window.location.origin}/t/${activeTenant.token}`;
-                          try {
-                            // navigator.clipboard is undefined on insecure origins
-                            // and some older mobile browsers — fall back to a
-                            // temporary textarea + execCommand so copy still works.
-                            if (navigator.clipboard?.writeText) {
-                              await navigator.clipboard.writeText(url);
-                            } else {
-                              const ta = document.createElement('textarea');
-                              ta.value = url;
-                              ta.style.position = 'fixed';
-                              ta.style.opacity = '0';
-                              document.body.appendChild(ta);
-                              ta.focus();
-                              ta.select();
-                              document.execCommand('copy');
-                              document.body.removeChild(ta);
-                            }
-                            toast.success('Link copied');
-                          } catch {
-                            toast.error('Could not copy — long-press the link to copy it manually');
-                          }
+                          // copyText falls back to execCommand on insecure origins / old browsers.
+                          if (await copyText(url)) toast.success('Link copied');
+                          else toast.error('Could not copy — long-press the link to copy it manually');
                         }}
                       >
                         <Copy className="h-4 w-4" />

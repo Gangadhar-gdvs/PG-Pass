@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useOwnerAvatarUrl } from '@/lib/client/ownerAvatar';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
@@ -22,6 +23,8 @@ import {
   FileText,
   DoorOpen,
   Plus,
+  Zap,
+  Package,
 } from 'lucide-react';
 import { Avatar } from '@/components/ui/avatar';
 import { PropertySwitcher } from '@/components/owner/PropertySwitcher';
@@ -38,7 +41,9 @@ const navLinks: TabItem[] = [
   { href: '/analytics', label: 'Analytics', icon: BarChart3, icon3d: 'chart', tint: 'violet' },
   { href: '/reports', label: 'Reports', icon: FileText, icon3d: 'report', tint: 'indigo' },
   { href: '/expenses', label: 'Expenses', icon: Wallet, icon3d: 'wallet-orange', tint: 'peach' },
+  { href: '/utilities', label: 'Utilities', icon: Zap, icon3d: 'bolt', tint: 'amber' },
   { href: '/maintenance', label: 'Maintenance', icon: Wrench, icon3d: 'wrench', tint: 'sky' },
+  { href: '/inventory', label: 'Room Inventory', icon: Package, icon3d: 'tools', tint: 'indigo' },
   { href: '/tasks', label: 'Tasks', icon: ClipboardList, icon3d: 'doc-green', tint: 'mint' },
   { href: '/visitors', label: 'Visitors', icon: DoorOpen, icon3d: 'user-add', tint: 'sky' },
   { href: '/notices', label: 'Notices', icon: Megaphone, icon3d: 'megaphone', tint: 'violet' },
@@ -53,7 +58,7 @@ const byHref = (href: string) => navLinks.find((l) => l.href === href)!;
 // Pages a staff/warden must not see — these mutate owner-only data (profile,
 // subscription, staff roster) and are already blocked server-side. Hiding them
 // from the nav keeps the staff console to day-to-day operations only.
-const OWNER_ONLY_HREFS = new Set(['/settings', '/billing', '/staff', '/reports']);
+const OWNER_ONLY_HREFS = new Set(['/settings', '/billing', '/staff', '/reports', '/utilities']);
 
 export function OwnerShell({
   session,
@@ -62,7 +67,7 @@ export function OwnerShell({
   session: OwnerSession;
   children: React.ReactNode;
 }) {
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -83,6 +88,11 @@ export function OwnerShell({
   };
 
   const displayPhone = session.phoneNumber || '+91 Owner';
+  // Prefer the person's name for avatar initials; fall back to the phone.
+  const avatarName = user?.displayName || displayPhone;
+
+  // Owner profile picture (private storage → short-lived URL). Staff keep initials.
+  const avatarUrl = useOwnerAvatarUrl(!isStaff);
 
   return (
     <OwnerSessionProvider value={session}>
@@ -136,7 +146,7 @@ export function OwnerShell({
 
             <div className="space-y-3 border-t border-line pt-4">
               <div className="flex items-center gap-2.5 px-1">
-                <Avatar name={displayPhone} size="md" />
+                <Avatar name={avatarName} src={avatarUrl} size="md" />
                 <div className="min-w-0 flex-1">
                   <span className="block truncate text-[13px] font-bold text-ink">{isStaff ? 'Warden / Staff' : 'PG Owner'}</span>
                   <span className="block truncate font-mono-numbers text-[11.5px] font-medium text-muted">{displayPhone}</span>
@@ -157,7 +167,7 @@ export function OwnerShell({
         {/* Main column. On mobile a sticky top bar (logo + notices + profile)
             gives fixed-header behaviour; desktop uses the sidebar. */}
         <div className="flex-1 flex flex-col min-w-0 max-w-7xl w-full">
-          <OwnerTopBar onSignOut={signOut} />
+          <OwnerTopBar onSignOut={signOut} avatarUrl={avatarUrl} avatarName={avatarName} />
 
           {/* `pb-28` on mobile reserves room for the fixed bottom nav + FAB. */}
           <main className="flex-1 overflow-x-hidden px-4 sm:px-6 lg:px-8 pt-2 pb-28 md:py-7 w-full">

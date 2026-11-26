@@ -99,6 +99,21 @@ service cloud.firestore {
       allow write: if false; // created/deleted via /api/expenses (Admin SDK)
     }
 
+    // Utility bills + their frozen per-resident allocation. Owner/staff of the
+    // PG may read; create/apply/void happen only via /api/utilities (Admin SDK).
+    match /utility_bills/{billId} {
+      allow get:   if canReadOwnerScope(resource.data.ownerId);
+      allow list:  if canReadOwnerScope(resource.data.ownerId) && boundedList();
+      allow write: if false;
+    }
+
+    // Room inventory / assets (with append-only history). Writes via /api/assets.
+    match /assets/{assetId} {
+      allow get:   if canReadOwnerScope(resource.data.ownerId);
+      allow list:  if canReadOwnerScope(resource.data.ownerId) && boundedList();
+      allow write: if false;
+    }
+
     match /guest_stays/{stayId} {
       allow get:   if canReadOwnerScope(resource.data.ownerId);
       allow list:  if canReadOwnerScope(resource.data.ownerId) && boundedList();

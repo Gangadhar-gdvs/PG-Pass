@@ -20,6 +20,11 @@ export const config = {
     messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || '',
     appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || '',
     isConfigured: (): boolean => {
+      // Local emulators accept any API key and any (demo) project id — including
+      // the `pgpass-demo` id the env templates document — so emulator mode always
+      // counts as configured. Without this, every client listener was disabled
+      // in the documented local setup and pages rendered empty.
+      if (process.env.NEXT_PUBLIC_USE_EMULATORS === 'true') return true;
       const k = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
       const p = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
       return Boolean(k && k.length > 10 && k !== 'demo-api-key' && p && p !== 'pgpass-demo');

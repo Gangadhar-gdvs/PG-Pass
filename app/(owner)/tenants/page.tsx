@@ -27,6 +27,7 @@ import { SearchInput } from '@/components/ui/input';
 import { ListSkeleton, StatGridSkeleton } from '@/components/ui/skeletons';
 import { PageHeader, SectionCard, StatTile } from '@/components/ui/dashboard-kit';
 import toast from 'react-hot-toast';
+import { copyText } from '@/lib/client/clipboard';
 
 /* Round icon links (call / open portal / WhatsApp). Mobile keeps the 44px
    touch target; desktop table rows use a tighter 36px. */
@@ -90,8 +91,9 @@ export default function TenantsPage() {
     }
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : config.app.url;
     const url = `${baseUrl}/t/${token}`;
-    navigator.clipboard.writeText(url);
-    toast.success('Resident portal link copied');
+    void copyText(url).then((ok) =>
+      ok ? toast.success('Resident portal link copied') : toast.error('Could not copy — long-press or select the text to copy it manually')
+    );
   };
 
   const handleExportCsv = () => {

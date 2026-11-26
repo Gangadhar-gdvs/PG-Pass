@@ -54,8 +54,9 @@ export default function ExpensesPage() {
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  // `quiet` re-syncs list + server month total without the loading skeleton.
+  const load = useCallback(async (opts?: { quiet?: boolean }) => {
+    if (!opts?.quiet) setLoading(true);
     try {
       const res = await fetch('/api/expenses');
       if (res.ok) {
@@ -121,6 +122,9 @@ export default function ExpensesPage() {
       if (!res.ok) throw new Error('Could not delete');
       setExpenses((list) => list.filter((e) => e.id !== id));
       toast.success('Expense removed');
+      // The "This Month" total is server-computed — refresh it so it reflects
+      // the deletion immediately (previously it stayed stale until reload).
+      void load({ quiet: true });
     } catch (e: unknown) {
       toast.error(errorMessage(e, 'Could not delete'));
     } finally {

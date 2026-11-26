@@ -39,12 +39,31 @@ export function BankCsvReconciler({
   const [parsing, setParsing] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [dragging, setDragging] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    // Reset so choosing the same file again still fires onChange.
+    e.target.value = '';
+    if (file) processFile(file);
+  };
 
-    if (!file.name.endsWith('.csv') && file.type !== 'text/csv') {
+  // Drag-and-drop onto the upload zone (the copy has always said "drop it here").
+  const handleDrop = (e: React.DragEvent<HTMLElement>) => {
+    e.preventDefault();
+    setDragging(false);
+    if (parsing) return;
+    const file = e.dataTransfer.files?.[0];
+    if (file) processFile(file);
+  };
+  const handleDragOver = (e: React.DragEvent<HTMLElement>) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    if (!dragging) setDragging(true);
+  };
+
+  const processFile = (file: File) => {
+    if (!file.name.toLowerCase().endsWith('.csv') && file.type !== 'text/csv') {
       toast.error('Please upload a valid bank statement CSV file');
       return;
     }
@@ -170,8 +189,14 @@ export function BankCsvReconciler({
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
+            onDragEnter={handleDragOver}
+            onDragOver={handleDragOver}
+            onDragLeave={() => setDragging(false)}
+            onDrop={handleDrop}
             aria-busy={parsing}
-            className="group flex w-full flex-col items-center rounded-[22px] border-2 border-dashed border-brand-200 bg-brand-50/60 px-5 py-8 text-center transition-all hover:border-brand-300 hover:bg-white/80 press sm:py-10 animate-pop"
+            className={`group flex w-full flex-col items-center rounded-[22px] border-2 border-dashed px-5 py-8 text-center transition-all hover:border-brand-300 hover:bg-white/80 press sm:py-10 animate-pop ${
+              dragging ? 'border-brand bg-white shadow-[0_0_0_4px_rgba(123,63,242,0.14)]' : 'border-brand-200 bg-brand-50/60'
+            }`}
           >
             <span
               className="icon-bubble tint-violet mb-4 transition-transform group-hover:scale-105"
@@ -180,7 +205,7 @@ export function BankCsvReconciler({
               <Icon3D name="report" size={48} />
             </span>
             <span className="block text-base font-extrabold tracking-[-0.01em] text-ink">
-              {parsing ? 'Parsing Statement Columns...' : 'Upload Bank Statement CSV'}
+              {parsing ? 'Parsing Statement Columns...' : dragging ? 'Drop the CSV to upload' : 'Upload Bank Statement CSV'}
             </span>
             <span className="mx-auto mt-1.5 block max-w-sm text-[13px] font-medium leading-relaxed text-muted">
               Export your statement from HDFC, ICICI, SBI, Axis, or Paytm Bank and drop it here.

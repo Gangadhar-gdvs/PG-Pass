@@ -66,6 +66,8 @@ import { IconBubble, IconTile, GlyphTile } from '@/components/brand/Icon3D';
 import { Tenant } from '@/types';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
+import { copyText } from '@/lib/client/clipboard';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 /** A system/error log row returned by /api/admin/logs. */
 interface SystemLog {
@@ -273,6 +275,7 @@ export default function SuperAdminPortalPage() {
 
   // Tab State
   const [activeTab, setActiveTab] = useState<AdminTab>('telemetry');
+  const [askConfirm, confirmDialogEl] = useConfirm();
   // Current admin's own tier + permissions (gates which tabs show).
   const [me, setMe] = useState<{ adminRole?: 'super' | 'staff'; permissions: string[] } | null>(null);
   const [upgradeRequests, setUpgradeRequests] = useState<SubscriptionRequest[]>([]);
@@ -338,7 +341,16 @@ export default function SuperAdminPortalPage() {
 
   const handleToggleAccountStatus = async (ownerId: string, currentStatus: string) => {
     const newStatus = currentStatus === 'suspended' ? 'active' : 'suspended';
-    if (!confirm(`Are you sure you want to change account status to ${newStatus}?`)) return;
+    const ok = await askConfirm({
+      title: newStatus === 'suspended' ? 'Suspend this account?' : 'Reactivate this account?',
+      message:
+        newStatus === 'suspended'
+          ? 'The owner and their staff will be signed out and blocked until reactivated.'
+          : 'The owner will be able to sign in and use PGPass again.',
+      confirmLabel: newStatus === 'suspended' ? 'Suspend' : 'Reactivate',
+      tone: newStatus === 'suspended' ? 'danger' : 'default',
+    });
+    if (!ok) return;
 
     try {
       const res = await fetch('/api/admin/accounts', {
@@ -477,10 +489,13 @@ export default function SuperAdminPortalPage() {
       }
 
       const idToken = token.token;
+      // `mode: 'login'` is required: the session route treats a missing mode as
+      // a background refresh, which (correctly) refuses to mint a session when
+      // the browser has no session id yet — so admin sign-in always failed.
       const res = await fetch('/api/auth/session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken }),
+        body: JSON.stringify({ idToken, mode: 'login' }),
       });
       if (!res.ok) {
         throw new Error('Failed to establish secure session cookie');
@@ -533,8 +548,9 @@ export default function SuperAdminPortalPage() {
   const handleCopyLink = (token?: string) => {
     if (!token) return;
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : config.app.url;
-    navigator.clipboard.writeText(`${baseUrl}/t/${token}`);
-    toast.success('Resident link copied');
+    void copyText(`${baseUrl}/t/${token}`).then((ok) =>
+      ok ? toast.success('Resident link copied') : toast.error('Could not copy — long-press or select the text to copy it manually')
+    );
   };
 
   const maskPhone = (phone: string) => {
@@ -796,6 +812,26 @@ export default function SuperAdminPortalPage() {
         return acc;
       }, {})
     : {};
+
+  // Tenant docs don't store rent — it lives on the tenant's bed. Attach it so
+  // the resident list shows it and the "Monthly Rent" column can sort.
+  const bedRentById = new Map((selectedPg?.beds ?? []).map((b) => [b.id, b.monthlyRent || 0]));
+  const tenantsWithRent = (selectedPg?.tenants ?? []).map((t) => ({
+    ...t,
+    monthlyRent: t.monthlyRent ?? bedRentById.get(t.bedId) ?? 0,
+  }));
+  // Owners rarely have a single default rent (rent is set per sharing type on
+  // beds), so fall back to the PG's bed rent range.
+  const bedRents = (selectedPg?.beds ?? []).map((b) => b.monthlyRent || 0).filter((r) => r > 0);
+  const rentMin = bedRents.length ? Math.min(...bedRents) : 0;
+  const rentMax = bedRents.length ? Math.max(...bedRents) : 0;
+  const ownerDefaultRent = selectedPg?.owner.monthlyRent || 0;
+  const rentLabel = ownerDefaultRent ? 'Default rent' : 'Bed rent';
+  const rentValue = ownerDefaultRent
+    ? formatCurrency(ownerDefaultRent)
+    : rentMin === rentMax
+      ? formatCurrency(rentMin)
+      : `${formatCurrency(rentMin)} – ${formatCurrency(rentMax)}`;
 
   return (
     <div className="theme-admin min-h-screen text-ink">
@@ -1270,9 +1306,9 @@ export default function SuperAdminPortalPage() {
 
                           <div className="mt-4 grid grid-cols-2 gap-2.5 sm:max-w-md">
                             <div className="well px-3.5 py-2.5">
-                              <span className="block text-xs font-semibold text-muted">Default rent</span>
+                              <span className="block text-xs font-semibold text-muted">{rentLabel}</span>
                               <span className="block text-base font-extrabold text-ink font-mono-numbers">
-                                {formatCurrency(selectedPg.owner.monthlyRent || 0)}
+                                {rentValue}
                               </span>
                             </div>
                             <div className="well px-3.5 py-2.5">
@@ -1352,7 +1388,7 @@ export default function SuperAdminPortalPage() {
                               />
                             ) : (
                               <div className="divide-y divide-line">
-                                {selectedPg.tenants.map((t) => (
+                                {tenantsWithRent.map((t) => (
                                   <div key={t.id} className="flex items-center gap-3 px-2 py-3">
                                     <Avatar name={t.name} size="md" />
                                     <div className="min-w-0 flex-1">
@@ -1374,7 +1410,7 @@ export default function SuperAdminPortalPage() {
                           <div className="hidden sm:block">
                             <DataTable
                               columns={residentColumns}
-                              data={selectedPg.tenants}
+                              data={tenantsWithRent}
                               keyExtractor={(t) => t.id}
                               emptyText="No residents currently registered in this PG."
                             />
@@ -1506,6 +1542,7 @@ export default function SuperAdminPortalPage() {
           </div>
         </Drawer>
       )}
+      {confirmDialogEl}
     </div>
   );
 }

@@ -9,10 +9,13 @@ import { PgPhotoGallery } from '@/components/owner/PgPhotoGallery';
 import { GmailConnectCard } from '@/components/owner/GmailConnectCard';
 import { SupportLink } from '@/components/ui/support-link';
 import { Input } from '@/components/ui/input';
+import { PhoneInput } from '@/components/ui/phone-input';
+import { OwnerAvatarEditor } from '@/components/owner/OwnerAvatarEditor';
+import { useOwnerAvatarUrl } from '@/lib/client/ownerAvatar';
 import { HeaderSkeleton, FormSkeleton } from '@/components/ui/skeletons';
 import { Button } from '@/components/ui/button';
 import { PageHeader, SectionCard, InfoBanner } from '@/components/ui/dashboard-kit';
-import { validateUpi, sanitizeText } from '@/lib/security';
+import { validateUpi, validatePhone, sanitizeText } from '@/lib/security';
 import { Save } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -27,6 +30,8 @@ function SettingsPageInner() {
   const [pgAddress, setPgAddress] = useState('');
   const [upiId, setUpiId] = useState('');
   const [phone, setPhone] = useState('');
+  const [phoneError, setPhoneError] = useState('');
+  const avatarUrl = useOwnerAvatarUrl();
   const [rentDueDay, setRentDueDay] = useState('5');
   const [lateFeePerDay, setLateFeePerDay] = useState('0');
   const [lateFeeGraceDays, setLateFeeGraceDays] = useState('0');
@@ -41,7 +46,7 @@ function SettingsPageInner() {
           setOwnerName(profile.name || '');
           setPgAddress(profile.address || profile.pgAddress || '');
           setUpiId(profile.upiId || '');
-          setPhone(profile.phone || '');
+          setPhone(String(profile.phone || '').replace(/\D/g, '').slice(-10));
           setRentDueDay(String(profile.rentDueDay ?? 5));
           setLateFeePerDay(String(Math.round((profile.lateFeePerDayPaise ?? 0) / 100)));
           setLateFeeGraceDays(String(profile.lateFeeGraceDays ?? 0));
@@ -67,6 +72,16 @@ function SettingsPageInner() {
       return;
     }
 
+    // Never persist a placeholder number: the owner's phone is shown to
+    // residents and used on receipts, so it must be real.
+    const phoneValidation = validatePhone(phone);
+    if (!phoneValidation.valid) {
+      setPhoneError(phoneValidation.error || 'Enter a valid 10-digit mobile number');
+      toast.error('Please enter your 10-digit mobile number');
+      return;
+    }
+    setPhoneError('');
+
     const upiValidation = validateUpi(upiId);
     if (!upiValidation.valid) {
       toast.error(upiValidation.error || 'Invalid UPI ID format');
@@ -83,7 +98,7 @@ function SettingsPageInner() {
           name: sanitizedOwnerName,
           address: sanitizedPgAddress || 'PG Address',
           upiId: upiValidation.formatted,
-          phone: phone.replace(/\D/g, '').slice(-10) || '9876543210',
+          phone: phoneValidation.cleaned,
           rentDueDay: Math.min(28, Math.max(1, Number(rentDueDay) || 5)),
           lateFeePerDayPaise: Math.max(0, Math.round((Number(lateFeePerDay) || 0) * 100)),
           lateFeeGraceDays: Math.max(0, Math.min(28, Number(lateFeeGraceDays) || 0)),
@@ -125,6 +140,15 @@ function SettingsPageInner() {
       <AddPropertyCard />
 
       <form onSubmit={handleSave} className="space-y-5">
+        <SectionCard title="Profile photo" icon="person">
+          <OwnerAvatarEditor
+            name={ownerName || phone || 'Owner'}
+            url={avatarUrl}
+            title={ownerName || 'PG Owner'}
+            subtitle="Shown on your account. Private — only you can see it."
+          />
+        </SectionCard>
+
         <SectionCard title="Property Information" icon="building" bodyClassName="space-y-4">
           <Input
             label="PG Business Name"
@@ -141,6 +165,17 @@ function SettingsPageInner() {
             value={ownerName}
             onChange={(e) => setOwnerName(e.target.value)}
             required
+            disabled={saving}
+          />
+
+          <PhoneInput
+            label="Owner mobile number"
+            value={phone}
+            onChange={(v) => {
+              setPhone(v);
+              if (phoneError) setPhoneError('');
+            }}
+            error={phoneError}
             disabled={saving}
           />
 

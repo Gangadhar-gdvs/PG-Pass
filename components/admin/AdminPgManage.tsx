@@ -19,6 +19,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SectionCard, InfoBanner } from '@/components/ui/dashboard-kit';
 import { Icon3D, type Icon3DName, type Tint } from '@/components/brand/Icon3D';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 /** Shape of the admin pg-detail history payload (counts + expense soft-delete flags). */
 interface PgDetail {
@@ -39,6 +40,7 @@ interface PgDetail {
 export function AdminPgManage({ pg, onChanged }: { pg: SuperAdminPgOverview; onChanged?: () => void }) {
   const ownerId = pg.owner.id;
   const [detail, setDetail] = useState<PgDetail | null>(null);
+  const [askConfirm, confirmDialogEl] = useConfirm();
   const [loadingDetail, setLoadingDetail] = useState(true);
   const [busy, setBusy] = useState(false);
 
@@ -190,9 +192,13 @@ export function AdminPgManage({ pg, onChanged }: { pg: SuperAdminPgOverview; onC
                         </button>
                         <button
                           type="button"
-                          onClick={() => {
-                            if (confirm(`Revoke ${s.name}'s access? (record is kept)`))
-                              post({ action: 'revokeStaff', staffUid: s.uid }, 'Staff access revoked');
+                          onClick={async () => {
+                            const ok = await askConfirm({
+                              title: `Revoke ${s.name}'s access?`,
+                              message: 'They lose access immediately. Their record is kept for history.',
+                              confirmLabel: 'Revoke access',
+                            });
+                            if (ok) post({ action: 'revokeStaff', staffUid: s.uid }, 'Staff access revoked');
                           }}
                           title="Revoke access"
                           aria-label={`Revoke ${s.name}'s access`}
@@ -278,6 +284,7 @@ export function AdminPgManage({ pg, onChanged }: { pg: SuperAdminPgOverview; onC
           </div>
         )}
       </SectionCard>
+      {confirmDialogEl}
     </div>
   );
 }

@@ -56,6 +56,10 @@ export type RentStatus = 'pending' | 'verify' | 'paid';
 export interface LineItem {
   label: string;
   amountPaise: number;
+  /** Set on server-generated utility charges / their reversals (absent = rent). */
+  kind?: 'utility' | 'utility_reversal';
+  /** The utility_bills doc this charge came from (idempotency + reversal key). */
+  utilityBillId?: string;
 }
 
 export interface Owner {
@@ -91,6 +95,9 @@ export interface Owner {
   lateFeePerDayPaise?: number; // optional late fee accrued per overdue day
   lateFeeGraceDays?: number; // days after due date before late fee starts
   pgAmenities?: string[];
+  /** Private storage key of the owner's profile picture (served via presigned GET). */
+  avatarKey?: string | null;
+  avatarUpdatedAt?: Timestampish | null;
   createdAt?: Timestampish;
   updatedAt?: Timestampish;
 }
@@ -442,4 +449,120 @@ export interface SubscriptionRequest {
   reviewedAt?: Timestampish;
   notes?: string;
   createdAt: Timestampish;
+}
+
+// ---------------------------------------------------------------------------
+// Utility bills & transparent split (collection `utility_bills`)
+// ---------------------------------------------------------------------------
+
+export type UtilityType = 'electricity' | 'water' | 'gas' | 'internet' | 'other';
+export type UtilityScope = 'room' | 'property';
+export type UtilityAllocationRule = 'equal' | 'occupancy_days' | 'custom';
+/** draft = saved, not charged · partial = some shares charged · applied · void. */
+export type UtilityBillStatus = 'draft' | 'partial' | 'applied' | 'void';
+export type UtilityAllocationStatus = 'pending' | 'applied' | 'skipped' | 'reversed';
+
+export interface UtilityMeterReading {
+  previous: number;
+  current: number;
+  units: number;
+  reset: boolean;
+}
+
+/** One resident's share of a bill (frozen when the bill is saved). */
+export interface UtilityAllocation {
+  id: string; // `${billId}_${tenantId}`
+  tenantId: string;
+  tenantName: string;
+  bedLabel: string | null;
+  days: number; // days stayed in the billing month
+  weight: number; // equal: 1 · occupancy_days: days · custom: the amount
+  sharePaise: number;
+  roundingPaise: number; // 1 if this share absorbed a remainder paisa
+  status: UtilityAllocationStatus;
+  rentRecordId: string | null;
+  appliedAt: string | null; // ISO
+  skipReason: string | null;
+  reopenedPaidRecord: boolean; // the rent record was 'paid' before this charge
+  reversedAt: string | null; // ISO
+  reversalMode: 'removed' | 'adjusted' | 'none' | null;
+}
+
+export interface UtilityBillHistoryEntry {
+  at: string; // ISO
+  by: string; // uid
+  action: 'created' | 'applied' | 'voided';
+  note: string | null;
+}
+
+export interface UtilityBill {
+  id: string;
+  ownerId: string;
+  propertyId: string;
+  type: UtilityType;
+  provider: string | null;
+  period: string; // YYYY-MM
+  scope: UtilityScope;
+  roomNumber: string | null; // when scope === 'room'
+  label: string; // "Electricity · Room 101 · Nov 2026" (rent line-item label)
+  totalPaise: number;
+  meter: UtilityMeterReading | null;
+  notes: string | null;
+  rule: UtilityAllocationRule;
+  daysInPeriod: number;
+  allocations: UtilityAllocation[];
+  status: UtilityBillStatus;
+  createdBy: string;
+  appliedAt?: Timestampish | null;
+  appliedBy?: string | null;
+  voidedAt?: Timestampish | null;
+  voidedBy?: string | null;
+  voidReason?: string | null;
+  history: UtilityBillHistoryEntry[];
+  deletedAt: Timestampish | null; // soft-delete (set when voided)
+  createdAt?: Timestampish;
+  updatedAt?: Timestampish;
+}
+
+// ---------------------------------------------------------------------------
+// Room inventory / assets (collection `assets`)
+// ---------------------------------------------------------------------------
+
+export type AssetCategory = 'furniture' | 'appliance' | 'electrical' | 'bedding' | 'other';
+export type AssetCondition = 'good' | 'fair' | 'damaged' | 'missing';
+export type AssetLocation = 'room' | 'common';
+
+/** Append-only change trail entry (condition / quantity / other edits). */
+export interface AssetHistoryEntry {
+  at: string; // ISO
+  by: string; // uid
+  byRole: string;
+  action: 'created' | 'condition' | 'quantity' | 'updated' | 'deleted';
+  fromCondition: AssetCondition | null;
+  toCondition: AssetCondition | null;
+  fromQuantity: number | null;
+  toQuantity: number | null;
+  fields: string[] | null; // for 'updated'
+  note: string | null;
+}
+
+export interface Asset {
+  id: string;
+  ownerId: string;
+  propertyId: string;
+  location: AssetLocation;
+  roomNumber: string | null; // when location === 'room'
+  name: string;
+  category: AssetCategory;
+  quantity: number;
+  condition: AssetCondition;
+  purchaseDate: string | null; // YYYY-MM-DD
+  warrantyUntil: string | null; // YYYY-MM-DD
+  notes: string | null;
+  history: AssetHistoryEntry[];
+  createdBy: string;
+  deletedAt: Timestampish | null;
+  deletedBy?: string | null;
+  createdAt?: Timestampish;
+  updatedAt?: Timestampish;
 }

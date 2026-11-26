@@ -1,5 +1,14 @@
 import { z } from 'zod';
 import { BED_STATUS, PLAN_TIER } from '@/lib/constants/status';
+import {
+  UTILITY_TYPES,
+  UTILITY_SCOPES,
+  UTILITY_ALLOCATION_RULES,
+  MAX_UTILITY_BILL_PAISE,
+  isValidIsoDate,
+  isValidPeriod,
+} from '@/lib/utilitySplit';
+import { ASSET_CATEGORIES, ASSET_CONDITIONS, ASSET_LOCATIONS, MAX_ASSET_QUANTITY } from '@/lib/assets';
 
 // Owner onboarding and update schema
 export const ownerProfileSchema = z.object({
@@ -108,3 +117,100 @@ export const subscriptionUpgradeSchema = z.object({
   amountPaise: z.number().int().positive().optional(),
   utrReference: z.string().min(6, 'Please enter a valid 12-digit UTR reference'),
 });
+
+// ---------------------------------------------------------------------------
+// Utility bills (business rules — meter order, custom sums, duplicates — are
+// enforced in lib/utilitySplit.ts + utilities.service, not here).
+// ---------------------------------------------------------------------------
+
+const billingPeriod = z.string().refine(isValidPeriod, 'Billing month must be in YYYY-MM format');
+const utilityPaise = z
+  .number()
+  .int('Amount must be whole paise')
+  .min(0, 'Amount cannot be negative')
+  .max(MAX_UTILITY_BILL_PAISE, 'Amount is too large');
+
+export const utilityBillInputSchema = z
+  .object({
+    propertyId: z.string().trim().min(1).max(128).optional(),
+    type: z.enum(UTILITY_TYPES),
+    provider: z.string().trim().max(80).optional(),
+    period: billingPeriod,
+    scope: z.enum(UTILITY_SCOPES),
+    roomNumber: z.string().trim().min(1).max(20).optional(),
+    totalPaise: utilityPaise,
+    meter: z
+      .object({
+        previous: z.number().min(0).max(1_000_000_000),
+        current: z.number().min(0).max(1_000_000_000),
+        reset: z.boolean().optional().default(false),
+      })
+      .nullable()
+      .optional(),
+    notes: z.string().trim().max(300).optional(),
+    rule: z.enum(UTILITY_ALLOCATION_RULES),
+    customPaise: z.record(z.string().min(1).max(128), utilityPaise).optional(),
+  })
+  .refine((v) => v.scope !== 'room' || !!v.roomNumber, {
+    message: 'Choose the room this bill is for',
+    path: ['roomNumber'],
+  });
+
+export type UtilityBillInputData = z.infer<typeof utilityBillInputSchema>;
+
+export const voidUtilityBillSchema = z.object({
+  reason: z.string().trim().min(3, 'Please give a short reason').max(200),
+});
+
+// ---------------------------------------------------------------------------
+// Room inventory / assets
+// ---------------------------------------------------------------------------
+
+const isoDate = z.string().refine(isValidIsoDate, 'Use a valid date (YYYY-MM-DD)');
+
+export const createAssetSchema = z
+  .object({
+    propertyId: z.string().trim().min(1).max(128).optional(),
+    location: z.enum(ASSET_LOCATIONS),
+    roomNumber: z.string().trim().min(1).max(20).optional(),
+    name: z.string().trim().min(2, 'Name must be at least 2 characters').max(80),
+    category: z.enum(ASSET_CATEGORIES),
+    quantity: z.number().int().min(1, 'Quantity must be at least 1').max(MAX_ASSET_QUANTITY),
+    condition: z.enum(ASSET_CONDITIONS).default('good'),
+    purchaseDate: isoDate.nullable().optional(),
+    warrantyUntil: isoDate.nullable().optional(),
+    notes: z.string().trim().max(300).optional(),
+  })
+  .refine((v) => v.location !== 'room' || !!v.roomNumber, {
+    message: 'Choose the room this item is in',
+    path: ['roomNumber'],
+  })
+  .refine((v) => !v.purchaseDate || !v.warrantyUntil || v.warrantyUntil >= v.purchaseDate, {
+    message: 'Warranty end date cannot be before the purchase date',
+    path: ['warrantyUntil'],
+  });
+
+export type CreateAssetData = z.infer<typeof createAssetSchema>;
+
+export const updateAssetSchema = z
+  .object({
+    name: z.string().trim().min(2).max(80).optional(),
+    category: z.enum(ASSET_CATEGORIES).optional(),
+    // 0 is allowed (e.g. all units written off) — never negative.
+    quantity: z.number().int().min(0, 'Quantity cannot be negative').max(MAX_ASSET_QUANTITY).optional(),
+    condition: z.enum(ASSET_CONDITIONS).optional(),
+    purchaseDate: isoDate.nullable().optional(),
+    warrantyUntil: isoDate.nullable().optional(),
+    notes: z.string().trim().max(300).nullable().optional(),
+    // Why this change was made — stored on the history entry only.
+    note: z.string().trim().max(200).optional(),
+  })
+  .refine(
+    (v) =>
+      ['name', 'category', 'quantity', 'condition', 'purchaseDate', 'warrantyUntil', 'notes'].some(
+        (k) => v[k as keyof typeof v] !== undefined
+      ),
+    { message: 'Nothing to update' }
+  );
+
+export type UpdateAssetData = z.infer<typeof updateAssetSchema>;

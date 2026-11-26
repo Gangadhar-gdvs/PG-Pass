@@ -35,6 +35,7 @@ import {
   Wifi,
   Zap,
   type LucideIcon,
+  X,
 } from 'lucide-react';
 import {
   SHARING_FORMATS,
@@ -239,6 +240,7 @@ interface FloorPlan {
 export function PropertySetupWizard({
   initialOwnerPhone,
   existingOwner,
+  onCancel,
   onComplete,
 }: PropertySetupWizardProps) {
   const { ownerId, properties, selectedPropertyId } = useOwnerSession();
@@ -549,10 +551,25 @@ export function PropertySetupWizard({
       {/* ---------------- Hero ---------------- */}
       <header className="relative flex items-center gap-2 sm:gap-6">
         <div className="relative z-10 min-w-0 flex-1 py-1">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-[image:var(--grad-brand)] px-3.5 py-1.5 text-[12.5px] font-bold text-white shadow-[var(--shadow-brand)]">
-            <Sparkles className="h-4 w-4" />
-            Step {step} of 4
-          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[image:var(--grad-brand)] px-3.5 py-1.5 text-[12.5px] font-bold text-white shadow-[var(--shadow-brand)]">
+              <Sparkles className="h-4 w-4" />
+              Step {step} of 4
+            </span>
+            {/* Re-configuration (adding rooms later) can be abandoned; first-run
+                onboarding has no onCancel because there is nothing to go back to. */}
+            {onCancel && (
+              <button
+                type="button"
+                onClick={onCancel}
+                disabled={submitting}
+                className="inline-flex h-11 items-center gap-1.5 rounded-full border border-white bg-white/85 px-4 text-[13px] font-bold text-ink-2 shadow-[0_8px_18px_-10px_rgba(70,40,160,0.4)] hover:text-brand-700 disabled:opacity-50 press"
+              >
+                <X className="h-4 w-4" />
+                Cancel setup
+              </button>
+            )}
+          </div>
           <h1 className="mt-3 text-[24px] font-extrabold leading-[1.1] tracking-[-0.03em] text-ink min-[380px]:text-[26px] sm:text-[34px]">
             PG Property <span className="text-gradient swoosh">Setup Wizard</span>
           </h1>
@@ -727,6 +744,11 @@ export function PropertySetupWizard({
           </StepCard>
 
           <div className="flex flex-col-reverse gap-2.5 pt-1 sm:flex-row sm:items-center sm:justify-end">
+            {onCancel && (
+              <Button variant="outline" onClick={onCancel} className="w-full sm:w-auto">
+                Cancel
+              </Button>
+            )}
             <Button
               variant="solid"
               onClick={() => {

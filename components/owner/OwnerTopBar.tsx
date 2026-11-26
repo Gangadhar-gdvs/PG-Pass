@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { OwnerAvatarEditor } from '@/components/owner/OwnerAvatarEditor';
 import Link from 'next/link';
 import { useOwnerSession } from '@/hooks/useOwner';
 import { Avatar } from '@/components/ui/avatar';
@@ -17,7 +18,16 @@ import { Bell, ChevronDown, LogOut } from 'lucide-react';
  *             current PG, property switcher and sign out).
  * Desktop keeps the sidebar (this bar is `md:hidden`).
  */
-export function OwnerTopBar({ onSignOut }: { onSignOut: () => void }) {
+export function OwnerTopBar({
+  onSignOut,
+  avatarUrl = null,
+  avatarName,
+}: {
+  onSignOut: () => void;
+  avatarUrl?: string | null;
+  avatarName?: string;
+}) {
+
   const { properties, selectedPropertyId, phoneNumber, role } = useOwnerSession();
   const [sheetOpen, setSheetOpen] = useState(false);
 
@@ -50,7 +60,7 @@ export function OwnerTopBar({ onSignOut }: { onSignOut: () => void }) {
             className="flex items-center gap-1 rounded-full press"
             aria-label="Open profile and property menu"
           >
-            <Avatar name={displayPhone} size="md" />
+            <Avatar name={avatarName || displayPhone} src={avatarUrl} size="md" />
             <ChevronDown className="h-4 w-4 text-ink-2" />
           </button>
         </div>
@@ -58,17 +68,19 @@ export function OwnerTopBar({ onSignOut }: { onSignOut: () => void }) {
 
       <Drawer isOpen={sheetOpen} onClose={() => setSheetOpen(false)} title="Profile" width="sm">
         <div className="space-y-4">
-          {/* Profile identity */}
-          <div className="app-card flex items-center gap-3 p-4">
-            <Avatar name={displayPhone} size="lg" />
-            <div className="min-w-0">
-              <span className="block truncate text-[15px] font-extrabold text-ink">
-                {role === 'staff' ? 'Warden / Staff' : 'PG Owner'}
-              </span>
-              <span className="block truncate font-mono-numbers text-[13px] font-medium text-muted">
-                {displayPhone}
-              </span>
-            </div>
+          {/* Profile identity (+ photo controls for owners) */}
+          <div className="app-card p-4">
+            {role === 'staff' ? (
+              <div className="flex items-center gap-3">
+                <Avatar name={avatarName || displayPhone} size="lg" />
+                <div className="min-w-0">
+                  <span className="block truncate text-[15px] font-extrabold text-ink">Warden / Staff</span>
+                  <span className="block truncate font-mono-numbers text-[13px] font-medium text-muted">{displayPhone}</span>
+                </div>
+              </div>
+            ) : (
+              <OwnerAvatarEditor name={avatarName || displayPhone} url={avatarUrl} title="PG Owner" subtitle={displayPhone} />
+            )}
           </div>
 
           {/* Current PG */}

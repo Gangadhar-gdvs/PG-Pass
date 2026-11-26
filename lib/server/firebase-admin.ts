@@ -61,7 +61,10 @@ try {
     // channel on every cold start — a slow, cross-region handshake that
     // dominated login/first-load latency. This app does a handful of short
     // reads per request, which REST serves far faster with no channel warm-up.
-    preferRest: true,
+    // Not against the local emulators: the REST transport insists on Google
+    // application-default credentials ("Could not load the default credentials")
+    // while the gRPC transport talks to the emulator unauthenticated.
+    preferRest: !env.NEXT_PUBLIC_USE_EMULATORS,
   });
 } catch {
   // Settings already frozen or initialized

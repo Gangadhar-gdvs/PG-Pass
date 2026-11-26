@@ -13,5 +13,6 @@
 | **Rent Records** | Firestore (`rent_records`) | Rent billing, UTR claims & receipts | Owner, Warden, Admin, Tenant | Retained for tax records |
 | **Owner Name & Phone** | Firestore (`owners`) | Account identity & support | Owner, Admin | Active account lifetime |
 | **Owner UPI ID & QR** | Firestore (`owners`) | Direct 0% rent collection | Owner, Residents, Admin | Active account lifetime |
+| **Owner Profile Photo** (optional) | Backblaze B2 (`avatar/`, private) + key in `owners.avatarKey` | Shown on the owner's own account | Owner only (short-lived presigned URL) | Until the owner removes/replaces it (old file deleted on replace) or the account is closed |
 | **Staff/Warden Details**| Firestore (`staff`) | Scoped property management delegation | Owner, Warden, Admin | Active until owner revokes access |
 | **Database Backups** | Backblaze B2 (`backups/`) | Disaster recovery | System / Admin only | AES-256-GCM encrypted, auto-purged after 30 days |
