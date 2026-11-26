@@ -1,5 +1,6 @@
 'use client';
 
+import { readApiError } from '../utils';
 import { compressImage } from './imageCompress';
 
 export interface UploadPhotoOptions {
@@ -57,8 +58,7 @@ export async function uploadPhotoToB2(
   });
 
   if (!intentRes.ok) {
-    const errData = await intentRes.json().catch(() => ({}));
-    throw new Error(errData.message || 'Failed to initialize upload');
+    throw new Error(await readApiError(intentRes, 'Failed to initialize upload'));
   }
 
   const { uploadUrl, objectKey } = await intentRes.json();
@@ -98,8 +98,7 @@ export async function uploadPhotoToB2(
   });
 
   if (!confirmRes.ok) {
-    const errData = await confirmRes.json().catch(() => ({}));
-    throw new Error(errData.message || 'Failed to finalize uploaded photo');
+    throw new Error(await readApiError(confirmRes, 'Failed to finalize uploaded photo'));
   }
 
   const { photo } = await confirmRes.json();
@@ -146,8 +145,7 @@ export async function uploadPropertyPhoto(
     }),
   });
   if (!intentRes.ok) {
-    const e = await intentRes.json().catch(() => ({}));
-    throw new Error(e.error || e.message || 'Failed to initialize upload');
+    throw new Error(await readApiError(intentRes, 'Failed to initialize upload'));
   }
   const { uploadUrl, objectKey } = await intentRes.json();
   onProgress?.(60);
@@ -166,8 +164,7 @@ export async function uploadPropertyPhoto(
     body: JSON.stringify({ propertyId, objectKey, category, caption, sharingType }),
   });
   if (!confirmRes.ok) {
-    const e = await confirmRes.json().catch(() => ({}));
-    throw new Error(e.error || e.message || 'Failed to publish photo');
+    throw new Error(await readApiError(confirmRes, 'Failed to publish photo'));
   }
   const { photo } = await confirmRes.json();
   onProgress?.(100);

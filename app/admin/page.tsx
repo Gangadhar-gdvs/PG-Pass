@@ -38,7 +38,7 @@ import { Button } from '@/components/ui/button';
 import { Input, SearchInput } from '@/components/ui/input';
 import { Dropdown } from '@/components/ui/dropdown';
 import { Drawer } from '@/components/ui/drawer';
-import { formatCurrency, errorMessage } from '@/lib/utils';
+import { formatCurrency, errorMessage, apiErrorMessage } from '@/lib/utils';
 import type { SuperAdminPgOverview } from '@/lib/server/services/adminOverview.service';
 import type { SubscriptionRequest } from '@/types';
 import { config } from '@/lib/config';
@@ -330,7 +330,7 @@ export default function SuperAdminPortalPage() {
         body: JSON.stringify({ requestId, action: 'approve' }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Approval failed');
+      if (!res.ok) throw new Error(apiErrorMessage(data, 'Approval failed'));
       toast.success('Subscription plan upgraded successfully');
       await loadUpgrades();
       await loadPlatformData();
@@ -359,7 +359,7 @@ export default function SuperAdminPortalPage() {
         body: JSON.stringify({ ownerId, accountStatus: newStatus }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Status update failed');
+      if (!res.ok) throw new Error(apiErrorMessage(data, 'Status update failed'));
       toast.success(`Account status set to ${newStatus}`);
       await loadPlatformData();
     } catch (e: unknown) {

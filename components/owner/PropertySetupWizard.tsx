@@ -47,7 +47,7 @@ import {
   FoodCuisine,
 } from '@/lib/constants/amenities';
 import { Owner } from '@/types';
-import { formatCurrency, errorMessage } from '@/lib/utils';
+import { formatCurrency, errorMessage, readApiError } from '@/lib/utils';
 import { validateUpi, sanitizeText } from '@/lib/security';
 import toast from 'react-hot-toast';
 
@@ -476,8 +476,7 @@ export function PropertySetupWizard({
       });
 
       if (!ownerRes.ok) {
-        const err = await ownerRes.json().catch(() => ({}));
-        throw new Error(err.message || 'Failed to save property profile');
+        throw new Error(await readApiError(ownerRes, 'Failed to save property profile'));
       }
 
       const updatedOwner = (await ownerRes.json()) as Owner;
@@ -531,8 +530,7 @@ export function PropertySetupWizard({
       });
 
       if (!bedsRes.ok) {
-        const err = await bedsRes.json().catch(() => ({}));
-        throw new Error(err.message || 'Failed to generate beds inventory');
+        throw new Error(await readApiError(bedsRes, 'Failed to generate beds inventory'));
       }
 
       toast.success(`Generated ${generatedBeds.length} beds across ${floors.length} floors!`);

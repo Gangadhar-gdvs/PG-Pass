@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useOwnerSession } from '@/hooks/useOwner';
-import { formatDateIN, tsToDate, errorMessage } from '@/lib/utils';
+import { formatDateIN, tsToDate, errorMessage, readApiError } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge, type BadgeProps } from '@/components/ui/badge';
 import { CardListSkeleton, StatGridSkeleton } from '@/components/ui/skeletons';
@@ -124,8 +124,7 @@ export default function MaintenancePage() {
         body: JSON.stringify({ status }),
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || 'Could not update ticket');
+        throw new Error(await readApiError(res, 'Could not update ticket'));
       }
       toast.success(status === 'resolved' ? 'Marked resolved' : 'Marked in progress');
       await load();

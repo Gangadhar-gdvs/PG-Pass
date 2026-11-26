@@ -41,7 +41,7 @@ export function cn(...inputs: ClassValue[]) {
  * handling stays type-safe while still surfacing the thrown message when present.
  */
 export function errorMessage(e: unknown, fallback: string): string {
-  // A browser `fetch` that never reached the server throws a TypeError with a
+  // A browser `fetch` that never reached the server throws a TypeError with an
   // engine-specific message ("Failed to fetch", "Load failed", …) — not
   // something a resident or owner can act on (AGENTS §3).
   if (e instanceof TypeError && /failed to fetch|load failed|networkerror|network request failed/i.test(e.message)) {

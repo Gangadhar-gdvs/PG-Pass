@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useOwnerSession } from '@/hooks/useOwner';
-import { errorMessage } from '@/lib/utils';
+import { errorMessage, readApiError } from '@/lib/utils';
 import { AddPropertyCard } from '@/components/owner/AddPropertyCard';
 import { OwnerOnlyGuard } from '@/components/owner/OwnerOnlyGuard';
 import { PgPhotoGallery } from '@/components/owner/PgPhotoGallery';
@@ -106,8 +106,7 @@ function SettingsPageInner() {
       });
 
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || 'Failed to update settings');
+        throw new Error(await readApiError(res, 'Failed to update settings'));
       }
 
       toast.success('Settings updated successfully');

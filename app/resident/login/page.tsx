@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PhoneInput } from '@/components/ui/phone-input';
 import { validatePhone } from '@/lib/security';
-import { errorMessage } from '@/lib/utils';
+import { errorMessage, readApiError } from '@/lib/utils';
 import { ArrowRight, Lock, Mail, User } from 'lucide-react';
 import { AuthShell } from '@/components/brand/AuthShell';
 import toast from 'react-hot-toast';
@@ -40,8 +40,7 @@ export default function ResidentLoginPage() {
         body: JSON.stringify({ idToken, name: name.trim(), phone: pv.cleaned, email }),
       });
       if (!reg.ok) {
-        const e = await reg.json().catch(() => ({}));
-        throw new Error(e.error || e.message || 'Registration failed');
+        throw new Error(await readApiError(reg, 'Registration failed'));
       }
       // Re-fetch token to pick up the new resident claim.
       idToken = await auth.currentUser!.getIdToken(true);

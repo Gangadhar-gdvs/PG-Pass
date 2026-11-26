@@ -7,7 +7,7 @@ import { useTenants } from '@/hooks/useTenants';
 import {
   subscribeToOwnerRentRecords,
 } from '@/lib/firestore';
-import { getCurrentPeriod, formatCurrency, getWhatsAppLink, errorMessage, depositPaidRupees } from '@/lib/utils';
+import { getCurrentPeriod, formatCurrency, getWhatsAppLink, errorMessage, depositPaidRupees, readApiError, apiErrorMessage } from '@/lib/utils';
 import { Bed, Owner, RentRecord } from '@/types';
 import { StatsBar, StatsRow } from '@/components/owner/StatsBar';
 import {
@@ -402,8 +402,7 @@ export default function OwnerDashboardPage() {
         body: JSON.stringify({}),
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || 'Could not update refund');
+        throw new Error(await readApiError(res, 'Could not update refund'));
       }
       toast.success('Refund marked as paid out');
       setPendingRefunds((list) => list.filter((r) => r.id !== depositId));
@@ -426,7 +425,7 @@ export default function OwnerDashboardPage() {
           body: JSON.stringify({ paymentReference: 'Manual confirmation' }),
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.message || 'Confirmation failed');
+        if (!res.ok) throw new Error(apiErrorMessage(data, 'Confirmation failed'));
         toast.success(`Bed ${bed.bedLabel} marked Paid! Receipt REC-${String(data.record.receiptNumber).padStart(5, '0')} issued.`);
         if (activeBedDrawer?.id === bed.id) {
           setActiveBedDrawer({ ...activeBedDrawer, status: 'paid' });
@@ -462,7 +461,7 @@ export default function OwnerDashboardPage() {
         body: JSON.stringify({ recordIds: ids }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Bulk confirm failed');
+      if (!res.ok) throw new Error(apiErrorMessage(data, 'Bulk confirm failed'));
       const okCount = data.confirmed?.length || 0;
       const failCount = data.failed?.length || 0;
       toast.success(
@@ -492,7 +491,7 @@ export default function OwnerDashboardPage() {
         body: JSON.stringify({ amountRupees: rupees }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Could not record payment');
+      if (!res.ok) throw new Error(apiErrorMessage(data, 'Could not record payment'));
       const paid = (data.record?.amountPaidPaise ?? 0) / 100;
       const due = (data.record?.amountDuePaise ?? 0) / 100;
       if (data.record?.status === 'paid') {
@@ -525,7 +524,7 @@ export default function OwnerDashboardPage() {
         body: JSON.stringify({ reversalReason: reason }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Reversal failed');
+      if (!res.ok) throw new Error(apiErrorMessage(data, 'Reversal failed'));
 
       toast.success(`Payment reversed. Bed ${bed.bedLabel} is now pending.`);
       if (activeBedDrawer?.id === bed.id) {
@@ -552,7 +551,7 @@ export default function OwnerDashboardPage() {
         body: JSON.stringify({ paymentReference: record.paymentReference }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Could not confirm payment');
+      if (!res.ok) throw new Error(apiErrorMessage(data, 'Could not confirm payment'));
 
       toast.success(`Payment approved for ${bed.tenantName}! Receipt REC-${String(data.record.receiptNumber).padStart(5, '0')} issued.`);
       setProofModalRecord(null);
@@ -580,7 +579,7 @@ export default function OwnerDashboardPage() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Could not vacate bed');
+      if (!res.ok) throw new Error(apiErrorMessage(data, 'Could not vacate bed'));
 
       toast.success(`Bed ${confirmVacateBed.bedLabel} is now vacant`);
       setConfirmVacateBed(null);

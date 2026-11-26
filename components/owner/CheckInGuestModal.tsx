@@ -8,7 +8,7 @@ import { Drawer } from '@/components/ui/drawer';
 import { InfoBanner, KeyValue } from '@/components/ui/dashboard-kit';
 import { IconBubble, type Icon3DName, type Tint } from '@/components/brand/Icon3D';
 import { CalendarDays, Moon, UserRound, Wallet } from 'lucide-react';
-import { formatCurrency, errorMessage } from '@/lib/utils';
+import { formatCurrency, errorMessage, apiErrorMessage } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
 function nightsBetween(a: string, b: string): number {
@@ -95,7 +95,7 @@ export function CheckInGuestModal({
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || data.message || 'Check-in failed');
+      if (!res.ok) throw new Error(apiErrorMessage(data, 'Check-in failed'));
       toast.success(`${name.trim()} checked in to Bed ${bed.bedLabel}`);
       onSuccess();
       onClose();

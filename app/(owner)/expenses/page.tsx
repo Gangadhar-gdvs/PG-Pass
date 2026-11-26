@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useOwnerSession } from '@/hooks/useOwner';
-import { formatCurrency, formatDateIN, errorMessage } from '@/lib/utils';
+import { formatCurrency, formatDateIN, errorMessage, readApiError } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dropdown } from '@/components/ui/dropdown';
@@ -99,8 +99,7 @@ export default function ExpensesPage() {
         body: JSON.stringify({ category, amountRupees: rupees, vendor, note, date }),
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || 'Could not save expense');
+        throw new Error(await readApiError(res, 'Could not save expense'));
       }
       toast.success('Expense recorded');
       setAmount('');

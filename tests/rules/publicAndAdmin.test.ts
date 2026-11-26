@@ -1,7 +1,7 @@
 import { assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
 import type { RulesTestEnvironment } from '@firebase/rules-unit-testing';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { ADMIN_BOUNDED, CATCH_ALL_EXAMPLES, PUBLIC_READ, SERVER_ONLY } from './collections';
+import { ADMIN_BOUNDED, CATCH_ALL_EXAMPLES, SERVER_ONLY } from './collections';
 import { OWNER_A, concrete, db, seed, startEnv, type PersonaKey } from './helpers';
 
 let env: RulesTestEnvironment;
@@ -12,10 +12,6 @@ const NON_ADMIN: PersonaKey[] = ['ownerA', 'staffA', 'resident', 'anon', 'suspen
 beforeAll(async () => {
   env = await startEnv('demo-rules-public-admin');
   const docs: Record<string, Record<string, unknown>> = {};
-  for (const col of PUBLIC_READ) {
-    docs[`${col}/p1`] = { ownerId: OWNER_A, propertyId: 'propA', hidden: false };
-    docs[`${col}/p2`] = { ownerId: OWNER_A, propertyId: 'propA', hidden: true };
-  }
   for (const col of [...ADMIN_BOUNDED, ...SERVER_ONLY, ...CATCH_ALL_EXAMPLES.map((c) => concrete(c))]) {
     docs[`${col}/d1`] = { ownerId: OWNER_A, tenantId: 't1' };
   }
@@ -26,23 +22,18 @@ afterAll(async () => {
   await env?.cleanup();
 });
 
-describe.each(PUBLIC_READ)('public read: %s', (col) => {
-  it('anyone — including signed-out visitors — can get and list (bounded)', async () => {
-    for (const who of EVERYONE) {
-      await assertSucceeds(db(env, who).doc(`${col}/p1`).get());
-      await assertSucceeds(db(env, who).collection(col).where('propertyId', '==', 'propA').limit(20).get());
+describe('R-S1/R-S2: reviews + gallery metadata are API-only', () => {
+  it('nobody — signed out, owner, staff, resident or admin — reads pg_reviews / property_photos directly', async () => {
+    await seed(env, {
+      'pg_reviews/hidden1': { ownerId: OWNER_A, propertyId: 'propA', reviewerUid: 'residentR', hidden: true },
+      'property_photos/ph1': { ownerId: OWNER_A, propertyId: 'propA', uploadedBy: OWNER_A },
+    });
+    for (const who of [...EVERYONE, 'staffANoPerms'] as PersonaKey[]) {
+      await assertFails(db(env, who).doc('pg_reviews/hidden1').get());
+      await assertFails(db(env, who).collection('pg_reviews').where('propertyId', '==', 'propA').limit(20).get());
+      await assertFails(db(env, who).doc('property_photos/ph1').get());
+      await assertFails(db(env, who).collection('property_photos').where('propertyId', '==', 'propA').limit(20).get());
     }
-  });
-  it('list must be bounded (limit ≤ 100)', async () => {
-    await assertFails(db(env, 'anon').collection(col).get());
-    await assertFails(db(env, 'anon').collection(col).limit(101).get());
-    await assertSucceeds(db(env, 'anon').collection(col).limit(100).get());
-  });
-  it('documents current behaviour: the rule does not filter on `hidden` (see report)', async () => {
-    // pg_reviews.hidden (admin moderation) is only enforced in reviews.service; the
-    // rule is `allow get: if true`, so a hidden doc is still client-readable.
-    const snap = await assertSucceeds(db(env, 'anon').doc(`${col}/p2`).get());
-    expect(snap.exists).toBe(true);
   });
 });
 
@@ -53,10 +44,9 @@ describe.each(ADMIN_BOUNDED)('admin-only (bounded): %s', (col) => {
     await assertFails(db(env, 'admin').collection(col).get());
     await assertFails(db(env, 'admin').collection(col).limit(101).get());
   });
-  it('documents current behaviour: admin single-doc GET is denied (boundedList() on a get — see report)', async () => {
-    // `allow get, list: if isAdmin() && boundedList()` — a get has no query limit,
-    // so boundedList() can never hold and the get is denied even for admins.
-    await assertFails(db(env, 'admin').doc(`${col}/d1`).get());
+  it('R-S4: admin can get a single doc (get is not subject to the list bound)', async () => {
+    const snap = await assertSucceeds(db(env, 'admin').doc(`${col}/d1`).get());
+    expect(snap.data()?.ownerId).toBe(OWNER_A);
   });
   it('non-admins (incl. the doc’s owner, suspended admins, admin:false) are denied', async () => {
     for (const who of NON_ADMIN) {

@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { IconBubble, IconTile } from '@/components/brand/Icon3D';
 import { Building2, MapPin, Plus } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { errorMessage } from '@/lib/utils';
+import { errorMessage, apiErrorMessage } from '@/lib/utils';
 
 /**
  * Lets an owner add an additional property. Once created, it appears in the
@@ -37,7 +37,7 @@ export function AddPropertyCard() {
         body: JSON.stringify({ pgName: pgName.trim(), pgAddress: pgAddress.trim() }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Could not add property');
+      if (!res.ok) throw new Error(apiErrorMessage(data, 'Could not add property'));
       toast.success('Property added');
       setPgName('');
       setPgAddress('');

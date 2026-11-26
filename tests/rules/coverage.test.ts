@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ALL_STAFF_PERMISSIONS } from '@/lib/constants/permissions';
 import { ALL_CLASSIFIED } from './collections';
 import { loadRules, parseRuleCollections } from './helpers';
 
@@ -24,6 +25,13 @@ describe('rules coverage', () => {
   it('no classified collection is missing from firestore.rules (stale entries)', () => {
     const stale = ALL_CLASSIFIED.filter((c) => !inRules.includes(c));
     expect(stale, 'remove these from tests/rules/collections.ts or restore the rule').toEqual([]);
+  });
+
+  it('every staff permission named in firestore.rules exists in lib/constants/permissions.ts', () => {
+    const named = [...loadRules().replace(/\/\/[^\n]*/g, '').matchAll(/'((?:manage|collect|view)_[a-z_]+)'/g)].map((m) => m[1]);
+    expect(named.length).toBeGreaterThan(0);
+    const unknown = named.filter((p) => !(ALL_STAFF_PERMISSIONS as string[]).includes(p));
+    expect(unknown, 'typo or stale permission name in firestore.rules').toEqual([]);
   });
 
   it('each collection has exactly one match block', () => {

@@ -1,7 +1,7 @@
 import { assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
 import type { RulesTestEnvironment } from '@firebase/rules-unit-testing';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { OWNER_A, OWNER_B, db, seed, startEnv } from './helpers';
+import { BROKEN_STAFF, OWNER_A, OWNER_B, db, seed, startEnv } from './helpers';
 
 /** Collections with bespoke rules (SPECIAL in collections.ts). */
 
@@ -12,11 +12,8 @@ beforeAll(async () => {
   await seed(env, {
     [`owners/${OWNER_A}`]: { id: OWNER_A, pgName: 'A PG' },
     [`owners/${OWNER_B}`]: { id: OWNER_B, pgName: 'B PG' },
-    'staff/staffA': { id: 'staffA', ownerId: OWNER_A, name: 'Warden A' },
-    'staff/staffA2': { id: 'staffA2', ownerId: OWNER_A, name: 'Warden A2' },
-    'staff/staffB': { id: 'staffB', ownerId: OWNER_B, name: 'Warden B' },
-    'subscription_requests/sa': { ownerId: OWNER_A, plan: 'pro' },
-    'subscription_requests/sb': { ownerId: OWNER_B, plan: 'pro' },
+    // staff/staffA, staff/staffB, … come from STAFF_DOCS (seeded by startEnv).
+    'staff/staffA2': { id: 'staffA2', ownerId: OWNER_A, name: 'Warden A2', accountStatus: 'active', permissions: [] },
     [`support_threads/${OWNER_A}`]: { ownerId: OWNER_A, unread: 0 },
     [`support_threads/${OWNER_B}`]: { ownerId: OWNER_B, unread: 0 },
     [`support_threads/${OWNER_A}/messages/m1`]: { from: 'owner', text: 'hi' },
@@ -48,6 +45,11 @@ describe('owners/{ownerId}', () => {
     await assertFails(db(env, 'ownerA').collection('owners').limit(10).get());
     await assertFails(db(env, 'staffA').collection('owners').limit(10).get());
   });
+  it('staff whose staff doc is revoked / suspended / moved / missing are denied at once', async () => {
+    for (const who of BROKEN_STAFF) await assertFails(db(env, who).doc(`owners/${OWNER_A}`).get());
+    // an active staff member with no permissions still sees the PG profile
+    await assertSucceeds(db(env, 'staffANoPerms').doc(`owners/${OWNER_A}`).get());
+  });
   it('residents, signed-out and suspended users are denied', async () => {
     await assertFails(db(env, 'resident').doc(`owners/${OWNER_A}`).get());
     await assertFails(db(env, 'anon').doc(`owners/${OWNER_A}`).get());
@@ -72,38 +74,14 @@ describe('staff/{staffUid}', () => {
     await assertFails(db(env, 'admin').collection('staff').limit(10).get());
     await assertFails(db(env, 'staffA').collection('staff').where('ownerId', '==', OWNER_A).limit(10).get());
   });
+  it('a revoked staff member can still read their OWN record (to see they were revoked), nothing else', async () => {
+    await assertSucceeds(db(env, 'revokedStaffA').doc('staff/staffA-revoked').get());
+    await assertFails(db(env, 'revokedStaffA').doc('staff/staffA').get());
+  });
   it('suspended staff, residents and signed-out users are denied', async () => {
     await assertFails(db(env, 'suspendedStaffA').doc('staff/staffA').get());
     await assertFails(db(env, 'resident').doc('staff/staffA').get());
     await assertFails(db(env, 'anon').doc('staff/staffA').get());
-  });
-});
-
-describe('subscription_requests/{reqId} (owner or admin — NOT staff)', () => {
-  it('owner reads own requests only', async () => {
-    await assertSucceeds(db(env, 'ownerA').doc('subscription_requests/sa').get());
-    await assertSucceeds(
-      db(env, 'ownerA').collection('subscription_requests').where('ownerId', '==', OWNER_A).limit(10).get()
-    );
-    await assertFails(db(env, 'ownerA').doc('subscription_requests/sb').get());
-    await assertFails(
-      db(env, 'ownerA').collection('subscription_requests').where('ownerId', '==', OWNER_B).limit(10).get()
-    );
-    await assertFails(
-      db(env, 'ownerA').collection('subscription_requests').where('ownerId', '==', OWNER_A).limit(101).get()
-    );
-  });
-  it("staff cannot read their owner's billing requests", async () => {
-    await assertFails(db(env, 'staffA').doc('subscription_requests/sa').get());
-    await assertFails(
-      db(env, 'staffA').collection('subscription_requests').where('ownerId', '==', OWNER_A).limit(10).get()
-    );
-  });
-  it('admin reads all (bounded); others denied', async () => {
-    await assertSucceeds(db(env, 'admin').collection('subscription_requests').limit(100).get());
-    await assertFails(db(env, 'resident').doc('subscription_requests/sa').get());
-    await assertFails(db(env, 'anon').doc('subscription_requests/sa').get());
-    await assertFails(db(env, 'suspendedOwnerA').doc('subscription_requests/sa').get());
   });
 });
 

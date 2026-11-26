@@ -1,5 +1,6 @@
 'use client';
 
+import { apiErrorMessage } from '@/lib/utils';
 import React, { useEffect, useState } from 'react';
 import { subscribeToSupportThreads } from '@/lib/firestore';
 import { SupportChat } from '@/components/support/SupportChat';
@@ -80,7 +81,7 @@ export function AdminSupportPanel() {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      toast.error(err.error || 'Could not send reply');
+      toast.error(apiErrorMessage(err, 'Could not send reply'));
       throw new Error('send failed');
     }
   };

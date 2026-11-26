@@ -28,7 +28,7 @@ import { HeaderSkeleton, CardListSkeleton, ListSkeleton } from '@/components/ui/
 import { PageHeader, SectionCard, InfoBanner } from '@/components/ui/dashboard-kit';
 import { GlyphTile, IconBubble } from '@/components/brand/Icon3D';
 import { validatePhone, sanitizeText } from '@/lib/security';
-import { errorMessage, ownerPlanTier } from '@/lib/utils';
+import { errorMessage, ownerPlanTier, readApiError, apiErrorMessage } from '@/lib/utils';
 import { OwnerOnlyGuard } from '@/components/owner/OwnerOnlyGuard';
 import { StaffPermissionsEditor } from '@/components/owner/StaffPermissionsEditor';
 import {
@@ -140,7 +140,7 @@ function StaffPageInner() {
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.message || 'Failed to invite staff member');
+        throw new Error(apiErrorMessage(data, 'Failed to invite staff member'));
       }
 
       toast.success(`Warden account provisioned for ${cleanName}`);
@@ -175,8 +175,7 @@ function StaffPageInner() {
       });
 
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || 'Status update failed');
+        throw new Error(await readApiError(res, 'Status update failed'));
       }
 
       toast.success(
@@ -202,8 +201,7 @@ function StaffPageInner() {
       });
 
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || 'Revocation failed');
+        throw new Error(await readApiError(res, 'Revocation failed'));
       }
 
       toast.success('Staff access revoked permanently');

@@ -6,7 +6,7 @@ import { useBeds } from '@/hooks/useBeds';
 import { PLAN_LIMITS } from '@/lib/constants/limits';
 import { PLAN_TIER, PlanTier } from '@/lib/constants/status';
 import type { Owner } from '@/types';
-import { formatCurrency, errorMessage, ownerPlanTier } from '@/lib/utils';
+import { formatCurrency, errorMessage, ownerPlanTier, apiErrorMessage } from '@/lib/utils';
 import { generateQrDataUrl } from '@/lib/client/qrcode';
 import { buildUpiPayload } from '@/lib/client/upi';
 import { Check, Camera, Sparkles, ArrowRight } from 'lucide-react';
@@ -250,7 +250,7 @@ function BillingPageInner() {
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.message || 'Upgrade submission failed');
+        throw new Error(apiErrorMessage(data, 'Upgrade submission failed'));
       }
 
       toast.success('Upgrade request submitted! Admin will activate your tier shortly.');

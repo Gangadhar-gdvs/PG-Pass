@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { formatCurrency, validateUtr, errorMessage } from '@/lib/utils';
+import { formatCurrency, validateUtr, errorMessage, apiErrorMessage } from '@/lib/utils';
 import type { RentRecord } from '@/types';
 import { generateNumberedReceipt } from '@/lib/client/receiptPdf';
 import { generateQrDataUrl } from '@/lib/client/qrcode';
@@ -174,7 +174,7 @@ export function RentStatusCard({
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.message || 'Failed to submit payment claim');
+        throw new Error(apiErrorMessage(data, 'Failed to submit payment claim'));
       }
 
       toast.success('Payment claim submitted! Awaiting PG manager confirmation.');

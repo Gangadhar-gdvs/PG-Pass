@@ -1,5 +1,6 @@
 'use client';
 
+import { apiErrorMessage } from '@/lib/utils';
 import React, { useEffect } from 'react';
 import { useOwnerSession } from '@/hooks/useOwner';
 import { SupportChat } from '@/components/support/SupportChat';
@@ -26,7 +27,7 @@ export default function OwnerSupportPage() {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      toast.error(err.error || 'Could not send message');
+      toast.error(apiErrorMessage(err, 'Could not send message'));
       throw new Error('send failed');
     }
   };

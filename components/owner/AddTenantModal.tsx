@@ -10,7 +10,7 @@ import { Drawer } from '@/components/ui/drawer';
 import { IconBubble, Icon3D, type Icon3DName, type Tint } from '@/components/brand/Icon3D';
 import { UserRound } from 'lucide-react';
 import { validatePhone, sanitizeText } from '@/lib/security';
-import { errorMessage } from '@/lib/utils';
+import { errorMessage, apiErrorMessage } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
 /** Glass form section with a small 3D icon header (local to this drawer). */
@@ -141,7 +141,7 @@ export function AddTenantModal({
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.message || 'Failed to assign resident');
+        throw new Error(apiErrorMessage(data, 'Failed to assign resident'));
       }
 
       toast.success(`${sanitizedName} assigned to Bed ${bed.bedLabel}`);
