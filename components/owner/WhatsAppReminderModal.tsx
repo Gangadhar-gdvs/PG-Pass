@@ -34,17 +34,23 @@ export function WhatsAppReminderModal({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [remindedIds, setRemindedIds] = useState<Set<string>>(new Set());
 
-  const recordMap = new Map<string, RentRecord>();
-  rentRecords.forEach((r) => recordMap.set(r.bedId || '', r));
+  // Rent records key by tenantId (doc id `${tenantId}_${period}`), not bedId.
+  const recordByTenant = new Map<string, RentRecord>();
+  rentRecords.forEach((r) => {
+    if (r.tenantId) recordByTenant.set(r.tenantId, r);
+  });
+  const recordFor = (b: Bed): RentRecord | undefined =>
+    b.tenantId ? recordByTenant.get(b.tenantId) : undefined;
 
   const tenantMap = new Map<string, Tenant>();
   tenants.forEach((t) => tenantMap.set(t.id, t));
 
-  // Filter beds that are occupied and whose rent is not marked paid
+  // Beds to remind: occupied monthly tenants whose rent this period is unpaid.
+  // Guests (billed separately) are excluded.
   const pendingItems = beds.filter((b) => {
-    if (b.status === 'vacant') return false;
-    const rec = recordMap.get(b.id);
-    return rec?.status !== 'paid' && b.status !== 'paid';
+    if (b.status === 'vacant' || b.status === 'guest') return false;
+    const rec = recordFor(b);
+    return rec?.status !== 'paid';
   });
 
   const getRentAmount = (bed: Bed): number => {
@@ -77,7 +83,7 @@ export function WhatsAppReminderModal({
     window.open(waUrl, '_blank');
 
     // Call server to stamp lastRemindedAt
-    const rec = recordMap.get(bed.id);
+    const rec = recordFor(bed);
     if (rec?.id) {
       try {
         await fetch(`/api/rent/${rec.id}/reminded`, { method: 'POST' });

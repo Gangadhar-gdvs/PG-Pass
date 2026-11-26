@@ -49,4 +49,20 @@ describe('aggregateTrend', () => {
     const out = aggregateTrend([], ['2026-11']);
     expect(out[0].label).toBe('Nov 26');
   });
+
+  // Guards the analytics service's `const current = trend[trend.length - 1]`:
+  // the trend must always be a full, defined row even for a brand-new owner with
+  // no rent records, so reading current.collectionRate never throws (which would
+  // surface as the "Couldn't load analytics" 500).
+  it('always returns a defined current row for a 6-month window with no records', () => {
+    const periods = recentPeriods('2026-11', 6);
+    expect(periods).toHaveLength(6);
+    const trend = aggregateTrend([], periods);
+    expect(trend).toHaveLength(6);
+    const current = trend[trend.length - 1];
+    expect(current).toBeDefined();
+    expect(current.collectionRate).toBe(0);
+    expect(current.collectedPaise).toBe(0);
+    expect(current.duePaise).toBe(0);
+  });
 });

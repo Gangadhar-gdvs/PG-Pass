@@ -41,6 +41,7 @@ interface Analytics {
   defaulterCount: number;
   currentExpensePaise: number;
   currentNetPaise: number;
+  degraded?: { aging?: boolean; expenses?: boolean };
 }
 
 function KpiCard({
@@ -79,6 +80,9 @@ export default function AnalyticsPage() {
   const [data, setData] = useState<Analytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  // A support-friendly reference for the failure (server requestId) so the owner
+  // can quote it to support and the admin can find it in the system log viewer.
+  const [errorRef, setErrorRef] = useState<string | null>(null);
   // True when the failure is specifically "the admin hasn't enabled Analytics
   // for this PG" — shown as an informative notice rather than a generic error.
   const [featureDisabled, setFeatureDisabled] = useState(false);
@@ -86,6 +90,7 @@ export default function AnalyticsPage() {
   const load = React.useCallback(async () => {
     setLoading(true);
     setError(false);
+    setErrorRef(null);
     setFeatureDisabled(false);
     try {
       const res = await fetch('/api/analytics');
@@ -95,7 +100,10 @@ export default function AnalyticsPage() {
           setFeatureDisabled(true);
           return;
         }
-        throw new Error('failed');
+        // Capture the server requestId (set by withErrorHandler) so the generic
+        // user-facing message can still point support at the exact logged error.
+        setErrorRef(body?.requestId || res.headers.get('X-Request-Id') || null);
+        throw new Error(body?.error || 'failed');
       }
       setData(await res.json());
     } catch {
@@ -106,7 +114,17 @@ export default function AnalyticsPage() {
   }, []);
 
   useEffect(() => {
-    if (ownerId) load();
+    if (!ownerId) return;
+    // Defer so load()'s synchronous setLoading/setError run after this effect
+    // commits rather than inside its body (cascading-render lint rule). Initial
+    // state already shows the skeleton, so there's no visible delay.
+    let active = true;
+    queueMicrotask(() => {
+      if (active) load();
+    });
+    return () => {
+      active = false;
+    };
   }, [ownerId, load]);
 
   if (loading) {
@@ -137,7 +155,11 @@ export default function AnalyticsPage() {
         <EmptyState
           icon={<BarChart3 className="w-6 h-6 text-[#64748B]" />}
           title="Couldn't load analytics"
-          description="There was a problem fetching your numbers."
+          description={
+            errorRef
+              ? `We couldn't fetch your numbers right now. Please retry — if it keeps happening, contact support with reference ${errorRef}.`
+              : "We couldn't fetch your numbers right now. Please retry in a moment."
+          }
           action={
             <button
               onClick={load}
@@ -183,6 +205,22 @@ export default function AnalyticsPage() {
           <p className="text-xs text-[#64748B]">Occupancy, collections and overdue aging for your PG.</p>
         </div>
       </div>
+
+      {/* Honest partial-failure notice: when a sub-report fails to load we show
+          zeros for it, so warn the owner rather than imply "0 overdue / full net"
+          is a healthy state. */}
+      {data.degraded && (
+        <div className="flex items-start gap-2 rounded-[10px] border border-[#FDE68A] bg-[#FFFBEB] px-3.5 py-2.5 text-xs text-[#92400E]">
+          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+          <span>
+            Some figures couldn&apos;t be calculated just now
+            {data.degraded.aging && ' (overdue / outstanding'}
+            {data.degraded.aging && data.degraded.expenses && ' and'}
+            {data.degraded.expenses && (data.degraded.aging ? ' expenses)' : ' (expenses)')}
+            {!data.degraded.aging && !data.degraded.expenses ? '' : ' are shown as ₹0'}. Please retry shortly.
+          </span>
+        </div>
+      )}
 
       {/* KPI row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

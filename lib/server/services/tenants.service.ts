@@ -151,6 +151,12 @@ export class TenantsService {
         securityDepositPaise: input.securityDepositPaise,
         depositPaidPaise: depositPaid,
         moveInDate: input.moveInDate,
+        // Persist the raw portal token on the owner-scoped tenant doc so the
+        // owner can re-share the resident pass link any time after creation
+        // (only the hash is kept server-side in portal_tokens, so the raw value
+        // is unrecoverable otherwise). Access is still gated by the last-4 PIN
+        // + lockout — the token alone is not sufficient to view the portal.
+        token: rawPortalToken,
         deletedAt: null,
         createdAt: now,
         updatedAt: now,
@@ -220,7 +226,9 @@ export class TenantsService {
     });
 
     const appUrl = env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-    const portalUrl = `${appUrl}/portal/${rawPortalToken}`;
+    // Canonical share path is /t/<token> (matches the owner UI copy button and
+    // the /t/[token] route); /portal/[token] renders the same view as a legacy alias.
+    const portalUrl = `${appUrl}/t/${rawPortalToken}`;
 
     return {
       tenant: createdTenant!,

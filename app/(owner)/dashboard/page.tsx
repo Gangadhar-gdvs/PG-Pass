@@ -7,9 +7,8 @@ import { useTenants } from '@/hooks/useTenants';
 import {
   subscribeToOwnerRentRecords,
 } from '@/lib/firestore';
-import { getPhotoViewUrl } from '@/lib/client/uploader';
-import { getCurrentPeriod, formatCurrency, getWhatsAppLink } from '@/lib/utils';
-import { Bed, Owner, RentRecord, Tenant } from '@/types';
+import { getCurrentPeriod, formatCurrency, getWhatsAppLink, errorMessage } from '@/lib/utils';
+import { Bed, Owner, RentRecord } from '@/types';
 import { StatsBar } from '@/components/owner/StatsBar';
 import { BedGrid } from '@/components/owner/BedGrid';
 import { AddTenantModal } from '@/components/owner/AddTenantModal';
@@ -20,13 +19,11 @@ import { PropertySetupWizard } from '@/components/owner/PropertySetupWizard';
 import { DocumentUploader } from '@/components/owner/DocumentUploader';
 import { TenantPhotoGallery } from '@/components/owner/TenantPhotoGallery';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Drawer } from '@/components/ui/drawer';
 import { DashboardSkeleton } from '@/components/ui/skeletons';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { StatusDot } from '@/components/ui/status-dot';
 import { Avatar } from '@/components/ui/avatar';
-import { config } from '@/lib/config';
 import {
   Building,
   CheckCircle2,
@@ -35,7 +32,6 @@ import {
   Send,
   Phone,
   Copy,
-  ExternalLink,
   UserPlus,
   ShieldAlert,
   FileSpreadsheet,
@@ -43,6 +39,7 @@ import {
   Layers,
   IndianRupee,
   BedDouble,
+  CalendarDays,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -72,10 +69,15 @@ export default function OwnerDashboardPage() {
   // time so the main dashboard paints and becomes interactive first.
   useEffect(() => {
     if (!owner) return;
-    const w = window as any;
+    // requestIdleCallback isn't in every TS DOM lib target — narrow it instead
+    // of casting to `any`. Falls back to setTimeout where unsupported (Safari).
+    const w = window as Window & {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
     const schedule: (cb: () => void) => number =
       typeof w.requestIdleCallback === 'function'
-        ? (cb) => w.requestIdleCallback(cb, { timeout: 2000 })
+        ? (cb) => w.requestIdleCallback!(cb, { timeout: 2000 })
         : (cb) => window.setTimeout(cb, 300);
     const cancel: (id: number) => void =
       typeof w.cancelIdleCallback === 'function' ? w.cancelIdleCallback : window.clearTimeout;
@@ -154,7 +156,13 @@ export default function OwnerDashboardPage() {
 
   useEffect(() => {
     let active = true;
-    reloadOwner(() => active);
+    // Defer to a microtask so the synchronous setLoadingOwner/setOwnerError at
+    // the top of reloadOwner run AFTER this effect commits rather than inside its
+    // body (avoids the cascading-render lint rule). Initial state already renders
+    // the loading skeleton, so there's no visible delay on mount.
+    queueMicrotask(() => {
+      if (active) reloadOwner(() => active);
+    });
     return () => {
       active = false;
     };
@@ -165,7 +173,10 @@ export default function OwnerDashboardPage() {
   // future months can be viewed and collected, not just the current month.
   useEffect(() => {
     if (!ownerId) return;
-    setRentError(false);
+    // Don't reset error state synchronously in the effect body (cascading-render
+    // lint rule). The subscription callbacks are authoritative: the success
+    // callback clears the error on the first emission after (re)subscribing, and
+    // the error callback sets it — so navigating months self-heals on next data.
     const unsub = subscribeToOwnerRentRecords(
       ownerId,
       selectedPeriod,
@@ -321,8 +332,8 @@ export default function OwnerDashboardPage() {
       }
       toast.success('Refund marked as paid out');
       setPendingRefunds((list) => list.filter((r) => r.id !== depositId));
-    } catch (e: any) {
-      toast.error(e.message || 'Could not update refund');
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, 'Could not update refund'));
     } finally {
       setRefundBusyId(null);
     }
@@ -348,8 +359,8 @@ export default function OwnerDashboardPage() {
       if (activeBedDrawer?.id === bed.id) {
         setActiveBedDrawer({ ...activeBedDrawer, status: 'paid' });
       }
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to update status');
+    } catch (err: unknown) {
+      toast.error(errorMessage(err, 'Failed to update status'));
     } finally {
       setActionBusy(false);
     }
@@ -379,8 +390,8 @@ export default function OwnerDashboardPage() {
       toast.success(
         `Confirmed ${okCount} payment${okCount === 1 ? '' : 's'}${failCount ? ` · ${failCount} skipped` : ''}`
       );
-    } catch (e: any) {
-      toast.error(e.message || 'Bulk confirm failed');
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, 'Bulk confirm failed'));
     } finally {
       setActionBusy(false);
     }
@@ -412,8 +423,8 @@ export default function OwnerDashboardPage() {
         toast.success(`Recorded ₹${rupees}. Paid ₹${paid} of ₹${due}.`);
       }
       setPartialAmount('');
-    } catch (e: any) {
-      toast.error(e.message || 'Could not record payment');
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, 'Could not record payment'));
     } finally {
       setActionBusy(false);
     }
@@ -443,8 +454,8 @@ export default function OwnerDashboardPage() {
         setActiveBedDrawer({ ...activeBedDrawer, status: 'occupied' });
       }
       setReverseTarget(null);
-    } catch (err: any) {
-      toast.error(err.message || 'Could not reverse payment');
+    } catch (err: unknown) {
+      toast.error(errorMessage(err, 'Could not reverse payment'));
     } finally {
       setReverseBusy(false);
     }
@@ -470,8 +481,8 @@ export default function OwnerDashboardPage() {
       if (activeBedDrawer?.id === bed.id) {
         setActiveBedDrawer({ ...activeBedDrawer, status: 'paid' });
       }
-    } catch (e: any) {
-      toast.error(e.message || 'Could not approve payment');
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, 'Could not approve payment'));
     } finally {
       setActionBusy(false);
     }
@@ -496,8 +507,8 @@ export default function OwnerDashboardPage() {
       toast.success(`Bed ${confirmVacateBed.bedLabel} is now vacant`);
       setConfirmVacateBed(null);
       setActiveBedDrawer(null);
-    } catch (e: any) {
-      toast.error(e.message || 'Could not vacate bed');
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, 'Could not vacate bed'));
     } finally {
       setActionBusy(false);
     }
@@ -607,11 +618,23 @@ export default function OwnerDashboardPage() {
   };
   const isCurrentPeriod = selectedPeriod === getCurrentPeriod();
 
-  const activeRecord = activeBedDrawer
-    ? rentRecords.find((r) => r.bedId === activeBedDrawer.id)
+  // Resolve the drawer's bed against the LIVE beds feed at render time. Handlers
+  // open/patch `activeBedDrawer` optimistically (e.g. right after assigning a
+  // resident, before the snapshot lands); preferring the live copy means the
+  // authoritative status + tenantId are picked up as soon as they arrive, so
+  // activeTenant/activeRecord resolve to the newly-created records without a
+  // setState-in-effect sync.
+  const liveBed = activeBedDrawer
+    ? beds.find((b) => b.id === activeBedDrawer.id) ?? activeBedDrawer
     : null;
-  const activeTenant = activeBedDrawer?.tenantId
-    ? tenants.find((t) => t.id === activeBedDrawer.tenantId)
+  // Rent records link to a resident (doc id `${tenantId}_${period}`), not a bed —
+  // resolve the drawer's current rent record via the bed's tenantId, scoped to
+  // the selected billing period. (Matching by bedId silently found nothing.)
+  const activeRecord = liveBed?.tenantId
+    ? rentRecords.find((r) => r.tenantId === liveBed.tenantId)
+    : null;
+  const activeTenant = liveBed?.tenantId
+    ? tenants.find((t) => t.id === liveBed.tenantId)
     : null;
 
   return (
@@ -834,12 +857,31 @@ export default function OwnerDashboardPage() {
           <ArrowLeft className="w-4 h-4" />
         </button>
         <div className="text-center">
-          <div className="text-sm font-bold text-[#09090B]">{labelPeriod(selectedPeriod)}</div>
+          {/* Tap the month label to open the OS month/year picker (full calendar
+              selection) instead of only stepping one month at a time with arrows.
+              A transparent native <input type="month"> overlays the label. */}
+          <label className="relative inline-flex items-center justify-center cursor-pointer">
+            <span className="text-sm font-bold text-[#09090B] inline-flex items-center gap-1">
+              {labelPeriod(selectedPeriod)}
+              <CalendarDays className="w-3.5 h-3.5 text-[#94A3B8]" />
+            </span>
+            <input
+              type="month"
+              value={selectedPeriod}
+              max={getCurrentPeriod()}
+              onChange={(e) => {
+                // <input type="month"> emits YYYY-MM — exactly our period format.
+                if (e.target.value) setSelectedPeriod(e.target.value);
+              }}
+              aria-label="Select billing month"
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            />
+          </label>
           {!isCurrentPeriod && (
             <button
               type="button"
               onClick={() => setSelectedPeriod(getCurrentPeriod())}
-              className="text-[11px] text-[#D97706] font-semibold"
+              className="block text-[11px] text-[#D97706] font-semibold"
             >
               Jump to current month
             </button>
@@ -848,7 +890,8 @@ export default function OwnerDashboardPage() {
         <button
           type="button"
           onClick={() => setSelectedPeriod((p) => shiftPeriod(p, 1))}
-          className="inline-flex items-center justify-center h-11 w-11 rounded-[8px] text-[#64748B] hover:bg-[#F8FAFC] hover:text-[#09090B] transition-colors"
+          disabled={isCurrentPeriod}
+          className="inline-flex items-center justify-center h-11 w-11 rounded-[8px] text-[#64748B] hover:bg-[#F8FAFC] hover:text-[#09090B] transition-colors disabled:opacity-30 disabled:pointer-events-none"
           aria-label="Next month"
         >
           <ArrowLeft className="w-4 h-4 rotate-180" />
@@ -1212,10 +1255,29 @@ export default function OwnerDashboardPage() {
                       </span>
                       <button
                         type="button"
-                        onClick={() => {
+                        onClick={async () => {
                           const url = `${window.location.origin}/t/${activeTenant.token}`;
-                          navigator.clipboard.writeText(url);
-                          toast.success('Link copied');
+                          try {
+                            // navigator.clipboard is undefined on insecure origins
+                            // and some older mobile browsers — fall back to a
+                            // temporary textarea + execCommand so copy still works.
+                            if (navigator.clipboard?.writeText) {
+                              await navigator.clipboard.writeText(url);
+                            } else {
+                              const ta = document.createElement('textarea');
+                              ta.value = url;
+                              ta.style.position = 'fixed';
+                              ta.style.opacity = '0';
+                              document.body.appendChild(ta);
+                              ta.focus();
+                              ta.select();
+                              document.execCommand('copy');
+                              document.body.removeChild(ta);
+                            }
+                            toast.success('Link copied');
+                          } catch {
+                            toast.error('Could not copy — long-press the link to copy it manually');
+                          }
                         }}
                         className="text-[#D97706] font-semibold hover:underline inline-flex items-center gap-1 cursor-pointer"
                       >
@@ -1244,6 +1306,15 @@ export default function OwnerDashboardPage() {
             setPrefillTenant(null);
           }}
           onSuccess={() => {
+            // Immediately open the bed-detail drawer for the just-assigned bed so
+            // the owner can record a payment / view the portal link / vacate right
+            // away — these actions live in that drawer and were otherwise hard to
+            // find after the add flow closed (reported "no option to add amount
+            // paid / checkout"). Mark it occupied optimistically; the real-time
+            // bed listener reconciles the authoritative status moments later.
+            if (selectedBedForAdd) {
+              setActiveBedDrawer({ ...selectedBedForAdd, status: 'occupied' });
+            }
             setSelectedBedForAdd(null);
             setPrefillTenant(null);
           }}
@@ -1320,6 +1391,11 @@ export default function OwnerDashboardPage() {
 
             {proofModalRecord.record.proofImageUrl ? (
               <div className="border border-[#E2E8F0] rounded-[10px] overflow-hidden bg-black/5 p-2 flex items-center justify-center">
+                {/* Plain <img>: this is a short-lived B2 presigned URL (expires
+                    ~5 min) of a user-uploaded proof of arbitrary dimensions.
+                    next/image can't optimize a rotating private URL and would
+                    require per-host remote config for no real benefit. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={proofModalRecord.record.proofImageUrl}
                   alt="Proof screenshot"

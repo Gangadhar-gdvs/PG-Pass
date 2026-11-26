@@ -6,6 +6,21 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/**
+ * Safely extract a human-readable message from an unknown thrown value.
+ * Use in `catch (e: unknown)` blocks instead of `catch (e: any)` so error
+ * handling stays type-safe while still surfacing the thrown message when present.
+ */
+export function errorMessage(e: unknown, fallback: string): string {
+  if (e instanceof Error && e.message) return e.message;
+  if (typeof e === 'string' && e) return e;
+  if (e && typeof e === 'object' && 'message' in e) {
+    const m = (e as { message?: unknown }).message;
+    if (typeof m === 'string' && m) return m;
+  }
+  return fallback;
+}
+
 export function generateToken(): string {
   // Cryptographically secure token generation
   const chars = 'abcdefghjkmnpqrstuvwxyz23456789';

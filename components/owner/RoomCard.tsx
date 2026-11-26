@@ -75,7 +75,9 @@ const SHARING_CONFIG: Record<
 
 interface RoomCardProps {
   room: RoomData;
-  recordMap: Map<string, RentRecord>;
+  /** Selected-month rent records keyed by tenantId (records link to residents,
+   *  not beds — see BedGrid). Resolve a bed's record via its tenantId. */
+  recordByTenant: Map<string, RentRecord>;
   ownerName: string;
   pgName: string;
   ownerUpi: string;
@@ -88,7 +90,7 @@ interface RoomCardProps {
 
 export function RoomCard({
   room,
-  recordMap,
+  recordByTenant,
   ownerName,
   pgName,
   ownerUpi,
@@ -198,11 +200,16 @@ export function RoomCard({
       {/* BEDS LIST INSIDE THE ROOM */}
       <div className="mt-2 space-y-2">
         {room.beds.map((bed) => {
-          const record = recordMap.get(bed.id);
+          // Payment status comes ONLY from the selected month's record (not the
+          // bed's month-agnostic denormalized status), so navigating months shows
+          // real per-month data. An occupied bed with no record this month has no
+          // bill for that period.
+          const record = bed.tenantId ? recordByTenant.get(bed.tenantId) : undefined;
           const isVacant = bed.status === 'vacant';
           const isGuest = bed.status === 'guest';
-          const isPaid = bed.status === 'paid' || record?.status === 'paid';
-          const isVerify = bed.status === 'verify' || record?.status === 'verify';
+          const isPaid = record?.status === 'paid';
+          const isVerify = record?.status === 'verify';
+          const noBill = !isVacant && !isGuest && !record;
 
           return (
             <div
@@ -217,6 +224,8 @@ export function RoomCard({
                   ? 'bg-emerald-50/30 border-[#A7F3D0] hover:border-[#059669]'
                   : isVerify
                   ? 'bg-indigo-50/30 border-[#C7D2FE] hover:border-[#6366F1]'
+                  : noBill
+                  ? 'bg-[#F8FAFC] border-[#E2E8F0] hover:border-[#CBD5E1]'
                   : 'bg-amber-50/30 border-[#FDE68A] hover:border-[#D97706]'
               }`}
             >
@@ -275,14 +284,18 @@ export function RoomCard({
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-[5px] bg-[#E0E7FF] text-[#3730A3] border border-[#C7D2FE]">
                         Verify
                       </span>
+                    ) : noBill ? (
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-[5px] bg-[#F1F5F9] text-[#64748B] border border-[#E2E8F0]">
+                        No bill
+                      </span>
                     ) : (
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-[5px] bg-[#FEF3C7] text-[#92400E] border border-[#FDE68A]">
                         Due
                       </span>
                     )}
 
-                    {/* Quick WhatsApp Reminder if Due */}
-                    {!isPaid && !isVerify && bed.tenantPhone && (
+                    {/* Quick WhatsApp Reminder — only when there's a due bill this month */}
+                    {!isPaid && !isVerify && !noBill && bed.tenantPhone && (
                       <button
                         title="Send WhatsApp Reminder"
                         onClick={(e) => handleSendReminder(e, bed)}

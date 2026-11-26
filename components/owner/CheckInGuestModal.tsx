@@ -5,7 +5,7 @@ import { Bed } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Drawer } from '@/components/ui/drawer';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, errorMessage } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
 function nightsBetween(a: string, b: string): number {
@@ -26,13 +26,16 @@ export function CheckInGuestModal({
   onClose: () => void;
   onSuccess: () => void;
 }) {
-  const today = new Date().toISOString().slice(0, 10);
-  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
-
+  // Read the clock in lazy useState initializers (run once at mount, exempt from
+  // the render-purity rule) rather than during render. `checkIn`/`checkOut` seed
+  // from today/tomorrow; `today` is also the min for the date inputs.
+  const [today] = useState(() => new Date().toISOString().slice(0, 10));
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [checkIn, setCheckIn] = useState(today);
-  const [checkOut, setCheckOut] = useState(tomorrow);
+  const [checkIn, setCheckIn] = useState(() => new Date().toISOString().slice(0, 10));
+  const [checkOut, setCheckOut] = useState(() =>
+    new Date(Date.now() + 86400000).toISOString().slice(0, 10)
+  );
   const [mode, setMode] = useState<'per_night' | 'flat'>('per_night');
   const [rate, setRate] = useState('500');
   const [flat, setFlat] = useState('');
@@ -44,8 +47,8 @@ export function CheckInGuestModal({
     return Number(flat) || 0;
   }, [mode, rate, flat, nights]);
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submit = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (loading) return;
     if (name.trim().length < 2) return toast.error('Enter the guest name');
     if (total <= 0) return toast.error('Enter a valid amount');
@@ -70,8 +73,8 @@ export function CheckInGuestModal({
       toast.success(`${name.trim()} checked in to Bed ${bed.bedLabel}`);
       onSuccess();
       onClose();
-    } catch (err: any) {
-      toast.error(err.message || 'Check-in failed');
+    } catch (err: unknown) {
+      toast.error(errorMessage(err, 'Check-in failed'));
     } finally {
       setLoading(false);
     }
@@ -91,7 +94,7 @@ export function CheckInGuestModal({
             <span className="font-extrabold font-mono-numbers">{formatCurrency(total)}</span>
             {mode === 'per_night' && <span className="text-xs text-slate-400"> · {nights}n</span>}
           </div>
-          <Button type="submit" form="guest-form" loading={loading} variant="solid">
+          <Button type="button" onClick={() => submit()} loading={loading} variant="solid">
             Check In Guest
           </Button>
         </div>
@@ -102,7 +105,7 @@ export function CheckInGuestModal({
         <Input label="Phone (optional)" type="tel" inputMode="numeric" value={phone} onChange={(e) => setPhone(e.target.value)} disabled={loading} />
 
         <div className="grid grid-cols-2 gap-3">
-          <Input label="Check-in" type="date" value={checkIn} onChange={(e) => setCheckIn(e.target.value)} disabled={loading} />
+          <Input label="Check-in" type="date" value={checkIn} min={today} onChange={(e) => setCheckIn(e.target.value)} disabled={loading} />
           <Input label="Check-out" type="date" value={checkOut} min={checkIn} onChange={(e) => setCheckOut(e.target.value)} disabled={loading} />
         </div>
 

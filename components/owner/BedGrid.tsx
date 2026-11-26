@@ -47,10 +47,17 @@ export function BedGrid({
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'rooms' | 'beds'>('rooms');
 
-  const recordMap = new Map<string, RentRecord>();
+  // Rent records are linked to a resident, not a bed — their doc id is
+  // `${tenantId}_${period}` and they store `tenantId` (never a reliable `bedId`).
+  // So key the per-period record map by tenantId and resolve each bed's record
+  // via the bed's current tenantId. (Keying by bedId silently matched nothing,
+  // which is why status used to fall back to the month-agnostic bed.status.)
+  const recordByTenant = new Map<string, RentRecord>();
   rentRecords.forEach((r) => {
-    if (r.bedId) recordMap.set(r.bedId, r);
+    if (r.tenantId) recordByTenant.set(r.tenantId, r);
   });
+  const recordFor = (b: Bed): RentRecord | undefined =>
+    b.tenantId ? recordByTenant.get(b.tenantId) : undefined;
 
   const uniqueFloors = Array.from(new Set(beds.map((b) => b.floor))).sort((a, b) => a - b);
 
@@ -68,11 +75,16 @@ export function BedGrid({
       return false;
     }
 
-    const record = recordMap.get(b.id);
-    const isPaid = b.status === 'paid' || record?.status === 'paid';
-    const isVerify = b.status === 'verify' || record?.status === 'verify';
+    // Payment status for the filter comes from the SELECTED month's record
+    // (resolved via the bed's tenant), not the bed's month-agnostic status.
+    // Guests are billed separately (no monthly rent record) so they're excluded
+    // from the paid/pending/verify rent filters entirely.
+    const record = recordFor(b);
     const isVacant = b.status === 'vacant';
-    const isPending = !isVacant && !isPaid && !isVerify;
+    const isGuest = b.status === 'guest';
+    const isPaid = record?.status === 'paid';
+    const isVerify = record?.status === 'verify';
+    const isPending = !isVacant && !isGuest && !isPaid && !isVerify;
 
     if (activeFilter === 'paid' && !isPaid) return false;
     if (activeFilter === 'verify' && !isVerify) return false;
@@ -312,7 +324,7 @@ export function BedGrid({
                       <RoomCard
                         key={room.roomNumber}
                         room={room}
-                        recordMap={recordMap}
+                        recordByTenant={recordByTenant}
                         ownerName={ownerName}
                         pgName={pgName}
                         ownerUpi={ownerUpi}
@@ -331,7 +343,7 @@ export function BedGrid({
                       <BedCard
                         key={bed.id}
                         bed={bed}
-                        rentRecord={recordMap.get(bed.id)}
+                        rentRecord={recordFor(bed)}
                         ownerName={ownerName}
                         pgName={pgName}
                         ownerUpi={ownerUpi}

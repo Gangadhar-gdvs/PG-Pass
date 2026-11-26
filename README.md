@@ -1,26 +1,144 @@
+<div align="center">
 
-Owner Panel 
+# 🏠 PGPass
 
-During adding the resident for the room with bed there is no assin button is showing for assign , only enter will automatically added , but user can't understand enter hits it, because they use Mobile mostly not desktop, so button needed 
+### Smart PG & Hostel Management — Made Easy
 
-After adding the resident there is no option to add the amount they paid, and no option to checkout the bed of that resident , 
-And also free tier 20 beds reached still it allow to created and managed more beds instead of disable or no access for create more , 
-And also when i try to copy the resident portal link copy button is not worked and not copied the link and when i click on the link icon it will open the portal , but in the url its shows something undefined, and its shows enter last digits if phone number but i tried to enter first , last , including country with all variants, but always shows invalid pin only, 
+**Manage beds, residents, rent, deposits, staff and more in one place — with zero platform fees.**
+Mobile-first. Multi-tenant. Built for India. Runs at **₹0** on free tiers.
 
-Tabs issues:
-Is i click on any other tabs sometimes it will open immediately sometimes it will not open even i click on multipe times also , i don't the issue , and maybe the tabs or ui stuck issues or any other issues 
+<br/>
 
-In top after login shows the pg details at left side , i think we can add user profile icon at right side top in them same pg details Row same like as modern mobiles apps format to acces their profile directly from it with uploading the profile pic option also after opening it , 
+<img src="docs/screenshots/landing.png" alt="PGPass landing screen" width="280"/>
 
-Stats tab shows 
-Couldn't load analytics, there is problem something message 
+</div>
 
-The support page shows scrollable whole page , make the support window full page format instead of side padding of it and make the window non scrollable, only inside chat only scrollable, add dates wise seperation like today , yesterday, unread messages, or new messages, delivered, seen , with ticked format , 
+---
 
-All pages header is not sticky, make it header sticky and fixed during scroll, don't change true header format keep current format just make it fixed instead of scrolling 
+## ✨ What is PGPass?
 
+PGPass helps PG and hostel **owners** run their property end-to-end — rooms, beds, residents,
+rent, deposits, expenses, maintenance and staff — while **residents** get a clean self-service
+portal and **admins** oversee the whole platform. Payments go **directly owner-to-resident via
+UPI** (0% fees), so no one pays transaction charges.
 
-Multiple properties Ui and design showing top also not good , i think we can update this design or placement or ux format or add inside profile to switch accounts etc , better modern approach needed to add 
+> **The product must be dependable before it is beautiful, and useful before it is monetized.**
 
-It shows date with arrows in beds tab but when i move to other dates shows same for all dates instead of real that dates data 
-And also make user to select particular date also woth give full calendar open selection instead if only arowos to shift the monthly only 
+---
+
+## 📱 The App
+
+<table>
+<tr>
+<td width="33%" align="center"><b>Owner Console</b></td>
+<td width="33%" align="center"><b>Resident Portal</b></td>
+<td width="33%" align="center"><b>Admin Panel</b></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/owner-dashboard.png" alt="Owner dashboard"/></td>
+<td><img src="docs/screenshots/resident-portal.png" alt="Resident portal"/></td>
+<td><img src="docs/screenshots/admin-panel.png" alt="Admin panel"/></td>
+</tr>
+<tr>
+<td>Live occupancy & collection stats, bed grid, rent, deposits, expenses, staff.</td>
+<td>Rent status, pay via UPI, deposit, raise issues, notices — all from a secure link.</td>
+<td>Cross-PG oversight, per-PG features, support chat, reviews, system logs.</td>
+</tr>
+</table>
+
+---
+
+## 🎯 Features
+
+| For Owners | For Residents | For Admins |
+|---|---|---|
+| 🛏️ Bed & room inventory | 🔑 Secure portal (link + PIN) | 🏢 Platform-wide overview |
+| 👥 Resident lifecycle | 💳 Pay rent via direct UPI | ⚙️ Per-PG feature flags |
+| 💰 Rent, partial payments, receipts | 📄 Deposit & rent history | 💬 Owner support chat |
+| 🏦 Deposit ledger & refunds | 🛠️ Raise maintenance issues | ⭐ Review moderation |
+| 📊 Analytics & defaulter aging | 🔔 Notices & reminders | 📋 System log viewer |
+| 🧾 Expenses & net revenue | 🏘️ Discover & review PGs | 🔐 Suspend / reactivate accounts |
+| 👷 Staff with granular permissions | | |
+
+**Also:** short-stay guests · multi-property · PG discovery directory · WhatsApp rent
+reminders · HRA PDF receipts · single active session · idle auto-logout.
+
+---
+
+## 🧱 Tech Stack
+
+| Layer | Choice |
+|---|---|
+| **Framework** | Next.js 16 (App Router) · React 19 |
+| **Language** | TypeScript (strict) |
+| **Styling** | Tailwind CSS v4 — per-role theming |
+| **Auth** | Firebase Auth (Google · Email · Phone) |
+| **Database** | Cloud Firestore |
+| **Storage** | Backblaze B2 (private photos, S3 API) |
+| **Validation** | Zod |
+
+**Principles:** server-only writes · strict tenant isolation · money in integer paise ·
+soft-delete (never destroy financial history) · append-only audit · ₹0 mandatory cost.
+
+---
+
+## 🚀 Getting Started
+
+```bash
+# 1. Install
+npm install
+
+# 2. Configure env (copy a template and fill it in)
+cp .env.development.example .env.development
+
+# 3. Run (local emulators optional)
+npm run emulators   # Firebase Auth + Firestore emulators
+npm run dev         # → http://localhost:3000
+```
+
+### Quality gates
+
+```bash
+npm run typecheck   # tsc --noEmit
+npm run lint        # eslint
+npm test            # vitest unit tests
+npm run build       # production build
+```
+
+---
+
+## 📂 Project Structure
+
+```
+app/            Routes + API (owner · resident · admin · tenant portal)
+components/     UI design system + feature components
+lib/
+  server/       Server-only: services, auth, security, storage, monitoring
+  client/       Browser helpers (upi, qrcode, receiptPdf, uploader…)
+  constants/    Limits, permissions, routes, status
+hooks/          useAuth · useOwner · useBeds · useTenants
+docs/           Architecture, blueprint, runbook, data inventory, issues
+```
+
+---
+
+## 📖 Documentation
+
+All docs live in [`docs/`](docs/):
+
+- **[architecture-spec.md](docs/architecture-spec.md)** — what exists today (the source of truth)
+- **[product-blueprint.md](docs/product-blueprint.md)** — product principles, scope & test matrix
+- **[runbook.md](docs/runbook.md)** — incident response
+- **[data-inventory.md](docs/data-inventory.md)** — DPDP data map
+- **[ISSUES.md](docs/ISSUES.md)** — issue & bug log
+
+> **[`AGENTS.md`](AGENTS.md)** stays in the root (the agents.md convention AI tools auto-discover)
+> — mandatory engineering rules for every contributor and AI agent.
+
+---
+
+<div align="center">
+
+**Built for Indian PG owners — dependable, mobile-first, and free at its core.**
+
+</div>

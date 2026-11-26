@@ -35,9 +35,10 @@ export function StatsBar({ beds, rentRecords, onRemindAll, summary }: StatsBarPr
   const occupancyRate =
     summary?.occupancyRate ?? (totalBeds > 0 ? Math.round((occupiedBeds / totalBeds) * 100) : 0);
 
-  const recordMap = new Map<string, RentRecord>();
+  // Rent records key by tenantId (doc id `${tenantId}_${period}`), not bedId.
+  const recordByTenant = new Map<string, RentRecord>();
   rentRecords.forEach((r) => {
-    if (r.bedId) recordMap.set(r.bedId, r);
+    if (r.tenantId) recordByTenant.set(r.tenantId, r);
   });
 
   let totalCollected = 0;
@@ -47,20 +48,34 @@ export function StatsBar({ beds, rentRecords, onRemindAll, summary }: StatsBarPr
   let verifyCount = 0;
 
   beds.forEach((bed) => {
-    if (bed.status === 'vacant') return;
+    // Skip vacant and guests (guests are billed separately, no monthly record).
+    if (bed.status === 'vacant' || bed.status === 'guest') return;
 
-    const record = recordMap.get(bed.id);
-    const isPaid = bed.status === 'paid' || record?.status === 'paid';
-    const isVerify = bed.status === 'verify' || record?.status === 'verify';
+    // Status from the selected month's record (via tenant), not bed.status.
+    const record = bed.tenantId ? recordByTenant.get(bed.tenantId) : undefined;
+    const isPaid = record?.status === 'paid';
+    const isVerify = record?.status === 'verify';
+
+    // Prefer the record's real amounts (honours partial payments + prorating) and
+    // fall back to the bed's configured monthly rent when no record exists yet.
+    const paidRupees = record ? Math.round((record.amountPaidPaise ?? 0) / 100) : 0;
+    const dueRupees = record
+      ? Math.round((record.amountDuePaise ?? 0) / 100)
+      : bed.monthlyRent || 0;
 
     if (isPaid) {
       paidCount++;
-      totalCollected += bed.monthlyRent || 0;
+      totalCollected += dueRupees;
     } else if (isVerify) {
       verifyCount++;
+      // A payment awaiting verification is partly collected in reality.
+      totalCollected += paidRupees;
+      totalPending += Math.max(0, dueRupees - paidRupees);
     } else {
       pendingCount++;
-      totalPending += bed.monthlyRent || 0;
+      // Count any partial already paid toward collected; the rest is pending.
+      totalCollected += paidRupees;
+      totalPending += Math.max(0, dueRupees - paidRupees);
     }
   });
 

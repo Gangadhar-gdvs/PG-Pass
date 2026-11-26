@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { Avatar } from '@/components/ui/avatar';
 import { PropertySwitcher } from '@/components/owner/PropertySwitcher';
+import { OwnerTopBar } from '@/components/owner/OwnerTopBar';
 import { BottomTabBar } from '@/components/ui/bottom-tab-bar';
 import { IdleLogout } from '@/components/auth/IdleLogout';
 
@@ -134,21 +135,19 @@ export function OwnerShell({
           </div>
         </aside>
 
-        {/* No mobile top header — the bottom tab bar is the primary nav. A slim
-            property switcher stays accessible on mobile when the owner has more
-            than one PG. */}
-        {session.role !== 'staff' && (
-          <div className="md:hidden px-4 pt-4">
-            <PropertySwitcher />
-          </div>
-        )}
+        {/* Main column. On mobile a sticky top bar (PG name + profile avatar)
+            gives fixed-header behaviour, direct profile access, and a home for
+            the property switcher; desktop uses the sidebar. */}
+        <div className="flex-1 flex flex-col min-w-0 max-w-7xl w-full">
+          <OwnerTopBar onSignOut={signOut} />
 
-        {/* `pb-24` on mobile reserves room for the fixed bottom tab bar WITHOUT
-            adding height on top of the full-screen container (which previously
-            forced every page to scroll even with little content). */}
-        <main className="flex-1 overflow-x-hidden px-4 sm:px-6 lg:px-8 py-4 md:py-6 lg:py-8 pb-24 md:pb-8 max-w-7xl w-full">
-          <div className="animate-fade-up">{children}</div>
-        </main>
+          {/* `pb-24` on mobile reserves room for the fixed bottom tab bar WITHOUT
+              adding height on top of the full-screen container (which previously
+              forced every page to scroll even with little content). */}
+          <main className="flex-1 overflow-x-hidden px-4 sm:px-6 lg:px-8 py-4 md:py-6 lg:py-8 pb-24 md:pb-8 w-full">
+            <div className="animate-fade-up">{children}</div>
+          </main>
+        </div>
 
         {/* Floating bottom tab bar — essentials with the active tab shown as a
             floating pill; everything else lives in "More". No center "+". */}

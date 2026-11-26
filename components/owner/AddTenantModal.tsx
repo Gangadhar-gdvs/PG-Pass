@@ -8,6 +8,7 @@ import { Dropdown } from '@/components/ui/dropdown';
 import { PhoneInput } from '@/components/ui/phone-input';
 import { Drawer } from '@/components/ui/drawer';
 import { validatePhone, sanitizeText } from '@/lib/security';
+import { errorMessage } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
 interface AddTenantModalProps {
@@ -33,11 +34,13 @@ export function AddTenantModal({
 
   // Seed from a join-request when the modal opens.
   React.useEffect(() => {
-    if (isOpen) {
+    if (!isOpen) return;
+    // Seed from a join-request after commit (microtask) so these state writes
+    // don't run synchronously inside the effect body (cascading-render rule).
+    queueMicrotask(() => {
       if (prefillName) setName(prefillName);
       if (prefillPhone) setPhone(prefillPhone);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    });
   }, [isOpen, prefillName, prefillPhone]);
   const [moveInDate, setMoveInDate] = useState(
     new Date().toISOString().split('T')[0]
@@ -53,8 +56,8 @@ export function AddTenantModal({
   const [loading, setLoading] = useState(false);
   const [phoneError, setPhoneError] = useState('');
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (loading) return; // double-submit guard
     setPhoneError('');
 
@@ -114,9 +117,9 @@ export function AddTenantModal({
       toast.success(`${sanitizedName} assigned to Bed ${bed.bedLabel}`);
       onSuccess(data.tenant.id, data.rawPortalToken);
       onClose();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Tenant assignment error:', err);
-      toast.error(err.message || 'Failed to add resident');
+      toast.error(errorMessage(err, 'Failed to add resident'));
     } finally {
       setLoading(false);
     }
@@ -141,8 +144,8 @@ export function AddTenantModal({
             Cancel
           </Button>
           <Button
-            type="submit"
-            form="add-tenant-form"
+            type="button"
+            onClick={() => handleSubmit()}
             loading={loading}
             variant="solid"
             className="w-full sm:w-auto"

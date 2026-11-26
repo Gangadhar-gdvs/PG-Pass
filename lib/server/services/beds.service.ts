@@ -151,26 +151,23 @@ export class BedsService {
     if (!ownerDoc.exists) {
       throw new AppError(404, 'Owner profile not found. Please complete setup.');
     }
-    const planLimit = ownerDoc.data()?.maxBeds ?? 20;
+    const maxBeds = ownerDoc.data()?.maxBeds ?? 20;
 
     // Count only ACTIVE beds — soft-deleted ones don't consume quota.
     const currentCount = bedsSnap.docs.filter((d) => !d.data()?.deletedAt).length;
-    // First-setup grace: a brand-new PG may generate its full bed layout in one
-    // batch even if it exceeds the default free limit — but never beyond a hard
-    // ceiling, so the grace can't be abused to create an unbounded inventory.
-    const FIRST_SETUP_HARD_CAP = 500;
-    const maxBeds =
-      currentCount === 0 ? Math.min(FIRST_SETUP_HARD_CAP, Math.max(planLimit, bedsList.length)) : planLimit;
 
+    // Hard-cap at the plan limit with NO first-setup grace: the free-tier bed
+    // limit is always authoritative, even on the very first batch. (Previously a
+    // large first batch bypassed the limit and permanently inflated maxBeds,
+    // which is the reported "free 20-bed limit isn't enforced" bug.) A PG that
+    // genuinely needs more than its plan allows must upgrade in Billing.
     if (currentCount + bedsList.length > maxBeds) {
+      const remaining = Math.max(0, maxBeds - currentCount);
       throw new AppError(
         403,
-        `Adding ${bedsList.length} beds exceeds your plan limit (${maxBeds} beds). You currently have ${currentCount} beds. Please upgrade your plan in Billing.`
+        `Adding ${bedsList.length} beds exceeds your plan limit (${maxBeds} beds). ` +
+          `You currently have ${currentCount} and can add ${remaining} more. Please upgrade your plan in Billing.`
       );
-    }
-
-    if (currentCount === 0 && bedsList.length > planLimit) {
-      await ownerDoc.ref.update({ maxBeds, maxTenants: maxBeds });
     }
 
     const batch = adminDb.batch();

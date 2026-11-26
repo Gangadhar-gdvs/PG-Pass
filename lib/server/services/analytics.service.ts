@@ -34,6 +34,9 @@ export interface OwnerAnalytics {
   defaulterCount: number;
   currentExpensePaise: number;
   currentNetPaise: number; // collected − expenses this period
+  // Which enhancement sections failed to load and were degraded to zero, so the
+  // UI can warn the owner instead of presenting "0 overdue / full net" as healthy.
+  degraded?: { aging?: boolean; expenses?: boolean };
 }
 
 export class AnalyticsService {
@@ -42,8 +45,13 @@ export class AnalyticsService {
     const periods = recentPeriods(currentPeriod, 6);
     const earliest = periods[0];
 
-    // Beds (occupancy) + recent rent records (trend) + current-period expenses.
-    const [bedsSnap, recordsSnap, defaulters, currentExpensePaise] = await Promise.all([
+    // Beds (occupancy) + recent rent records (trend) are the CORE of analytics;
+    // if either fails the request should surface the error. Defaulter aging and
+    // expenses are ENHANCEMENTS — a failure there (e.g. a missing composite index
+    // on one collection) must degrade gracefully to zeros rather than blank the
+    // entire analytics page. Each is isolated so one bad query can't take down
+    // occupancy/collection numbers the owner relies on.
+    const [bedsSnap, recordsSnap, defaultersRaw, currentExpenseRaw] = await Promise.all([
       adminDb.collection('beds').where('ownerId', '==', ownerId).limit(1000).get(),
       adminDb
         .collection('rent_records')
@@ -52,9 +60,20 @@ export class AnalyticsService {
         .orderBy('period', 'asc')
         .limit(1000)
         .get(),
-      rentService.getDefaulters(ownerId, todayIso, 500),
-      expensesService.totalForPeriod(ownerId, currentPeriod),
+      rentService.getDefaulters(ownerId, todayIso, 500).catch((e) => {
+        console.warn('analytics: getDefaulters failed, degrading aging to empty:', e?.code || e?.message);
+        return null; // null (vs []) distinguishes "failed" from "genuinely none"
+      }),
+      expensesService.totalForPeriod(ownerId, currentPeriod).catch((e) => {
+        console.warn('analytics: expense total failed, degrading to 0:', e?.code || e?.message);
+        return null; // null (vs 0) distinguishes "failed" from "genuinely zero"
+      }),
     ]);
+
+    const agingDegraded = defaultersRaw === null;
+    const expensesDegraded = currentExpenseRaw === null;
+    const defaulters = defaultersRaw ?? [];
+    const currentExpensePaise = currentExpenseRaw ?? 0;
 
     const beds = bedsSnap.docs.map((d) => ({ ...d.data(), id: d.id } as Bed));
     const totalBeds = beds.length;
@@ -115,6 +134,9 @@ export class AnalyticsService {
       defaulterCount: defaulters.length,
       currentExpensePaise,
       currentNetPaise: current.collectedPaise - currentExpensePaise,
+      ...(agingDegraded || expensesDegraded
+        ? { degraded: { ...(agingDegraded ? { aging: true } : {}), ...(expensesDegraded ? { expenses: true } : {}) } }
+        : {}),
     };
   }
 }

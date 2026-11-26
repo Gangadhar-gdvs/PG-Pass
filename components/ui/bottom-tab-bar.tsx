@@ -42,7 +42,19 @@ export function BottomTabBar({
 }) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
-  const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/');
+  // Optimistic navigation feedback: the tapped tab lights up IMMEDIATELY (before
+  // the route commits) so on a slow network the owner sees the tap registered
+  // and doesn't tap repeatedly thinking it's "stuck".
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
+  // Clear the optimistic highlight DURING render once the real route has caught
+  // up (React's "adjust state while rendering" pattern — preferred over an effect
+  // that calls setState, which causes cascading renders). `matchesPath` mirrors
+  // the active-route test so a pending tab is dropped as soon as its route lands.
+  const matchesPath = (href: string) => pathname === href || pathname.startsWith(href + '/');
+  if (pendingHref && matchesPath(pendingHref)) {
+    setPendingHref(null);
+  }
+  const isActive = (href: string) => (pendingHref ? pendingHref === href : matchesPath(href));
 
   // "More" is active when the current route lives in the more-menu AND no
   // primary tab already owns it (primary takes precedence, so a route can never
@@ -59,6 +71,7 @@ export function BottomTabBar({
       return (
         <Link
           href={item.href}
+          onClick={() => setPendingHref(item.href)}
           aria-current="page"
           aria-label={item.label}
           className="flex items-center justify-center min-w-[52px]"
@@ -72,6 +85,7 @@ export function BottomTabBar({
     return (
       <Link
         href={item.href}
+        onClick={() => setPendingHref(item.href)}
         className="flex flex-col items-center justify-center gap-0.5 min-w-[52px] min-h-[48px] press text-slate-400"
       >
         <Icon className="w-[22px] h-[22px]" />
@@ -160,7 +174,10 @@ export function BottomTabBar({
                   <Link
                     key={item.href}
                     href={item.href}
-                    onClick={() => setMenuOpen(false)}
+                    onClick={() => {
+                      setPendingHref(item.href);
+                      setMenuOpen(false);
+                    }}
                     className="flex flex-col items-center justify-center gap-2 py-4 rounded-[16px] press"
                     style={
                       active

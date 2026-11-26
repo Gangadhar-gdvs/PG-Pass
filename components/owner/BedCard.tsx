@@ -40,8 +40,14 @@ export function BedCard({
 }: BedCardProps) {
   const isVacant = bed.status === 'vacant';
   const isGuest = bed.status === 'guest';
-  const isPaid = bed.status === 'paid' || rentRecord?.status === 'paid';
-  const isVerify = bed.status === 'verify' || rentRecord?.status === 'verify';
+  // Payment status is per-SELECTED-MONTH and must come ONLY from that month's
+  // rent record — never from the bed's denormalized current status, which would
+  // bleed the same state across every month (the "shows same data for all dates"
+  // bug). An occupied bed with no record for the selected period has no bill
+  // that month (e.g. a month before move-in, or rent not generated yet).
+  const isPaid = rentRecord?.status === 'paid';
+  const isVerify = rentRecord?.status === 'verify';
+  const noBill = !isVacant && !isGuest && !rentRecord;
 
   // Left status bar color (guest = violet, distinct from monthly tenants)
   const statusColor = isVacant
@@ -52,6 +58,8 @@ export function BedCard({
     ? 'bg-[#10B981]'
     : isVerify
     ? 'bg-[#6366F1]'
+    : noBill
+    ? 'bg-[#CBD5E1]'
     : 'bg-[#F59E0B]';
 
   const handleSendReminder = (e: React.MouseEvent) => {
@@ -103,6 +111,10 @@ export function BedCard({
             <Badge variant="paid" dot>Paid</Badge>
           ) : isVerify ? (
             <Badge variant="verify" dot>Verify</Badge>
+          ) : noBill ? (
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#F1F5F9] text-[#64748B] border border-[#E2E8F0]">
+              No bill
+            </span>
           ) : (
             <Badge variant="amber" dot>Due</Badge>
           )}

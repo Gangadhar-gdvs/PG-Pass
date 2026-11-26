@@ -3,8 +3,41 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { subscribeToSupportMessages } from '@/lib/firestore';
 import { Button } from '@/components/ui/button';
-import { Send } from 'lucide-react';
+import { Send, Check, CheckCheck } from 'lucide-react';
 import type { SupportMessage } from '@/types';
+
+/** Firestore Timestamp | Date | ISO string → Date (or null if unparseable). */
+function toDate(v: unknown): Date | null {
+  if (!v) return null;
+  if (v instanceof Date) return v;
+  if (typeof v === 'object' && v !== null && 'toDate' in v && typeof (v as { toDate: unknown }).toDate === 'function') {
+    try {
+      return (v as { toDate: () => Date }).toDate();
+    } catch {
+      return null;
+    }
+  }
+  if (typeof v === 'string' || typeof v === 'number') {
+    const d = new Date(v);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  return null;
+}
+
+/** "Today" / "Yesterday" / "12 Nov 2026" for a date separator. */
+function dayLabel(d: Date): string {
+  const now = new Date();
+  const startOf = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const diffDays = Math.round((startOf(now) - startOf(d)) / 86_400_000);
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+/** HH:MM in 12-hour Indian format for a message timestamp. */
+function timeLabel(d: Date): string {
+  return d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true });
+}
 
 /**
  * Live owner↔admin chat. Messages stream in via Firestore onSnapshot (server
@@ -37,8 +70,12 @@ export function SupportChat({
   useEffect(() => {
     if (!threadOwnerId) return;
     onOpen?.();
-    setLoading(true);
-    setError(false);
+    // Reset loading/error for the (re)subscription in a microtask so these don't
+    // run synchronously inside the effect body (cascading-render lint rule).
+    queueMicrotask(() => {
+      setLoading(true);
+      setError(false);
+    });
     let settled = false;
     const timeout = setTimeout(() => {
       if (!settled) {
@@ -111,21 +148,50 @@ export function SupportChat({
             {emptyHint || 'No messages yet. Start the conversation below.'}
           </div>
         )}
-        {!loading && messages.map((m) => {
+        {!loading && messages.map((m, i) => {
           const mine = m.sender === viewerSide;
+          const when = toDate(m.createdAt);
+          // Insert a date separator whenever the calendar day changes.
+          const prevWhen = i > 0 ? toDate(messages[i - 1].createdAt) : null;
+          const showDaySep =
+            when && (!prevWhen || when.toDateString() !== prevWhen.toDateString());
+          // "Seen" is derived honestly (no per-message receipts exist): one of my
+          // messages counts as seen once the OTHER side has sent any later message.
+          const seen =
+            mine && messages.slice(i + 1).some((n) => n.sender !== viewerSide);
           return (
-            <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'} animate-fade-up`}>
-              <div
-                className={`max-w-[80%] px-3.5 py-2 rounded-[16px] text-sm ${
-                  mine ? 'accent-bg rounded-br-sm' : 'bg-slate-100 text-slate-900 rounded-bl-sm'
-                }`}
-              >
-                <span className="block whitespace-pre-wrap break-words">{m.text}</span>
-                <span className={`block text-[10px] mt-0.5 ${mine ? 'text-white/70' : 'text-slate-400'}`}>
-                  {m.sender === 'admin' ? 'Support' : 'You'}
-                </span>
+            <React.Fragment key={m.id}>
+              {showDaySep && when && (
+                <div className="flex justify-center py-1">
+                  <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 rounded-full px-2.5 py-0.5">
+                    {dayLabel(when)}
+                  </span>
+                </div>
+              )}
+              <div className={`flex ${mine ? 'justify-end' : 'justify-start'} animate-fade-up`}>
+                <div
+                  className={`max-w-[80%] px-3.5 py-2 rounded-[16px] text-sm ${
+                    mine ? 'accent-bg rounded-br-sm' : 'bg-slate-100 text-slate-900 rounded-bl-sm'
+                  }`}
+                >
+                  <span className="block whitespace-pre-wrap break-words">{m.text}</span>
+                  <span
+                    className={`flex items-center gap-1 justify-end text-[10px] mt-0.5 ${
+                      mine ? 'text-white/70' : 'text-slate-400'
+                    }`}
+                  >
+                    <span>{m.sender === 'admin' ? 'Support' : 'You'}</span>
+                    {when && <span>· {timeLabel(when)}</span>}
+                    {mine &&
+                      (seen ? (
+                        <CheckCheck className="w-3 h-3" aria-label="Seen" />
+                      ) : (
+                        <Check className="w-3 h-3" aria-label="Sent" />
+                      ))}
+                  </span>
+                </div>
               </div>
-            </div>
+            </React.Fragment>
           );
         })}
       </div>
