@@ -2,6 +2,7 @@ import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { config } from './config';
 import type { Timestampish } from '@/types';
+import { PLAN_TIER, type PlanTier } from '@/lib/constants/status';
 
 /**
  * Convert a Firestore timestamp / Date / ISO string / epoch number to a `Date`,
@@ -151,4 +152,35 @@ export function amountInWords(n: number): string {
   if (n < 1000) return ones[Math.floor(n / 100)] + ' Hundred' + (n % 100 ? ' ' + amountInWords(n % 100) : '');
   if (n < 100000) return amountInWords(Math.floor(n / 1000)) + ' Thousand' + (n % 1000 ? ' ' + amountInWords(n % 1000) : '');
   return amountInWords(Math.floor(n / 100000)) + ' Lakh' + (n % 100000 ? ' ' + amountInWords(n % 100000) : '');
+}
+
+/**
+ * Security deposit a resident has PAID, in rupees. The server stores money as
+ * integer paise (`depositPaidPaise`); very old tenant docs may carry a rupee
+ * `depositPaid` instead. Never read `depositPaid` directly in UI code.
+ */
+export function depositPaidRupees(
+  t: { depositPaidPaise?: number | null; depositPaid?: number | null } | null | undefined
+): number {
+  if (!t) return 0;
+  if (typeof t.depositPaidPaise === 'number' && Number.isFinite(t.depositPaidPaise)) {
+    return Math.max(0, t.depositPaidPaise) / 100;
+  }
+  if (typeof t.depositPaid === 'number' && Number.isFinite(t.depositPaid)) {
+    return Math.max(0, t.depositPaid);
+  }
+  return 0;
+}
+
+/**
+ * The owner's subscription tier. The server writes `plan` (owner creation and
+ * upgrade approval); `planTier` is accepted only as a legacy alias. Unknown or
+ * missing values fall back to Free.
+ */
+export function ownerPlanTier(
+  o: { plan?: string | null; planTier?: string | null } | null | undefined
+): PlanTier {
+  const raw = o?.plan ?? o?.planTier;
+  const tiers = Object.values(PLAN_TIER) as string[];
+  return raw && tiers.includes(raw) ? (raw as PlanTier) : PLAN_TIER.FREE;
 }

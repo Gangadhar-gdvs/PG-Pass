@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useOwnerSession } from '@/hooks/useOwner';
 import { useTenants } from '@/hooks/useTenants';
 import { useBeds } from '@/hooks/useBeds';
-import { formatCurrency, getWhatsAppLink } from '@/lib/utils';
+import { formatCurrency, getWhatsAppLink, depositPaidRupees } from '@/lib/utils';
 import { config } from '@/lib/config';
 import { Tenant } from '@/types';
 import {
@@ -80,7 +80,7 @@ export default function TenantsPage() {
 
   // Display-only totals derived from the data already on the page.
   const vacantBeds = beds.filter((b) => b.status === 'vacant').length;
-  const depositsHeld = tenants.reduce((sum, t) => sum + (t.depositPaid || 0), 0);
+  const depositsHeld = tenants.reduce((sum, t) => sum + depositPaidRupees(t), 0);
   const portalReady = tenants.filter((t) => Boolean(t.token)).length;
 
   const handleCopyLink = (token?: string) => {
@@ -148,13 +148,13 @@ export default function TenantsPage() {
       render: (t) => <span className="text-[13px] font-medium text-muted">{moveInLabel(t)}</span>,
     },
     {
-      key: 'depositPaid',
+      key: 'depositPaidPaise',
       header: 'Deposit',
       sortable: true,
       align: 'right',
       render: (t) => (
         <span className="font-mono-numbers text-[14px] font-extrabold text-ink">
-          {formatCurrency(t.depositPaid || 0)}
+          {formatCurrency(depositPaidRupees(t))}
         </span>
       ),
     },
@@ -298,7 +298,7 @@ export default function TenantsPage() {
                     </div>
                     <div className="shrink-0 text-right">
                       <div className="font-mono-numbers text-[15px] font-extrabold text-ink">
-                        {formatCurrency(t.depositPaid || 0)}
+                        {formatCurrency(depositPaidRupees(t))}
                       </div>
                       <div className="text-[11px] font-semibold text-muted">Deposit</div>
                     </div>
