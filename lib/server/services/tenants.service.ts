@@ -9,7 +9,7 @@ import {
   PORTAL_TOKEN_TTL_DAYS,
 } from '@/lib/constants/limits';
 import { generatePortalToken, hashToken } from '../security/tokens';
-import { rentDueDate, tsToMillis } from '@/lib/utils';
+import { rentDueDate, tsToMillis, getCurrentPeriod } from '@/lib/utils';
 import { env } from '@/lib/env';
 import { Timestamp } from 'firebase-admin/firestore';
 
@@ -202,7 +202,8 @@ export class TenantsService {
       }
 
       // 5. Initial rent record for current period
-      const currentPeriod = new Date().toISOString().slice(0, 7); // YYYY-MM
+      // IST billing month — the UTC month is still last month 00:00–05:30 IST on the 1st.
+      const currentPeriod = getCurrentPeriod(); // YYYY-MM
       const rentAmount = input.initialRentAmountPaise ?? bedData.rentAmountPaise;
       const rentRef = adminDb.collection('rent_records').doc(`${tenantRef.id}_${currentPeriod}`);
 

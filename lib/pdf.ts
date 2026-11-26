@@ -1,5 +1,5 @@
 'use client';
-import { amountInWords } from './utils';
+import { amountInWords, todayIST } from './utils';
 
 export interface HRAData {
   tenantName: string;
@@ -30,7 +30,7 @@ export async function generateHRAReceipt(data: HRAData): Promise<void> {
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
   doc.text('Form 12BB Proof of Rent Paid | Income Tax Act, 1961', margin, 27);
-  doc.text(`Receipt Generation Date: ${data.paidDate || new Date().toISOString().split('T')[0]}`, margin, 34);
+  doc.text(`Receipt Generation Date: ${data.paidDate || todayIST()}`, margin, 34);
 
   // PG & Landlord Details Box
   doc.setFillColor(248, 250, 252); // slate-50

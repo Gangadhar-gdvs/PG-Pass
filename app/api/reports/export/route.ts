@@ -4,6 +4,7 @@ import { withAuth, AuthContext } from '@/lib/server/api/withAuth';
 import { withRateLimit } from '@/lib/server/api/withRateLimit';
 import { reportsService } from '@/lib/server/services/reports.service';
 import { toCsv, csvResponseHeaders } from '@/lib/server/export/csv';
+import { todayIST } from '@/lib/utils';
 
 // CSV export: ?type=residents|rent|expenses (&period=YYYY-MM for rent/expenses).
 // Injection-safe (toCsv neutralizes formula triggers). Rate-limited.
@@ -15,7 +16,7 @@ export const GET = withErrorHandler(
         const url = new URL(req.url);
         const type = url.searchParams.get('type') || 'residents';
         const period = url.searchParams.get('period') || undefined;
-        const today = new Date().toISOString().split('T')[0];
+        const today = todayIST();
 
         let data: { headers: string[]; rows: unknown[][] };
         let name: string;

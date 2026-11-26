@@ -1,7 +1,7 @@
 import 'server-only';
 import { adminDb } from '../firebase-admin';
 import { Owner, Bed, Tenant, RentRecord, Timestampish } from '@/types';
-import { getCurrentPeriod, tsToMillis } from '@/lib/utils';
+import { getCurrentPeriod, tsToMillis, todayIST } from '@/lib/utils';
 import { ACCOUNT_STATUS } from '@/lib/constants/status';
 import type {
   DocumentData,
@@ -79,7 +79,7 @@ async function getPlatformTotals(): Promise<{
   platformTotalBeds: number;
   platformTotalResidents: number;
 }> {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIST(); // same IST day key the metrics cron writes
   const metricsSnap = await adminDb.collection('metrics').doc(today).get();
   if (metricsSnap.exists) {
     const m = metricsSnap.data() || {};

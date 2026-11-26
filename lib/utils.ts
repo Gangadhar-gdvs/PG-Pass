@@ -41,6 +41,12 @@ export function cn(...inputs: ClassValue[]) {
  * handling stays type-safe while still surfacing the thrown message when present.
  */
 export function errorMessage(e: unknown, fallback: string): string {
+  // A browser `fetch` that never reached the server throws a TypeError with a
+  // engine-specific message ("Failed to fetch", "Load failed", …) — not
+  // something a resident or owner can act on (AGENTS §3).
+  if (e instanceof TypeError && /failed to fetch|load failed|networkerror|network request failed/i.test(e.message)) {
+    return "Couldn't reach PGPass. Check your internet connection and try again.";
+  }
   if (e instanceof Error && e.message) return e.message;
   if (typeof e === 'string' && e) return e;
   if (e && typeof e === 'object' && 'message' in e) {
@@ -99,6 +105,10 @@ export function validateUtr(raw: string): { valid: boolean; value: string; error
 /** Format an ISO date (YYYY-MM-DD) or Date as DD/MM/YYYY for Indian users. */
 export function formatDateIN(value?: string | Date | null): string {
   if (!value) return '';
+  if (typeof value === 'string') {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+  }
   const d = typeof value === 'string' ? new Date(value) : value;
   if (isNaN(d.getTime())) return typeof value === 'string' ? value : '';
   const dd = String(d.getDate()).padStart(2, '0');
@@ -106,21 +116,107 @@ export function formatDateIN(value?: string | Date | null): string {
   return `${dd}/${mm}/${d.getFullYear()}`;
 }
 
+// ---------------------------------------------------------------------------
+// India time (Asia/Kolkata). Business dates (rent periods, move-in/expense
+// dates, "today") are IST calendar dates regardless of where the code runs:
+// servers run in UTC and `toISOString()` is UTC, which is YESTERDAY between
+// 00:00 and 05:30 IST (and last month on the 1st). India has no DST, so a fixed
+// +05:30 offset is exact.
+// ---------------------------------------------------------------------------
+
+const IST_OFFSET_MS = 330 * 60_000;
+
+/** Today's calendar date in Asia/Kolkata as YYYY-MM-DD. */
+export function todayIST(now: Date | number = Date.now()): string {
+  const ms = typeof now === 'number' ? now : now.getTime();
+  return new Date(ms + IST_OFFSET_MS).toISOString().slice(0, 10);
+}
+
+/** The current billing period (YYYY-MM) in Asia/Kolkata. */
+export function currentPeriodIST(now: Date | number = Date.now()): string {
+  return todayIST(now).slice(0, 7);
+}
+
+/** Add `days` to a YYYY-MM-DD calendar date (pure date arithmetic, no time zone). */
+export function addDaysToIsoDate(iso: string, days: number): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+}
+
+/** Shift a YYYY-MM period by `delta` months (handles year rollover). */
+export function shiftPeriodBy(period: string, delta: number): string {
+  const [y, m] = period.split('-').map(Number);
+  const d = new Date(Date.UTC(y, m - 1 + delta, 1));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
 export function getCurrentMonthYear(): string {
-  const d = new Date();
+  const [y, m] = currentPeriodIST().split('-').map(Number);
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  return `${months[d.getMonth()]}-${d.getFullYear()}`;
+  return `${months[m - 1]}-${y}`;
 }
 
 /**
- * Current billing period in canonical YYYY-MM form (e.g. "2026-11").
+ * Current billing period in canonical YYYY-MM form (e.g. "2026-11"), in IST.
  * This is the `period` field actually stored on rent_records by the server
  * services; `getCurrentMonthYear()` returns the legacy "Nov-2026" display
  * string and must NOT be used for Firestore queries.
  */
 export function getCurrentPeriod(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  return currentPeriodIST();
+}
+
+// ---------------------------------------------------------------------------
+// API error messages. Every route returns errors as `{ error, code, requestId }`
+// (withErrorHandler); a few legacy paths used `{ message }`. Clients must read
+// these through apiErrorMessage/readApiError so the server's human-friendly
+// message (e.g. "Incorrect PIN. 3 attempt(s) remaining.") reaches the user.
+// ---------------------------------------------------------------------------
+
+function humanizeApiError(msg: string, code?: string): string {
+  if (code === 'VALIDATION_ERROR' || /^Validation failed:/i.test(msg)) {
+    // "Validation failed: totalPaise: Amount cannot be negative; name: Too short"
+    // → "Amount cannot be negative. Too short" (field paths are developer detail).
+    const issues = msg
+      .replace(/^Validation failed:\s*/i, '')
+      .split(/;\s*/)
+      .map((i) => i.replace(/^[\w.[\]-]+:\s+/, '').trim())
+      .filter(Boolean);
+    const unique = Array.from(new Set(issues));
+    if (unique.length === 0) return 'Please check the details you entered and try again.';
+    return unique.map((i) => i.charAt(0).toUpperCase() + i.slice(1).replace(/\.$/, '')).join('. ');
+  }
+  if (/missing session cookie|invalid or expired session/i.test(msg)) {
+    return 'Your session has expired. Please sign in again.';
+  }
+  if (/^access denied: required role/i.test(msg)) {
+    return "You don't have access to this. Please sign in with the right account.";
+  }
+  return msg;
+}
+
+/**
+ * The user-facing message from an API error body: `error` → `message` →
+ * `fallback`. Developer-only phrasing (validation field paths, session
+ * internals) is rewritten into plain language.
+ */
+export function apiErrorMessage(body: unknown, fallback: string): string {
+  if (!body || typeof body !== 'object') return fallback;
+  const b = body as { error?: unknown; message?: unknown; code?: unknown };
+  const raw =
+    typeof b.error === 'string' && b.error.trim()
+      ? b.error.trim()
+      : typeof b.message === 'string' && b.message.trim()
+        ? b.message.trim()
+        : '';
+  if (!raw) return fallback;
+  return humanizeApiError(raw, typeof b.code === 'string' ? b.code : undefined) || fallback;
+}
+
+/** Read a failed `Response`'s JSON body and return its user-facing message. */
+export async function readApiError(res: Response, fallback: string): Promise<string> {
+  const body = await res.json().catch(() => null);
+  return apiErrorMessage(body, fallback);
 }
 
 /**

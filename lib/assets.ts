@@ -3,6 +3,7 @@
  * owner UI. No Firestore, no implicit clock (callers pass `todayIso`).
  */
 import type { Asset, AssetCategory, AssetCondition, AssetHistoryEntry } from '@/types';
+import { todayIST } from '@/lib/utils';
 
 export const ASSET_CATEGORIES = ['furniture', 'appliance', 'electrical', 'bedding', 'other'] as const;
 export const ASSET_CONDITIONS = ['good', 'fair', 'damaged', 'missing'] as const;
@@ -31,7 +32,7 @@ const DAY_MS = 86_400_000;
 
 /** Today's calendar date in Asia/Kolkata (UTC+5:30) as YYYY-MM-DD. */
 export function istTodayIso(nowMs: number): string {
-  return new Date(nowMs + 330 * 60_000).toISOString().slice(0, 10);
+  return todayIST(nowMs);
 }
 
 /** Add `days` to a YYYY-MM-DD date. */

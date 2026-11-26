@@ -364,6 +364,37 @@ super-admin; ONE backend for mobile/website/admin.
 - Gate after Phase 3+4+5-partial: lint 0 · typecheck 0 · **86 tests** · build ✓.
   New server-only Firestore rules + indexes for notices/staff_tasks/visitors.
 
+## Found by the new rules / E2E / restore-drill suites (27 Nov 2026)
+App bugs
+- 🔴 **R-A1 Admin console 401s right after sign-in** — the auth listener calls `/api/admin/me` + `/api/admin/overview`
+  before the session cookie exists → "Couldn't load platform telemetry" until Retry/reload. (`e2e/admin.spec.ts` fixme)
+- 🔴 **R-A2 Admin directory search crashes the page** on owner docs without `pgName`/`name`/`phone` (e.g. a fresh
+  sign-up whose doc only holds session fields). (`e2e` fixme)
+- 🔴 **R-A3 Server error messages dropped app-wide** — clients read `data.message`, the API returns `{ error, code,
+  requestId }`. Portal never shows "N attempts remaining"/lockout/expired; ~18 owner-console call sites affected. (`e2e` fixme)
+- 🔴 **R-A4** Residents page shows an "Open portal" link to `/t/undefined` for tenants without a stored token.
+- 🔴 **R-A5** Default move-in / expense dates use the UTC day (yesterday before 05:30 IST).
+- 🔴 **R-A6** `createTenant` derives the first rent period from the UTC month (wrong month 00:00–05:30 IST on the 1st).
+Firestore rules (from `tests/rules`)
+- 🔴 **R-S1** `pg_reviews` is `get: if true` — hidden reviews, reviewer uids, reviews of PGs with reviews disabled are readable.
+- 🔴 **R-S2** `property_photos` public reads expose owner/uploader uids (low).
+- 🔴 **R-S3** Staff can read everything their owner can — rules ignore per-staff permissions (tenants incl. phone +
+  raw portal token, rent, deposits, expenses, utility bills, assets). With the token + last-4 PIN a staff member can
+  open any resident portal. (Revisits accepted decision C2.)
+- 🔴 **R-S4** Admins can't `get` single `audit_logs` / `admin_notifications` / `support_flags` docs (list-size check
+  applied to single reads; fails closed).
+- 🔴 **R-S5** A revoked staff member's ID token keeps read access until refresh (≤1 h).
+Backup / restore (from the drill)
+- 🔴 **R-B1** Nightly backup covers only 6 collections — missing properties, staff, residents, expenses,
+  maintenance_tickets, notices, support_threads(+messages), utility_bills, assets, portal_tokens (losing portal_tokens
+  breaks every resident link), …
+- 🔴 **R-B2** Firebase Auth users + custom claims are not backed up at all.
+- 🔴 **R-B3** `BACKUP_ENCRYPTION_KEY` is padded/truncated by the route and never validated in `lib/env.ts`.
+- 🔴 **R-B4** A document field literally named `_id` overrides the document id on restore; the route should use the
+  shared, tested `lib/server/backup/format.ts`.
+- ⚪ Restores larger than the free tier's 20,000 writes/day can't finish in one day at ₹0 — needs a temporary paid
+  upgrade (owner approval, AGENTS §8) or a multi-day restore. Documented in the runbook.
+
 ## Follow-ups (explicitly deferred, not forgotten)
 - 🟢 **#6 avatar image upload — BUILT.** Private storage (never a public URL): client compresses to
   ≤512px WebP (EXIF stripped) → presigned PUT into `pending/{ownerId}/avatar/` → `POST /api/owners/avatar`

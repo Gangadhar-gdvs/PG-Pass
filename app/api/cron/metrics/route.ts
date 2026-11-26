@@ -3,13 +3,13 @@ import { withErrorHandler } from '@/lib/server/api/withErrorHandler';
 import { withCronAuth } from '@/lib/server/api/withCronAuth';
 import { adminDb } from '@/lib/server/firebase-admin';
 import { RENT_STATUS, ACCOUNT_STATUS } from '@/lib/constants/status';
-import { rentDueDate } from '@/lib/utils';
+import { rentDueDate, todayIST, currentPeriodIST, shiftPeriodBy } from '@/lib/utils';
 import { Timestamp, QueryDocumentSnapshot } from 'firebase-admin/firestore';
 import { rentBillEligibility } from '@/lib/rentEligibility';
 
 export const POST = withErrorHandler(
   withCronAuth(async (_req: NextRequest) => {
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = todayIST(); // IST calendar day (metrics doc id; read by adminOverview)
     const now = Timestamp.now();
 
     // 1. Compute platform metrics
@@ -45,9 +45,9 @@ export const POST = withErrorHandler(
     // 4. Auto-generate next-period pending rent records for ALL active tenants.
     //    Paginated (no silent 100-tenant cap) with per-owner due-day caching to
     //    avoid an owner read per tenant.
-    const nextMonthDate = new Date();
-    nextMonthDate.setMonth(nextMonthDate.getMonth() + 1);
-    const nextPeriod = nextMonthDate.toISOString().slice(0, 7); // YYYY-MM
+    // Period arithmetic in IST — the old `setMonth(+1)` on a UTC Date skipped
+    // February when run on 31 Jan and used the UTC month on the 1st.
+    const nextPeriod = shiftPeriodBy(currentPeriodIST(), 1); // YYYY-MM
 
     const ownerDueDayCache = new Map<string, number | undefined>();
     async function dueDayFor(ownerId: string): Promise<number | undefined> {

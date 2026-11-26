@@ -4,18 +4,14 @@ import { withAuth, AuthContext } from '@/lib/server/api/withAuth';
 import { withRateLimit } from '@/lib/server/api/withRateLimit';
 import { expensesService } from '@/lib/server/services/expenses.service';
 import { STAFF_PERMISSIONS, PG_FEATURES } from '@/lib/constants/permissions';
-
-function currentPeriod() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-}
+import { getCurrentPeriod, todayIST } from '@/lib/utils';
 
 // List expenses for a billing period (defaults to current month).
 export const GET = withErrorHandler(
   withAuth(
     async (req: NextRequest, ctx: { auth: AuthContext }) => {
       const ownerId = ctx.auth.ownerId || ctx.auth.uid;
-      const period = new URL(req.url).searchParams.get('period') || currentPeriod();
+      const period = new URL(req.url).searchParams.get('period') || getCurrentPeriod();
       const expenses = await expensesService.listByPeriod(ownerId, period);
       const total = expenses.reduce((s, e) => s + (e.amountPaise || 0), 0);
       return NextResponse.json({ expenses, total, period });
@@ -54,7 +50,7 @@ export const POST = withErrorHandler(
           amountPaise,
           note: body.note,
           vendor: body.vendor,
-          date: body.date || new Date().toISOString().slice(0, 10),
+          date: body.date || todayIST(),
         });
 
         return NextResponse.json({ success: true, expense }, { status: 201 });

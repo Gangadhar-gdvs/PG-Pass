@@ -13,11 +13,35 @@ service cloud.firestore {
         && ('role' in request.auth.token && request.auth.token.role == 'staff')
         && ('ownerId' in request.auth.token && request.auth.token.ownerId == ownerId);
     }
-    function canReadOwnerScope(ownerId) { return isOwnerUid(ownerId) || isStaffFor(ownerId) || isAdmin(); }
     function boundedList() { return request.query.limit <= 100; } // MAX_LIST_LIMIT
 
+    // Staff = claims say so (free) AND the live staff/{uid} doc agrees: it exists,
+    // belongs to this owner and is active. Reading the doc (1 billed read per
+    // request; repeated get()s of the same doc count once) makes suspension /
+    // revocation effective immediately instead of at the next ID-token refresh.
+    // Mirrors withAuth (accountStatus absent => 'active').
+    function staffProfile() { return get(/databases/$(database)/documents/staff/$(request.auth.uid)).data; }
+    function isActiveStaffFor(ownerId) {
+      return isStaffFor(ownerId)
+        && staffProfile().ownerId == ownerId
+        && staffProfile().get('accountStatus', 'active') == 'active';
+    }
+    // ...and holds at least one of `perms` (STAFF_PERMISSIONS values from
+    // lib/constants/permissions.ts; tests/rules/coverage.test.ts checks the names).
+    function isStaffWith(ownerId, perms) {
+      return isActiveStaffFor(ownerId) && staffProfile().get('permissions', []).hasAny(perms);
+    }
+    // Owner / admin first (claims only, no document read), staff last.
+    function canReadOwnerScope(ownerId) { return isOwnerUid(ownerId) || isAdmin() || isActiveStaffFor(ownerId); }
+    function canReadOwnerScopeWith(ownerId, perms) { return isOwnerUid(ownerId) || isAdmin() || isStaffWith(ownerId, perms); }
+
+    // Staff permission sets per data class.
+    function tenancyPerms() { return ['manage_tenants', 'collect_rent']; } // residents, rent, deposits
+    function photoPerms()   { return ['manage_tenants', 'manage_photos']; }
+    function moneyPerms()   { return ['manage_expenses']; }                 // expenses, utility bills
+
     match /owners/{ownerId} {
-      allow get:   if isOwnerUid(ownerId) || isStaffFor(ownerId) || isAdmin();
+      allow get:   if isOwnerUid(ownerId) || isAdmin() || isActiveStaffFor(ownerId);
       allow list:  if isAdmin() && boundedList();
       allow write: if false;
     }
@@ -35,27 +59,29 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Residents (incl. phone + raw pass token), rent and deposits: staff need a
+    // tenancy permission (manage_tenants or collect_rent).
     match /tenants/{tenantId} {
-      allow get:   if canReadOwnerScope(resource.data.ownerId);
-      allow list:  if canReadOwnerScope(resource.data.ownerId) && boundedList();
+      allow get:   if canReadOwnerScopeWith(resource.data.ownerId, tenancyPerms());
+      allow list:  if canReadOwnerScopeWith(resource.data.ownerId, tenancyPerms()) && boundedList();
       allow write: if false;
     }
 
     match /deposits/{txId} {
-      allow get:   if canReadOwnerScope(resource.data.ownerId);
-      allow list:  if canReadOwnerScope(resource.data.ownerId) && boundedList();
+      allow get:   if canReadOwnerScopeWith(resource.data.ownerId, tenancyPerms());
+      allow list:  if canReadOwnerScopeWith(resource.data.ownerId, tenancyPerms()) && boundedList();
       allow write: if false;
     }
 
     match /rent_records/{recordId} {
-      allow get:   if canReadOwnerScope(resource.data.ownerId);
-      allow list:  if canReadOwnerScope(resource.data.ownerId) && boundedList();
+      allow get:   if canReadOwnerScopeWith(resource.data.ownerId, tenancyPerms());
+      allow list:  if canReadOwnerScopeWith(resource.data.ownerId, tenancyPerms()) && boundedList();
       allow write: if false; // transitions happen strictly in rent.service.ts (§10.1)
     }
 
     match /movein_photos/{photoId} {
-      allow get:   if canReadOwnerScope(resource.data.ownerId); // metadata only; image bytes come from B2 via /api (§11)
-      allow list:  if canReadOwnerScope(resource.data.ownerId) && boundedList();
+      allow get:   if canReadOwnerScopeWith(resource.data.ownerId, photoPerms()); // metadata only; image bytes come from B2 via /api (§11)
+      allow list:  if canReadOwnerScopeWith(resource.data.ownerId, photoPerms()) && boundedList();
       allow write: if false;
     }
 
@@ -66,14 +92,16 @@ service cloud.firestore {
     }
 
     match /maintenance_tickets/{ticketId} {
-      allow get:   if canReadOwnerScope(resource.data.ownerId);
-      allow list:  if canReadOwnerScope(resource.data.ownerId) && boundedList();
+      allow get:   if canReadOwnerScopeWith(resource.data.ownerId, ['manage_maintenance']);
+      allow list:  if canReadOwnerScopeWith(resource.data.ownerId, ['manage_maintenance']) && boundedList();
       allow write: if false; // created by tenant via /api/maintenance, resolved via Admin SDK
     }
 
+    // Owner-targeted alerts (subscription, payment, move-out). No client reads
+    // them; owner + admin only (no staff permission maps to billing alerts).
     match /owner_notifications/{id} {
-      allow get:   if canReadOwnerScope(resource.data.ownerId);
-      allow list:  if canReadOwnerScope(resource.data.ownerId) && boundedList();
+      allow get:   if isOwnerUid(resource.data.ownerId) || isAdmin();
+      allow list:  if (isOwnerUid(resource.data.ownerId) || isAdmin()) && boundedList();
       allow write: if false;
     }
 
@@ -94,29 +122,29 @@ service cloud.firestore {
     }
 
     match /expenses/{expenseId} {
-      allow get:   if canReadOwnerScope(resource.data.ownerId);
-      allow list:  if canReadOwnerScope(resource.data.ownerId) && boundedList();
+      allow get:   if canReadOwnerScopeWith(resource.data.ownerId, moneyPerms());
+      allow list:  if canReadOwnerScopeWith(resource.data.ownerId, moneyPerms()) && boundedList();
       allow write: if false; // created/deleted via /api/expenses (Admin SDK)
     }
 
-    // Utility bills + their frozen per-resident allocation. Owner/staff of the
-    // PG may read; create/apply/void happen only via /api/utilities (Admin SDK).
+    // Utility bills + their frozen per-resident allocation. Owner (and staff
+    // with manage_expenses) may read; create/apply/void only via /api/utilities.
     match /utility_bills/{billId} {
-      allow get:   if canReadOwnerScope(resource.data.ownerId);
-      allow list:  if canReadOwnerScope(resource.data.ownerId) && boundedList();
+      allow get:   if canReadOwnerScopeWith(resource.data.ownerId, moneyPerms());
+      allow list:  if canReadOwnerScopeWith(resource.data.ownerId, moneyPerms()) && boundedList();
       allow write: if false;
     }
 
     // Room inventory / assets (with append-only history). Writes via /api/assets.
     match /assets/{assetId} {
-      allow get:   if canReadOwnerScope(resource.data.ownerId);
-      allow list:  if canReadOwnerScope(resource.data.ownerId) && boundedList();
+      allow get:   if canReadOwnerScopeWith(resource.data.ownerId, ['manage_beds']);
+      allow list:  if canReadOwnerScopeWith(resource.data.ownerId, ['manage_beds']) && boundedList();
       allow write: if false;
     }
 
     match /guest_stays/{stayId} {
-      allow get:   if canReadOwnerScope(resource.data.ownerId);
-      allow list:  if canReadOwnerScope(resource.data.ownerId) && boundedList();
+      allow get:   if canReadOwnerScopeWith(resource.data.ownerId, ['manage_guests']);
+      allow list:  if canReadOwnerScopeWith(resource.data.ownerId, ['manage_guests']) && boundedList();
       allow write: if false; // check-in/checkout via /api/guests (Admin SDK)
     }
 
@@ -126,21 +154,16 @@ service cloud.firestore {
       allow write: if false; // managed via /api/properties (Admin SDK)
     }
 
-    // PG gallery photos. Metadata is public (the underlying B2 objects are
-    // public-read anyway, and prospective residents browse galleries while
-    // signed out). Writes are server-only via /api/properties/photos.
+    // PG gallery photos + public PG reviews are served ONLY through app/api as
+    // DTOs (discovery/reviews services drop hidden reviews and reviews of PGs
+    // with the feature disabled, and never return reviewerUid/uploadedBy/
+    // ownerId). No client SDK code reads them, so direct access is denied.
     match /property_photos/{photoId} {
-      allow get:   if true;
-      allow list:  if boundedList();
-      allow write: if false;
+      allow read, write: if false;
     }
 
-    // Public PG reviews (verified residents/guests/staff only — enforced in the
-    // service). Publicly readable; written server-side via /api/reviews.
     match /pg_reviews/{reviewId} {
-      allow get:   if true;
-      allow list:  if boundedList();
-      allow write: if false;
+      allow read, write: if false;
     }
 
     // Individual staff ratings (resident → staff). Read by the owning PG + admin;
@@ -178,9 +201,10 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    match /audit_logs/{logId}           { allow get, list: if isAdmin() && boundedList(); allow write: if false; }
-    match /admin_notifications/{id}     { allow get, list: if isAdmin() && boundedList(); allow write: if false; }
-    match /support_flags/{flagId}       { allow get, list: if isAdmin() && boundedList(); allow write: if false; }
+    // Single-doc reads have no query limit, so get and list are separate rules.
+    match /audit_logs/{logId}           { allow get: if isAdmin(); allow list: if isAdmin() && boundedList(); allow write: if false; }
+    match /admin_notifications/{id}     { allow get: if isAdmin(); allow list: if isAdmin() && boundedList(); allow write: if false; }
+    match /support_flags/{flagId}       { allow get: if isAdmin(); allow list: if isAdmin() && boundedList(); allow write: if false; }
     match /metrics/{date}               { allow get: if isAdmin(); allow list, write: if false; }
 
     // Admin roster (who is an admin + their permissions). Read/written only via

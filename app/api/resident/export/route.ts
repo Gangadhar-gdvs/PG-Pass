@@ -3,6 +3,7 @@ import { withErrorHandler } from '@/lib/server/api/withErrorHandler';
 import { withAuth, AuthContext } from '@/lib/server/api/withAuth';
 import { withRateLimit } from '@/lib/server/api/withRateLimit';
 import { residentsService } from '@/lib/server/services/residents.service';
+import { todayIST } from '@/lib/utils';
 
 // DPDP data-access: a resident downloads ALL their own data as JSON. Strictly
 // scoped to the caller (ctx.auth.uid). Rate-limited to deter scraping.
@@ -14,7 +15,7 @@ export const GET = withErrorHandler(
         return new NextResponse(JSON.stringify(data, null, 2), {
           headers: {
             'Content-Type': 'application/json; charset=utf-8',
-            'Content-Disposition': `attachment; filename="pgpass-my-data-${new Date().toISOString().split('T')[0]}.json"`,
+            'Content-Disposition': `attachment; filename="pgpass-my-data-${todayIST()}.json"`,
             'Cache-Control': 'private, no-store',
           },
         });

@@ -7,7 +7,7 @@ import { sendFromOwnerGmail, getOwnerGmailStatus } from '@/lib/server/services/g
 import { residentsService } from '@/lib/server/services/residents.service';
 import { recordEvent } from '@/lib/server/services/systemLogs.service';
 import { STAFF_PERMISSIONS } from '@/lib/constants/permissions';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, getCurrentPeriod } from '@/lib/utils';
 import { Timestamp } from 'firebase-admin/firestore';
 import type { RentRecord } from '@/types';
 
@@ -34,7 +34,7 @@ export const POST = withErrorHandler(
         } catch {
           /* period optional */
         }
-        const period = body.period || new Date().toISOString().slice(0, 7);
+        const period = body.period || getCurrentPeriod();
 
         // Owner profile for PG name + the from-name on the email.
         const ownerSnap = await adminDb.collection('owners').doc(ownerId).get();
