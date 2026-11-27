@@ -7,7 +7,9 @@ import { MAX_LIST_LIMIT } from '@/lib/constants/limits';
 import { smsService } from './sms.service';
 import { emailService } from './email.service';
 import { recordEvent } from './systemLogs.service';
-import { errorMessage, normalizePhone } from '@/lib/utils';
+import { residentsService } from './residents.service';
+import { sendFromOwnerGmail } from './gmail.service';
+import { errorMessage, normalizePhone, formatCurrency, getCurrentPeriod } from '@/lib/utils';
 import { hashUtr } from '../security/tokens';
 import { Timestamp, Transaction, DocumentReference } from 'firebase-admin/firestore';
 
@@ -598,6 +600,73 @@ export class RentService {
       actorUid,
       targetId: recordId,
     });
+  }
+
+  /**
+   * The HTML body for a rent-reminder email. Single source of truth so the
+   * bulk "email all unpaid" route and the per-resident reminder send the same
+   * message. Pure — no I/O.
+   */
+  buildReminderEmailHtml(params: {
+    tenantName: string;
+    pgName: string;
+    period: string;
+    outstandingPaise: number;
+    upiId?: string;
+  }): string {
+    const amountStr = formatCurrency(Math.max(0, params.outstandingPaise) / 100);
+    return `
+      <div style="font-family:Arial,sans-serif;font-size:14px;color:#0F172A;line-height:1.6">
+        <p>Namaste ${params.tenantName},</p>
+        <p>This is a friendly reminder that your rent for <b>${params.period}</b> at <b>${params.pgName}</b> is pending.</p>
+        <p><b>Amount due: ${amountStr}</b></p>
+        ${params.upiId ? `<p>You can pay directly via UPI: <b>${params.upiId}</b></p>` : ''}
+        <p>Thank you,<br/>${params.pgName}</p>
+      </div>`;
+  }
+
+  /**
+   * Email ONE resident their rent reminder from the owner's connected Gmail, and
+   * stamp `lastRemindedAt` on success. Resolves the resident email from the
+   * tenant's phone. Returns a structured outcome so the API can tell the owner
+   * exactly what happened (no-email → WhatsApp instead; sent; failed). Assumes
+   * the caller already verified owner Gmail is connected + the record is unpaid.
+   */
+  async sendEmailReminderForRecord(params: {
+    ownerId: string;
+    record: RentRecord;
+    pgName: string;
+    upiId?: string;
+  }): Promise<{ outcome: 'sent' | 'no_email' | 'failed'; email?: string; tenantName: string }> {
+    const { ownerId, record, pgName, upiId } = params;
+    let phone = '';
+    let tenantName = record.tenantName || 'Resident';
+    if (record.tenantId) {
+      const tSnap = await adminDb.collection('tenants').doc(record.tenantId).get();
+      phone = (tSnap.data()?.phone as string) || '';
+      tenantName = (tSnap.data()?.name as string) || tenantName;
+    }
+
+    const email = phone ? await residentsService.emailForPhone(phone) : null;
+    if (!email) return { outcome: 'no_email', tenantName };
+
+    const outstandingPaise = Math.max(0, (record.amountDuePaise ?? 0) - (record.amountPaidPaise ?? 0));
+    const period = record.period || getCurrentPeriod();
+    const ok = await sendFromOwnerGmail(ownerId, {
+      to: email,
+      subject: `Rent reminder — ${pgName} (${period})`,
+      html: this.buildReminderEmailHtml({ tenantName, pgName, period, outstandingPaise, upiId }),
+      fromName: pgName,
+    }).catch(() => false);
+
+    if (ok && record.id) {
+      await adminDb
+        .collection('rent_records')
+        .doc(record.id)
+        .update({ lastRemindedAt: Timestamp.now() })
+        .catch(() => {});
+    }
+    return { outcome: ok ? 'sent' : 'failed', email, tenantName };
   }
 }
 

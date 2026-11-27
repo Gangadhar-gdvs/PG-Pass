@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { LayoutGrid, Plus, X } from 'lucide-react';
@@ -48,14 +48,30 @@ export function BottomTabBar({
   const [quickOpen, setQuickOpen] = useState(false);
   // Optimistic navigation feedback: the tapped tab lights up IMMEDIATELY (before
   // the route commits) so on a slow network the user sees the tap registered.
-  const [pendingHref, setPendingHref] = useState<string | null>(null);
-  // Clear the optimistic highlight DURING render once the real route has caught
-  // up (React's "adjust state while rendering" pattern).
+  // We remember the pathname AT TAP TIME; the optimistic highlight is cleared as
+  // soon as the pathname CHANGES at all — whether the route landed on the tapped
+  // tab, a different tab (rapid re-tap), or a redirect. Clearing only on an exact
+  // match used to leave the highlight STUCK on the wrong tab after a rapid
+  // double-tap or a redirect, so the bar showed a tab you weren't actually on.
   const matchesPath = (href: string) => pathname === href || pathname.startsWith(href + '/');
-  if (pendingHref && matchesPath(pendingHref)) {
-    setPendingHref(null);
+  const [pending, setPending] = useState<{ href: string; from: string } | null>(null);
+  if (pending && (pathname !== pending.from || matchesPath(pending.href))) {
+    // Navigation resolved (pathname moved) OR we're already on the target.
+    setPending(null);
   }
+  const pendingHref = pending?.href ?? null;
+  const startPending = (href: string) => setPending({ href, from: pathname });
   const isActive = (href: string) => (pendingHref ? pendingHref === href : matchesPath(href));
+
+  // Safety net: if a navigation never resolves (a redirect back to the same
+  // route, a cancelled/failed nav), the render-time clear above never fires and
+  // the optimistic highlight would stick forever. Clear it after a short window
+  // so the bar always falls back to the real `pathname`.
+  useEffect(() => {
+    if (!pending) return;
+    const id = setTimeout(() => setPending(null), 2500);
+    return () => clearTimeout(id);
+  }, [pending]);
 
   const primaryActive = primary.some((p) => isActive(p.href));
   const moreActive = !primaryActive && more.some((m) => isActive(m.href));
@@ -82,7 +98,7 @@ export function BottomTabBar({
       <Link
         key={item.href}
         href={item.href}
-        onClick={() => setPendingHref(item.href)}
+        onClick={() => startPending(item.href)}
         aria-current={active ? 'page' : undefined}
         className="flex flex-1 justify-center press"
       >
@@ -121,7 +137,7 @@ export function BottomTabBar({
             key={item.href}
             href={item.href}
             onClick={() => {
-              setPendingHref(item.href);
+              startPending(item.href);
               onPick();
             }}
             className={`tint-card tint-${item.tint || 'violet'} flex flex-col items-center justify-center gap-2 px-1.5 py-3.5 text-center press ${

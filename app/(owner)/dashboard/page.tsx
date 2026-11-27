@@ -25,6 +25,7 @@ import { BedGrid } from '@/components/owner/BedGrid';
 import { AddTenantModal } from '@/components/owner/AddTenantModal';
 import { CheckInGuestModal } from '@/components/owner/CheckInGuestModal';
 import { WhatsAppReminderModal } from '@/components/owner/WhatsAppReminderModal';
+import { emailRentReminder } from '@/lib/client/rentReminders';
 import { BankCsvReconciler } from '@/components/owner/BankCsvReconciler';
 import { PropertySetupWizard } from '@/components/owner/PropertySetupWizard';
 import { DocumentUploader } from '@/components/owner/DocumentUploader';
@@ -50,6 +51,7 @@ import {
   LogOut,
   Send,
   Phone,
+  Mail,
   Copy,
   UserPlus,
   FileSpreadsheet,
@@ -194,6 +196,29 @@ export default function OwnerDashboardPage() {
       setEmailReminding(false);
     }
   };
+
+  // Email ONE resident (from the bed drawer) from the owner's Gmail; falls back
+  // to WhatsApp for that resident if they have no email / Gmail isn't connected.
+  const [emailingRecordId, setEmailingRecordId] = useState<string | null>(null);
+  const emailOneReminder = async (bed: Bed, record: RentRecord) => {
+    if (!record.id || emailingRecordId) return;
+    setEmailingRecordId(record.id);
+    try {
+      await emailRentReminder(record.id, {
+        tenantName: bed.tenantName,
+        isStaff: role === 'staff',
+        onWhatsAppFallback: () => {
+          if (bed.tenantPhone) {
+            const msg = `Namaste ${bed.tenantName || 'Resident'} ji 🙏, a friendly reminder that rent for Bed ${bed.bedLabel} at ${owner?.pgName || 'your PG'} is pending.`;
+            window.open(getWhatsAppLink(bed.tenantPhone, msg), '_blank');
+          }
+        },
+      });
+    } finally {
+      setEmailingRecordId(null);
+    }
+  };
+
   const [showBankReconciler, setShowBankReconciler] = useState(false);
   const [proofModalRecord, setProofModalRecord] = useState<{ bed: Bed; record: RentRecord } | null>(null);
   const [activeBedDrawer, setActiveBedDrawer] = useState<Bed | null>(null);
@@ -1265,6 +1290,21 @@ export default function OwnerDashboardPage() {
                         <span>WhatsApp</span>
                       </a>
                     </div>
+                    {/* Email reminder from the owner's Gmail — only when rent is
+                        actually due this month. Falls back to WhatsApp for this
+                        resident if they have no email / Gmail isn't connected. */}
+                    {activeRecord?.id && activeRecord.status !== 'paid' && (
+                      <Button
+                        variant="outline"
+                        size="full"
+                        disabled={emailingRecordId === activeRecord.id}
+                        loading={emailingRecordId === activeRecord.id}
+                        onClick={() => emailOneReminder(activeBedDrawer, activeRecord)}
+                      >
+                        <Mail className="h-4 w-4" />
+                        <span>Email rent reminder</span>
+                      </Button>
+                    )}
                   </div>
                 )}
 
@@ -1391,6 +1431,7 @@ export default function OwnerDashboardPage() {
         pgName={owner.pgName}
         ownerName={owner.name}
         ownerUpi={owner.upiId}
+        isStaff={isStaff}
       />
 
       {/* VERIFY PROOF MODAL */}

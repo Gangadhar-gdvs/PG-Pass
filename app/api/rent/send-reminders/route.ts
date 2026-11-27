@@ -3,12 +3,11 @@ import { withErrorHandler, AppError } from '@/lib/server/api/withErrorHandler';
 import { withAuth, AuthContext } from '@/lib/server/api/withAuth';
 import { withRateLimit } from '@/lib/server/api/withRateLimit';
 import { adminDb } from '@/lib/server/firebase-admin';
-import { sendFromOwnerGmail, getOwnerGmailStatus } from '@/lib/server/services/gmail.service';
-import { residentsService } from '@/lib/server/services/residents.service';
+import { getOwnerGmailStatus } from '@/lib/server/services/gmail.service';
+import { rentService } from '@/lib/server/services/rent.service';
 import { recordEvent } from '@/lib/server/services/systemLogs.service';
 import { STAFF_PERMISSIONS } from '@/lib/constants/permissions';
-import { formatCurrency, getCurrentPeriod } from '@/lib/utils';
-import { Timestamp } from 'firebase-admin/firestore';
+import { getCurrentPeriod } from '@/lib/utils';
 import type { RentRecord } from '@/types';
 
 /**
@@ -55,48 +54,18 @@ export const POST = withErrorHandler(
         let sent = 0;
         const skipped: Array<{ tenantName?: string; reason: string }> = [];
 
+        // Per-record resolve-email → send → stamp is shared with the single-
+        // resident route via rentService.sendEmailReminderForRecord (one source
+        // of truth for the email body + lastRemindedAt stamp).
         for (const r of unpaid) {
-          // Need the tenant's phone to resolve a linked resident email.
-          let phone = '';
-          let tenantName = r.tenantName || 'Resident';
-          if (r.tenantId) {
-            const tSnap = await adminDb.collection('tenants').doc(r.tenantId).get();
-            phone = (tSnap.data()?.phone as string) || '';
-            tenantName = (tSnap.data()?.name as string) || tenantName;
-          }
-          const email = phone ? await residentsService.emailForPhone(phone) : null;
-          if (!email) {
-            skipped.push({ tenantName, reason: 'no email on file' });
-            continue;
-          }
-
-          const due = (r.amountDuePaise ?? 0) / 100;
-          const paid = (r.amountPaidPaise ?? 0) / 100;
-          const outstanding = Math.max(0, due - paid);
-          const amountStr = formatCurrency(outstanding);
-          const html = `
-            <div style="font-family:Arial,sans-serif;font-size:14px;color:#0F172A;line-height:1.6">
-              <p>Namaste ${tenantName},</p>
-              <p>This is a friendly reminder that your rent for <b>${period}</b> at <b>${pgName}</b> is pending.</p>
-              <p><b>Amount due: ${amountStr}</b></p>
-              ${upiId ? `<p>You can pay directly via UPI: <b>${upiId}</b></p>` : ''}
-              <p>Thank you,<br/>${pgName}</p>
-            </div>`;
-
-          const ok = await sendFromOwnerGmail(ownerId, {
-            to: email,
-            subject: `Rent reminder — ${pgName} (${period})`,
-            html,
-            fromName: pgName,
-          }).catch(() => false);
-
-          if (ok) {
+          const result = await rentService.sendEmailReminderForRecord({ ownerId, record: r, pgName, upiId });
+          if (result.outcome === 'sent') {
             sent++;
-            if (r.id) {
-              await adminDb.collection('rent_records').doc(r.id).update({ lastRemindedAt: Timestamp.now() }).catch(() => {});
-            }
           } else {
-            skipped.push({ tenantName, reason: 'send failed' });
+            skipped.push({
+              tenantName: result.tenantName,
+              reason: result.outcome === 'no_email' ? 'no email on file' : 'send failed',
+            });
           }
         }
 

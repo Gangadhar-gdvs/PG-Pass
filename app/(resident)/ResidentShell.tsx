@@ -68,7 +68,10 @@ export function ResidentShell({ children }: { children: React.ReactNode }) {
 
       {/* overflow-x-CLIP keeps sticky page headers working (hidden would not). */}
       <main
-        className={`flex-1 overflow-x-clip px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] max-w-2xl mx-auto w-full ${
+        /* px-4 → sm:px-6 matches the owner shell's padding scale so the shared
+           PageHeader's full-bleed negative margins (`-mx-4 sm:-mx-6`) cancel the
+           gutter exactly in BOTH areas — no over/under-pull at any width. */
+        className={`flex-1 overflow-x-clip px-4 sm:px-6 pb-[calc(6rem+env(safe-area-inset-bottom))] max-w-2xl mx-auto w-full ${
           isHome ? 'pt-2' : 'pt-[max(0.5rem,env(safe-area-inset-top))]'
         }`}
       >

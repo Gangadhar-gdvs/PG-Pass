@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Drawer } from '@/components/ui/drawer';
 import { formatCurrency } from '@/lib/utils';
 import { buildWaReminderLink } from '@/lib/client/upi';
-import { Send, Check, Copy, ArrowRight, Clock } from 'lucide-react';
+import { emailRentReminder } from '@/lib/client/rentReminders';
+import { Send, Check, Copy, ArrowRight, Clock, Mail } from 'lucide-react';
 import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -25,6 +26,8 @@ interface WhatsAppReminderModalProps {
   pgName: string;
   ownerName: string;
   ownerUpi: string;
+  /** Staff can send from the owner's Gmail but can't connect it (owner-only). */
+  isStaff?: boolean;
 }
 
 export function WhatsAppReminderModal({
@@ -36,9 +39,11 @@ export function WhatsAppReminderModal({
   pgName,
   ownerName,
   ownerUpi,
+  isStaff = false,
 }: WhatsAppReminderModalProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [remindedIds, setRemindedIds] = useState<Set<string>>(new Set());
+  const [emailingBedId, setEmailingBedId] = useState<string | null>(null);
 
   // Rent records key by tenantId (doc id `${tenantId}_${period}`), not bedId.
   const recordByTenant = new Map<string, RentRecord>();
@@ -102,6 +107,28 @@ export function WhatsAppReminderModal({
     }
 
     return true;
+  };
+
+  // Email this resident from the owner's connected Gmail; if they have no email
+  // (or Gmail isn't enabled) the helper falls back to the WhatsApp flow for them.
+  const emailReminderForBed = async (bed: Bed) => {
+    const rec = recordFor(bed);
+    if (!rec?.id) {
+      toast('No rent bill for this resident this month.');
+      return;
+    }
+    if (emailingBedId) return;
+    setEmailingBedId(bed.id);
+    try {
+      const ok = await emailRentReminder(rec.id, {
+        tenantName: bed.tenantName,
+        isStaff,
+        onWhatsAppFallback: () => void sendReminderForBed(bed),
+      });
+      if (ok) setRemindedIds((prev) => new Set(prev).add(bed.id));
+    } finally {
+      setEmailingBedId(null);
+    }
   };
 
   const handleSendAndNext = async () => {
@@ -238,6 +265,16 @@ export function WhatsAppReminderModal({
                       </div>
 
                       <div className="flex shrink-0 items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          title="Email reminder from your Gmail"
+                          aria-label="Email reminder"
+                          disabled={emailingBedId === bed.id}
+                          onClick={() => emailReminderForBed(bed)}
+                          className="grid h-11 w-11 place-items-center rounded-full border border-white bg-white/90 text-ink-2 shadow-[var(--shadow-tile)] transition-colors press hover:text-brand-700 disabled:opacity-50"
+                        >
+                          <Mail className="h-4 w-4" />
+                        </button>
                         <button
                           type="button"
                           title="Copy text"

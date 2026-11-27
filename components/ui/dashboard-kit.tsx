@@ -211,17 +211,19 @@ export function PageHeader({
   // under it and scroll away, keeping the pinned bar slim; from `sm` up they
   // live inside the bar.
   //
-  // PHONE shape mirrors the bottom nav bar: full-bleed to the screen edges with
-  // curved BOTTOM corners only (`rounded-b-[26px]`) — the top edge runs flush to
-  // the screen top (incl. the notch safe-area, padded inside), so the header and
-  // the bottom bar frame the content symmetrically. `-mx-4` cancels <main>'s
-  // `px-4`; `-mt` pulls it up flush to the very top. The reset is at `sm` (640px)
-  // — exactly where <main>'s padding grows to `px-6` — so there's no partial-
-  // inset gap; from `sm` up it's the inset, floating rounded pill.
+  // The header MIRRORS the bottom nav bar across the WHOLE range where that bar
+  // exists (everything below `md` — the bottom bar is `md:hidden`): full-bleed to
+  // the screen edges with curved BOTTOM corners only (`rounded-b-[26px]`), solid
+  // white, bottom border + downward shadow — the exact inverse of the bottom bar's
+  // `rounded-t-[26px]` top border + upward shadow. The top edge runs flush to the
+  // screen top (safe-area padded inside). Negative margins cancel <main>'s padding
+  // so there's NO outside gap at any width: `-mx-4` below `sm` (px-4), `-mx-6`
+  // from `sm` (px-6). Only at `md+` — where the sidebar layout replaces the bottom
+  // bar — does it revert to the inset, floating rounded pill.
   return (
     <>
       <header
-        className={`sticky z-30 -mx-4 -mt-[max(0.5rem,env(safe-area-inset-top))] flex items-center gap-3 rounded-b-[26px] border-b border-[#EEE8FD] bg-white px-4 pt-[calc(env(safe-area-inset-top)+0.625rem)] pb-3 shadow-[0_10px_30px_-14px_rgba(70,40,160,0.30)] top-0 sm:mx-0 sm:mt-0 sm:gap-3.5 sm:rounded-[22px] sm:border sm:border-white/90 sm:glass-bar sm:px-4 sm:py-3 sm:pt-3 sm:top-[calc(env(safe-area-inset-top)+0.5rem)] sm:shadow-[0_12px_28px_-16px_rgba(70,40,160,0.45)] ${className}`}
+        className={`sticky z-30 -mx-4 sm:-mx-6 -mt-[max(0.5rem,env(safe-area-inset-top))] flex items-center gap-3 sm:gap-3.5 rounded-b-[26px] border-b border-[#EEE8FD] bg-white px-4 sm:px-6 pt-[calc(env(safe-area-inset-top)+0.625rem)] pb-3 shadow-[0_10px_30px_-14px_rgba(70,40,160,0.30)] top-0 md:mx-0 md:mt-0 md:rounded-[22px] md:border md:border-white/90 md:glass-bar md:px-4 md:py-3 md:pt-3 md:top-[calc(env(safe-area-inset-top)+0.5rem)] md:shadow-[0_12px_28px_-16px_rgba(70,40,160,0.45)] ${className}`}
       >
         {back && (
           <Link
@@ -247,9 +249,9 @@ export function PageHeader({
             <p className="truncate text-[12.5px] sm:text-[13.5px] font-medium text-muted">{subtitle}</p>
           )}
         </div>
-        {actions && <div className="hidden shrink-0 items-center gap-2 sm:flex">{actions}</div>}
+        {actions && <div className="hidden shrink-0 items-center gap-2 md:flex">{actions}</div>}
       </header>
-      {actions && <div className="flex flex-wrap items-center gap-2 sm:hidden">{actions}</div>}
+      {actions && <div className="flex flex-wrap items-center gap-2 md:hidden">{actions}</div>}
     </>
   );
 }

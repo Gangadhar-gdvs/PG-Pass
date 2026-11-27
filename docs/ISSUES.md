@@ -562,6 +562,69 @@ Re-checked everything built this session for real-world edge cases / production 
   `lib/utils` builds `tel:+91XXXXXXXXXX` (strips to the last 10 digits, returns `''` for a non-10-digit
   number so the link is inert rather than dialing garbage). Tests: `sharedHelpers.test.ts` (+2 → 200 total).
 
+## Per-resident Gmail rent reminders (28 Nov 2026)
+Previously: reminders were WhatsApp/call per-resident, and email was ONLY the bulk "email all unpaid" button.
+Built the single-resident email counterpart (owner's connected Gmail):
+- 🟢 **New route `POST /api/rent/[id]/send-email-reminder`** — ownership-checked (403), unpaid-only, returns
+  distinct codes: `GMAIL_UNAVAILABLE`/`GMAIL_NOT_CONNECTED` (prompt connect) and a 200 `NO_RESIDENT_EMAIL`
+  (offer WhatsApp). Gate: `owner/staff` + `collect_rent` (same as WhatsApp + the bulk button).
+- 🟢 **Shared service method `rentService.sendEmailReminderForRecord()`** + `buildReminderEmailHtml()` —
+  single source of truth for the email body + `lastRemindedAt` stamp; the BULK route was refactored to
+  reuse it (removed its duplicated inline send/HTML).
+- 🟢 **UI in BOTH places** (as requested): the bed detail drawer ("Email rent reminder", shown only when
+  rent is due) and each row of the WhatsApp reminder modal (a Mail button next to Copy/Send). Shared client
+  helper `lib/client/rentReminders.tsx` → on no-email it **falls back to WhatsApp for that resident**; on
+  Gmail-not-connected it shows a toast with a one-tap **Connect** action → `/settings#gmail` (new anchor).
+- ✅ Gate: tsc 0 · lint 0 · 200 tests · build ✓.
+
+## Tab navigation lag / stale page (28 Nov 2026)
+Owner report: "tap a tab → it highlights fast but the PREVIOUS page stays for a few seconds, then shifts"
+and "sometimes the tab moves but the page shows the previous page." Two root causes, both fixed:
+- 🟢 **No `loading.tsx` → App Router kept the OLD page on screen while fetching the next route's RSC.**
+  Added `app/(owner)/loading.tsx` + `app/(resident)/loading.tsx` — a Suspense boundary so the content area
+  swaps to a skeleton INSTANTLY on navigation (the shell/tab bar stays mounted), then the real page streams
+  in. No more lingering on the previous page. (Was flagged at the start of the session: only root-level
+  error/not-found existed, zero loading files.)
+- 🟢 **Optimistic tab highlight could stick to the WRONG tab.** `bottom-tab-bar` cleared the pending
+  highlight only when `pathname` EXACTLY matched the tapped href — so a rapid double-tap or a redirect left
+  the highlight stuck on a tab you weren't on (tab shows active, content is elsewhere). Now it records the
+  pathname at tap time and clears the moment the pathname CHANGES at all (landed on target, another tab, or
+  a redirect). Render-time clear, no setState loop.
+- Admin console tabs are local state (not routes) → unaffected; desktop sidebar `<Link>`s also benefit from
+  `loading.tsx`. Gate: tsc 0 · lint 0 · 200 tests · build ✓.
+
+## Top header edge-curved to match the bottom tab bar across the full mobile/tablet range (28 Nov 2026)
+Owner wanted the top `PageHeader` to mirror the bottom tab bar on ALL pages — full-bleed to the screen
+edges (no outside margin) with curved BOTTOM corners — exactly inverse to the bottom bar's curved top.
+- 🟢 **Fixed: the header reverted to a floating inset pill too early (at `sm`), while the bottom bar is
+  full-bleed until `md`** — so between 640–768px (tablet portrait) the header was a pill but the bottom bar
+  was still edge-curved (inconsistent). The edge-curved full-bleed header now spans the WHOLE range where
+  the bottom bar exists (below `md`, since the bar is `md:hidden`), reverting to the inset pill only at
+  `md+` where the sidebar layout replaces the bottom bar. Negative margins match `<main>`'s padding at each
+  breakpoint (`-mx-4` below `sm`, `-mx-6` from `sm`) so there's NO outside gap at any width. The in-bar vs
+  below-bar `actions` split moved `sm`→`md` to match.
+- 🟢 **Harmonized the resident shell's `<main>` padding** to `px-4 sm:px-6` (was `px-4` only) so the shared
+  PageHeader's negative margins cancel the gutter exactly in BOTH owner + resident areas (no over/under-pull).
+- Shell top bars (`OwnerTopBar`, resident Home bar) were already edge-curved full-bleed. Gate: tsc 0 · lint 0
+  · 200 tests · build ✓.
+
+## Re-audit of the latest changes (28 Nov 2026) — found + fixed
+- 🟢 **Staff "Connect Gmail" dead-end.** When the owner hadn't connected Gmail, a STAFF member (who can
+  send rent reminders via `collect_rent`) got a "Connect" button → `/settings` → bounced by `OwnerOnlyGuard`
+  (Settings is owner-only). The reminder helper now takes `isStaff`: staff see "ask the PG owner to connect
+  Gmail, use WhatsApp for now" (+ WhatsApp fallback) instead of a dead-end button. `rentReminders.tsx`,
+  `WhatsAppReminderModal` (new `isStaff` prop), dashboard.
+- 🟢 **Tab-bar optimistic highlight safety net.** The render-time clear only fires when `pathname` moves; a
+  navigation that never resolves (redirect back to same route, cancelled nav) would leave the highlight
+  stuck. Added a 2.5s timeout fallback that clears it so the bar always falls back to the real `pathname`.
+- 🟢 **Verified sound (no change):** edge-curved header inside pages' own `max-w-*` wrappers (the max-w only
+  constrains at widths where the header has already reverted to the inset pill → no overflow; `overflow-x-clip`
+  backstops anyway); `useSessionExpiryRedirect` interceptor is cleaned up on unmount (no leak/double-fire)
+  and the portal pages use raw fetch + aren't in the shell, so no false 401-reload; `phoneLast4` unchanged
+  by the tenant-phone normalization (last-4 is identical with/without a country code); `send-email-reminder`
+  treats `verify` as remind-able, consistent with the existing bulk + WhatsApp flows. Gate: tsc 0 · lint 0 ·
+  200 tests · build ✓.
+
 ## Follow-ups (explicitly deferred, not forgotten)
 - 🟢 **#6 avatar image upload — BUILT.** Private storage (never a public URL): client compresses to
   ≤512px WebP (EXIF stripped) → presigned PUT into `pending/{ownerId}/avatar/` → `POST /api/owners/avatar`

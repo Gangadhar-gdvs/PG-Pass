@@ -271,7 +271,11 @@ function SettingsPageInner() {
         </div>
       </form>
 
-      <GmailConnectCard />
+      {/* Anchor target for `/settings#gmail` deep-links (e.g. the "Connect"
+          action on a rent-reminder email prompt). scroll-mt clears the sticky header. */}
+      <div id="gmail" className="scroll-mt-24">
+        <GmailConnectCard />
+      </div>
 
       <PgPhotoGallery propertyId={selectedPropertyId} />
 
