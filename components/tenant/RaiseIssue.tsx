@@ -7,7 +7,8 @@ import { CheckCircle2 } from 'lucide-react';
 import { Textarea } from '@/components/ui/input';
 import { IconTile } from '@/components/brand/Icon3D';
 import toast from 'react-hot-toast';
-import { errorMessage, readApiError } from '@/lib/utils';
+import { errorMessage } from '@/lib/utils';
+import { apiPost } from '@/lib/client/api';
 
 const CATEGORIES = [
   { value: 'plumbing', label: 'Plumbing' },
@@ -35,19 +36,12 @@ export function RaiseIssue({ portalAuth }: { portalAuth: { token: string; pin: s
     }
     setSubmitting(true);
     try {
-      const res = await fetch('/api/maintenance', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          token: portalAuth.token,
-          pin: portalAuth.pin,
-          category,
-          description: description.trim(),
-        }),
+      await apiPost('/api/maintenance', {
+        token: portalAuth.token,
+        pin: portalAuth.pin,
+        category,
+        description: description.trim(),
       });
-      if (!res.ok) {
-        throw new Error(await readApiError(res, 'Could not submit'));
-      }
       toast.success('Issue reported — your PG manager has been notified.');
       setSubmitted(true);
       setDescription('');

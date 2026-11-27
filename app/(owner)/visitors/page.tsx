@@ -1,7 +1,10 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import { useOwnerSession } from '@/hooks/useOwner';
+import { useAsyncData, fetchJson } from '@/hooks/useAsyncData';
+import { apiPost } from '@/lib/client/api';
+import { LoadError } from '@/components/ui/load-error';
 import { PageHeader, SectionCard, StatTile } from '@/components/ui/dashboard-kit';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -11,7 +14,7 @@ import { ListSkeleton, StatGridSkeleton } from '@/components/ui/skeletons';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Plus, LogOut, LogIn, Phone, UserRound } from 'lucide-react';
 import type { Visitor } from '@/types';
-import { errorMessage, tsToDate, readApiError } from '@/lib/utils';
+import { errorMessage, tsToDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
 function timeLabel(v: unknown): string {
@@ -26,11 +29,11 @@ function dayKey(d: Date): string {
 
 export default function OwnerVisitorsPage() {
   const { ownerId } = useOwnerSession();
-  const [visitors, setVisitors] = useState<Visitor[]>([]);
-  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [today] = useState(() => dayKey(new Date()));
+  // Optimistically checked-out ids (status → 'out') until the next reload.
+  const [checkedOut, setCheckedOut] = useState<Set<string>>(new Set());
 
   const [name, setName] = useState('');
   const [purpose, setPurpose] = useState('');
@@ -38,28 +41,20 @@ export default function OwnerVisitorsPage() {
   const [phone, setPhone] = useState('');
   const [posting, setPosting] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch('/api/visitors');
-      if (res.ok) setVisitors((await res.json()).visitors || []);
-    } catch {
-      /* non-fatal */
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!ownerId) return;
-    let active = true;
-    queueMicrotask(() => {
-      if (active) load();
-    });
-    return () => {
-      active = false;
-    };
-  }, [ownerId, load]);
+  // Loads through the shared hook so a failed load shows an error + Retry instead
+  // of a silently-empty visitor log.
+  const { data, loading, error, reload } = useAsyncData(
+    () => fetchJson<{ visitors?: Visitor[] }>('/api/visitors'),
+    [ownerId],
+    { enabled: !!ownerId }
+  );
+  const load = () => {
+    setCheckedOut(new Set());
+    reload();
+  };
+  const visitors = (data?.visitors ?? []).map((v) =>
+    checkedOut.has(v.id) ? { ...v, status: 'out' as const } : v
+  );
 
   const checkIn = async () => {
     if (!name.trim()) {
@@ -68,18 +63,12 @@ export default function OwnerVisitorsPage() {
     }
     setPosting(true);
     try {
-      const res = await fetch('/api/visitors', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: name.trim(),
-          purpose: purpose.trim() || undefined,
-          visitingResident: visiting.trim() || undefined,
-          phone: phone.trim() || undefined,
-        }),
+      await apiPost('/api/visitors', {
+        name: name.trim(),
+        purpose: purpose.trim() || undefined,
+        visitingResident: visiting.trim() || undefined,
+        phone: phone.trim() || undefined,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Could not check in');
       toast.success('Visitor checked in');
       setName('');
       setPurpose('');
@@ -97,9 +86,8 @@ export default function OwnerVisitorsPage() {
   const checkOut = async (id: string) => {
     setBusyId(id);
     try {
-      const res = await fetch(`/api/visitors/${id}/checkout`, { method: 'POST' });
-      if (!res.ok) throw new Error(await readApiError(res, 'Could not check out'));
-      setVisitors((prev) => prev.map((v) => (v.id === id ? { ...v, status: 'out' } : v)));
+      await apiPost(`/api/visitors/${id}/checkout`);
+      setCheckedOut((prev) => new Set(prev).add(id));
     } catch (e: unknown) {
       toast.error(errorMessage(e, 'Could not check out'));
     } finally {
@@ -129,6 +117,10 @@ export default function OwnerVisitorsPage() {
         }
       />
 
+      {error ? (
+        <LoadError message={error} onRetry={reload} />
+      ) : (
+        <>
       {loading ? (
         <StatGridSkeleton count={4} />
       ) : (
@@ -240,6 +232,8 @@ export default function OwnerVisitorsPage() {
             })}
           </ul>
         </SectionCard>
+      )}
+        </>
       )}
     </div>
   );

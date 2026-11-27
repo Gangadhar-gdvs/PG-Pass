@@ -10,6 +10,7 @@ import {
 import { ShieldCheck, Lock, Unlock, Trash2, Star, Save } from 'lucide-react';
 import type { Expense } from '@/types';
 import { errorMessage } from '@/lib/utils';
+import { apiGet, apiPost } from '@/lib/client/api';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -61,8 +62,7 @@ export function AdminPgManage({ pg, onChanged }: { pg: SuperAdminPgOverview; onC
       setUpiId(pg.owner.upiId || '');
       setLoadingDetail(true);
     });
-    fetch(`/api/admin/pg-detail?ownerId=${encodeURIComponent(ownerId)}`)
-      .then((r) => (r.ok ? r.json() : Promise.reject()))
+    apiGet<PgDetail>(`/api/admin/pg-detail?ownerId=${encodeURIComponent(ownerId)}`)
       .then(setDetail)
       .catch(() => setDetail(null))
       .finally(() => setLoadingDetail(false));
@@ -71,13 +71,7 @@ export function AdminPgManage({ pg, onChanged }: { pg: SuperAdminPgOverview; onC
   const post = async (bodyObj: Record<string, unknown>, okMsg: string) => {
     setBusy(true);
     try {
-      const res = await fetch('/api/admin/manage', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(bodyObj),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Action failed');
+      await apiPost('/api/admin/manage', bodyObj);
       toast.success(okMsg);
       onChanged?.();
       return true;

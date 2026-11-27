@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { formatCurrency, validateUtr, errorMessage, apiErrorMessage } from '@/lib/utils';
+import { formatCurrency, validateUtr, errorMessage } from '@/lib/utils';
+import { apiPost } from '@/lib/client/api';
 import type { RentRecord } from '@/types';
 import { generateNumberedReceipt } from '@/lib/client/receiptPdf';
 import { generateQrDataUrl } from '@/lib/client/qrcode';
@@ -161,21 +162,12 @@ export function RentStatusCard({
 
     setSubmittingClaim(true);
     try {
-      const res = await fetch(`/api/rent/${rentRecord.id}/claim`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          token: portalAuth.token,
-          pin: portalAuth.pin,
-          paymentReference: cleanUtr,
-          proofPhotoId,
-        }),
+      await apiPost(`/api/rent/${rentRecord.id}/claim`, {
+        token: portalAuth.token,
+        pin: portalAuth.pin,
+        paymentReference: cleanUtr,
+        proofPhotoId,
       });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(apiErrorMessage(data, 'Failed to submit payment claim'));
-      }
 
       toast.success('Payment claim submitted! Awaiting PG manager confirmation.');
       setShowClaimForm(false);

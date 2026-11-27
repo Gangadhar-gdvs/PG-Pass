@@ -46,8 +46,8 @@ export function OwnerTopBar({
 
   return (
     <header
-      className="md:hidden sticky top-0 z-30 glass-bar px-4 flex items-center justify-between gap-3 border-b border-white/70"
-      style={{ paddingTop: 'max(0.6rem, env(safe-area-inset-top))', paddingBottom: '0.6rem' }}
+      className="md:hidden sticky top-0 z-30 flex items-center justify-between gap-3 rounded-b-[26px] border-b border-[#EEE8FD] bg-white px-4 shadow-[0_10px_30px_-14px_rgba(70,40,160,0.30)]"
+      style={{ paddingTop: 'max(0.625rem, env(safe-area-inset-top))', paddingBottom: '0.625rem' }}
     >
       {/* PG switcher */}
       <div ref={rootRef} className="relative min-w-0">

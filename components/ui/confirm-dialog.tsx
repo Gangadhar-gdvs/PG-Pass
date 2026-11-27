@@ -41,6 +41,7 @@ export function ConfirmDialog({
   const [reason, setReason] = React.useState('');
   const titleId = React.useId();
   const descId = React.useId();
+  const panelRef = React.useRef<HTMLDivElement>(null);
 
   // Reset the reason each time the dialog opens.
   React.useEffect(() => {
@@ -50,14 +51,45 @@ export function ConfirmDialog({
 
   React.useEffect(() => {
     if (!open) return;
+    document.body.style.overflow = 'hidden';
+
+    // Move focus into the dialog and restore it on close, so a keyboard user
+    // isn't left focused on the page behind this (alert)dialog.
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const FOCUSABLE =
+      'input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])';
+    queueMicrotask(() => {
+      const target = panelRef.current?.querySelector<HTMLElement>(FOCUSABLE) || panelRef.current;
+      target?.focus?.();
+    });
+
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !busy) onCancel();
+      if (e.key === 'Escape') {
+        if (!busy) onCancel();
+        return;
+      }
+      // Focus trap — keep Tab / Shift+Tab inside the dialog.
+      if (e.key !== 'Tab' || !panelRef.current) return;
+      const items = Array.from(
+        panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE)
+      ).filter((el) => el.offsetParent !== null || el === document.activeElement);
+      if (items.length === 0) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+      if (e.shiftKey && (active === first || active === panelRef.current)) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
     };
     window.addEventListener('keydown', onKey);
-    document.body.style.overflow = 'hidden';
     return () => {
       window.removeEventListener('keydown', onKey);
       document.body.style.overflow = '';
+      previouslyFocused?.focus?.();
     };
   }, [open, busy, onCancel]);
 
@@ -74,11 +106,13 @@ export function ConfirmDialog({
         aria-hidden="true"
       />
       <div
+        ref={panelRef}
+        tabIndex={-1}
         role="alertdialog"
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={descId}
-        className="relative z-[61] w-full max-w-sm overflow-hidden rounded-[28px] border border-white bg-[linear-gradient(180deg,#FFFFFF_0%,#F5F0FF_100%)] p-6 shadow-[0_30px_70px_-24px_rgba(40,20,120,0.55)] animate-pop"
+        className="relative z-[61] w-full max-w-sm max-h-[calc(100dvh-1.5rem)] overflow-y-auto overflow-x-hidden rounded-[28px] border border-white bg-[linear-gradient(180deg,#FFFFFF_0%,#F5F0FF_100%)] p-6 shadow-[0_30px_70px_-24px_rgba(40,20,120,0.55)] animate-pop focus:outline-none"
         style={{ marginBottom: 'env(safe-area-inset-bottom)' }}
       >
         <div aria-hidden className="pointer-events-none absolute -top-14 -right-12 h-40 w-40 rounded-full bg-[#D9C6FF]/50 blur-3xl" />

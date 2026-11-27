@@ -11,6 +11,7 @@ import { PgDetailDrawer } from '@/components/resident/PgDetailDrawer';
 import { PageHeader, FilterChips } from '@/components/ui/dashboard-kit';
 import { Icon3D, IconTile } from '@/components/brand/Icon3D';
 import { errorMessage, formatCurrency } from '@/lib/utils';
+import { apiGet, apiPost } from '@/lib/client/api';
 
 interface Listing {
   propertyId: string;
@@ -43,8 +44,10 @@ export default function DiscoverPage() {
       const qs = new URLSearchParams();
       if (q.trim()) qs.set('q', q.trim());
       if (city.trim()) qs.set('city', city.trim());
-      const res = await fetch(`/api/discover?${qs.toString()}`);
-      if (res.ok) setListings((await res.json()).listings || []);
+      const data = await apiGet<{ listings?: typeof listings }>(`/api/discover?${qs.toString()}`);
+      setListings(data.listings || []);
+    } catch {
+      /* non-fatal — leave the current results in place */
     } finally {
       setLoading(false);
     }
@@ -66,13 +69,7 @@ export default function DiscoverPage() {
     if (joiningId) return;
     setJoiningId(propertyId);
     try {
-      const res = await fetch(`/api/discover/${propertyId}/join`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || data.message || 'Could not send request');
+      await apiPost(`/api/discover/${propertyId}/join`, {});
       toast.success('Join request sent — the PG owner will review it.');
     } catch (e: unknown) {
       toast.error(errorMessage(e, 'Could not send request'));

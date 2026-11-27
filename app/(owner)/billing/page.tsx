@@ -6,7 +6,10 @@ import { useBeds } from '@/hooks/useBeds';
 import { PLAN_LIMITS } from '@/lib/constants/limits';
 import { PLAN_TIER, PlanTier } from '@/lib/constants/status';
 import type { Owner } from '@/types';
-import { formatCurrency, errorMessage, ownerPlanTier, apiErrorMessage } from '@/lib/utils';
+import { formatCurrency, errorMessage, ownerPlanTier } from '@/lib/utils';
+import { fetchJson } from '@/hooks/useAsyncData';
+import { apiPost } from '@/lib/client/api';
+import { LoadError } from '@/components/ui/load-error';
 import { generateQrDataUrl } from '@/lib/client/qrcode';
 import { buildUpiPayload } from '@/lib/client/upi';
 import { Check, Camera, Sparkles, ArrowRight } from 'lucide-react';
@@ -15,7 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input, fieldLabelClass } from '@/components/ui/input';
 import { Drawer } from '@/components/ui/drawer';
 import { ProgressBar } from '@/components/ui/progress-bar';
-import { HeaderSkeleton, CardListSkeleton, PanelSkeleton } from '@/components/ui/skeletons';
+import { CardListSkeleton, PanelSkeleton } from '@/components/ui/skeletons';
 import { PageHeader, SectionCard } from '@/components/ui/dashboard-kit';
 import { IconBubble, IconTile, type Icon3DName, type Tint } from '@/components/brand/Icon3D';
 import { OwnerOnlyGuard } from '@/components/owner/OwnerOnlyGuard';
@@ -164,6 +167,8 @@ function BillingPageInner() {
 
   const [profile, setProfile] = useState<(Owner & { planTier?: PlanTier }) | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   // Upgrade Modal State
   const [selectedPlan, setSelectedPlan] = useState<PlanTier | null>(null);
@@ -175,19 +180,19 @@ function BillingPageInner() {
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch('/api/owners');
-        if (res.ok) {
-          const data = await res.json();
-          setProfile(data);
-        }
+        // Surface a load failure instead of silently defaulting the owner to the
+        // Free plan + quotas when the profile couldn't be fetched.
+        const data = await fetchJson<Owner & { planTier?: PlanTier }>('/api/owners');
+        setProfile(data);
+        setLoadError(null);
       } catch (e) {
-        console.error('Error fetching owner profile:', e);
+        setLoadError(errorMessage(e, "Couldn't load your subscription. Please try again."));
       } finally {
         setLoading(false);
       }
     }
     if (ownerId) load();
-  }, [ownerId]);
+  }, [ownerId, reloadKey]);
 
   const currentTier: PlanTier = ownerPlanTier(profile);
   const currentLimits = PLAN_LIMITS[currentTier] || PLAN_LIMITS.free;
@@ -237,21 +242,12 @@ function BillingPageInner() {
 
     setSubmitting(true);
     try {
-      const res = await fetch('/api/billing/upgrade', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          requestedPlan: selectedPlan,
-          billingCycle,
-          amountPaise: selectedAmountRupees * 100,
-          utrReference: cleanUtr,
-        }),
+      await apiPost('/api/billing/upgrade', {
+        requestedPlan: selectedPlan,
+        billingCycle,
+        amountPaise: selectedAmountRupees * 100,
+        utrReference: cleanUtr,
       });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(apiErrorMessage(data, 'Upgrade submission failed'));
-      }
 
       toast.success('Upgrade request submitted! Admin will activate your tier shortly.');
       setSelectedPlan(null);
@@ -264,11 +260,26 @@ function BillingPageInner() {
   };
 
   if (loading) {
+    // Real header during load so its shape doesn't change when data arrives.
     return (
       <div className="max-w-5xl mx-auto space-y-5">
-        <HeaderSkeleton action={false} />
+        <PageHeader
+          icon="rupee"
+          tint="mint"
+          title="Subscription &"
+          highlight="Platform Quotas"
+          subtitle="Flat, zero-commission SaaS pricing. Never pay a percentage of your rent."
+        />
         <PanelSkeleton height="h-48" />
         <CardListSkeleton rows={3} height="h-80" cols={3} />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="max-w-5xl mx-auto">
+        <LoadError message={loadError} onRetry={() => { setLoading(true); setLoadError(null); setReloadKey((k) => k + 1); }} />
       </div>
     );
   }

@@ -232,10 +232,28 @@ export function rentDueDate(period: string, dueDay?: number): string {
   return `${period}-${String(day).padStart(2, '0')}`;
 }
 
+/**
+ * The last 10 digits of an Indian mobile number — the app's canonical phone key.
+ * Strips spaces, `+91`, `0` prefixes, hyphens, etc. Returns `''` for empty input.
+ * Use this EVERYWHERE instead of hand-rolling `str.replace(/\D/g,'').slice(-10)`
+ * so tenant/owner/staff lookups all key on the same 10 digits.
+ */
+export function normalizePhone(raw: string | null | undefined): string {
+  return (raw || '').replace(/\D/g, '').slice(-10);
+}
+
+/**
+ * E.164-ish India number: `91` + the 10 canonical digits (no `+`). Returns `''`
+ * when there aren't 10 digits to work with, so callers can guard before use.
+ */
+export function toIndiaMsisdn(raw: string | null | undefined): string {
+  const ten = normalizePhone(raw);
+  return ten.length === 10 ? `91${ten}` : '';
+}
+
 export function getWhatsAppLink(phone: string, message: string): string {
-  const cleaned = phone.replace(/\D/g, '');
-  const withCountryCode = cleaned.startsWith('91') && cleaned.length > 10 ? cleaned : `91${cleaned.slice(-10)}`;
-  return `https://wa.me/${withCountryCode}?text=${encodeURIComponent(message)}`;
+  const msisdn = toIndiaMsisdn(phone) || `91${normalizePhone(phone)}`;
+  return `https://wa.me/${msisdn}?text=${encodeURIComponent(message)}`;
 }
 
 export function amountInWords(n: number): string {

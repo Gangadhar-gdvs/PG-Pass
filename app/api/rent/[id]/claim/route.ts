@@ -1,17 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { adminDb } from '@/lib/server/firebase-admin';
 import { withErrorHandler, AppError } from '@/lib/server/api/withErrorHandler';
 import { withRateLimit } from '@/lib/server/api/withRateLimit';
-import { hashUtr } from '@/lib/server/security/tokens';
 import { verifyPortalSession } from '@/lib/server/security/portalAuth';
-import { Timestamp } from 'firebase-admin/firestore';
+import { rentService } from '@/lib/server/services/rent.service';
 
 export const POST = withErrorHandler(
   withRateLimit(
-    async (
-      req: NextRequest,
-      ctx: { params: Promise<{ id: string }> }
-    ) => {
+    async (req: NextRequest, ctx: { params: Promise<{ id: string }> }) => {
       const { id: rentRecordId } = await ctx.params;
       if (!rentRecordId) {
         throw new AppError(400, 'Missing rent record ID');
@@ -43,63 +38,16 @@ export const POST = withErrorHandler(
         );
       }
 
-      const normalizedUtr = paymentReference.trim().toUpperCase();
-
-      // 1. Authoritative verification of portal session & PIN
+      // Authoritative verification of portal session & PIN before any mutation.
       const session = await verifyPortalSession(token, pin);
 
-      const ownerId = session.ownerId;
-      const tenantId = session.tenantId;
-      const utrHashKey = hashUtr(ownerId, normalizedUtr);
-      const utrClaimRef = adminDb.collection('utr_claims').doc(utrHashKey);
-      const rentRecordRef = adminDb
-        .collection('rent_records')
-        .doc(rentRecordId);
-
-      // 2. Atomic Firestore Transaction for UTR deduplication and status transition
-      await adminDb.runTransaction(async (transaction) => {
-        // Assert UTR is not already used
-        const existingUtr = await transaction.get(utrClaimRef);
-        if (existingUtr.exists) {
-          throw new AppError(
-            409,
-            'This UPI UTR number has already been claimed for another payment. Please verify the 12-digit number.'
-          );
-        }
-
-        // Fetch rent record
-        const rentRecordDoc = await transaction.get(rentRecordRef);
-        if (!rentRecordDoc.exists) {
-          throw new AppError(404, 'Rent record not found');
-        }
-
-        const rentData = rentRecordDoc.data()!;
-
-        // Confirm tenant owns this rent record
-        if (rentData.tenantId !== tenantId) {
-          throw new AppError(403, 'Unauthorized rent record access');
-        }
-
-        if (rentData.status === 'paid') {
-          throw new AppError(400, 'This rent record has already been marked as paid');
-        }
-
-        // Create UTR claim lock
-        transaction.set(utrClaimRef, {
-          ownerId,
-          rentRecordId,
-          tenantId,
-          claimedAt: Timestamp.now(),
-        });
-
-        // Transition status pending -> verify
-        transaction.update(rentRecordRef, {
-          status: 'verify',
-          paymentReference: normalizedUtr,
-          proofPhotoId: proofPhotoId || null,
-          claimedAt: Timestamp.now(),
-          updatedAt: Timestamp.now(),
-        });
+      // Service owns the UTR dedup + pending→verify transition.
+      await rentService.claimPayment({
+        rentRecordId,
+        ownerId: session.ownerId,
+        tenantId: session.tenantId,
+        normalizedUtr: paymentReference.trim().toUpperCase(),
+        proofPhotoId,
       });
 
       return NextResponse.json({

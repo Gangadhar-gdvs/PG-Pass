@@ -1,8 +1,10 @@
 import 'server-only';
 import { adminDb } from '../firebase-admin';
+import { AppError } from '../api/withErrorHandler';
 import { Owner } from '@/types';
 import { FREE_MAX_BEDS, FREE_MAX_PHOTOS, FREE_MAX_STAFF } from '@/lib/constants/limits';
 import { PLAN_TIER, ACCOUNT_STATUS } from '@/lib/constants/status';
+import { ownerProfileSchema } from '@/lib/validation';
 import { Timestamp, type UpdateData } from 'firebase-admin/firestore';
 
 export class OwnersService {
@@ -146,6 +148,40 @@ export class OwnersService {
       ...(existing.data() as Owner),
       ...updateData,
     } as Owner;
+  }
+
+  /**
+   * Admin act-as-owner profile edit: merge a PARTIAL profile over the owner's
+   * current doc, validate the merged result with the same schema the owner route
+   * uses (phone/UPI regex, name min-length, rentDueDay/late-fee ranges…), then
+   * upsert. Owns the read + merge so `/api/admin/manage` stays thin (no adminDb).
+   */
+  async adminMergeUpdate(ownerId: string, profile: Record<string, unknown>): Promise<Owner> {
+    const snap = await adminDb.collection('owners').doc(ownerId).get();
+    if (!snap.exists) throw new AppError(404, 'Owner not found');
+    const cur = snap.data()!;
+    const merged = {
+      name: profile.name ?? cur.name,
+      phone: profile.phone ?? cur.phone,
+      pgName: profile.pgName ?? cur.pgName,
+      address: profile.address ?? cur.pgAddress ?? cur.address,
+      upiId: profile.upiId ?? cur.upiId,
+      upiMerchantName: profile.upiMerchantName ?? cur.upiMerchantName,
+      pgCategory: profile.pgCategory ?? cur.pgCategory,
+      foodPlan: profile.foodPlan ?? cur.foodPlan,
+      foodCuisine: profile.foodCuisine ?? cur.foodCuisine,
+      noticePeriodDays: profile.noticePeriodDays ?? cur.noticePeriodDays,
+      city: profile.city ?? cur.city,
+      area: profile.area ?? cur.area,
+      isListed: profile.isListed ?? cur.isListed,
+      rentDueDay: profile.rentDueDay ?? cur.rentDueDay,
+      lateFeePerDayPaise: profile.lateFeePerDayPaise ?? cur.lateFeePerDayPaise,
+      lateFeeGraceDays: profile.lateFeeGraceDays ?? cur.lateFeeGraceDays,
+      pgAmenities: profile.pgAmenities ?? cur.pgAmenities,
+      totalFloors: profile.totalFloors ?? cur.totalFloors,
+    };
+    const validated = ownerProfileSchema.parse(merged);
+    return this.upsertProfile(ownerId, validated);
   }
 }
 

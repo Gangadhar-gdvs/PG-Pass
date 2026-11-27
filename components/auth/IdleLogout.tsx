@@ -128,7 +128,7 @@ export function IdleLogout({
   return (
     <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-3 sm:p-4" role="alertdialog" aria-modal="true" aria-labelledby="idle-title">
       <div className="fixed inset-0 bg-[#1A1458]/40 backdrop-blur-[3px] animate-fade" aria-hidden="true" />
-      <div className="relative w-full max-w-sm overflow-hidden rounded-[28px] border border-white bg-[linear-gradient(180deg,#FFFFFF_0%,#F5F0FF_100%)] p-6 text-center shadow-[0_30px_70px_-24px_rgba(40,20,120,0.55)] animate-pop">
+      <div className="relative w-full max-w-sm max-h-[calc(100dvh-1.5rem)] overflow-y-auto overflow-x-hidden rounded-[28px] border border-white bg-[linear-gradient(180deg,#FFFFFF_0%,#F5F0FF_100%)] p-6 text-center shadow-[0_30px_70px_-24px_rgba(40,20,120,0.55)] animate-pop">
         <div aria-hidden className="pointer-events-none absolute -top-14 -right-12 h-40 w-40 rounded-full bg-[#D9C6FF]/50 blur-3xl" />
         <div className="relative mx-auto grid h-24 w-24 place-items-center">
           <Icon3D name="clock" size={44} className="absolute -top-1 -right-1 opacity-90" />

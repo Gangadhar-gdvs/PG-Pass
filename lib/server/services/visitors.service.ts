@@ -3,6 +3,7 @@ import { adminDb } from '../firebase-admin';
 import { AppError } from '../api/withErrorHandler';
 import { Visitor } from '@/types';
 import { MAX_LIST_LIMIT } from '@/lib/constants/limits';
+import { normalizePhone } from '@/lib/utils';
 import { Timestamp } from 'firebase-admin/firestore';
 
 export class VisitorsService {
@@ -18,7 +19,7 @@ export class VisitorsService {
   }): Promise<Visitor> {
     const name = params.name.trim().slice(0, 80);
     if (name.length < 2) throw new AppError(400, 'Please enter the visitor name');
-    const phone = params.phone?.replace(/\D/g, '').slice(-10) || undefined;
+    const phone = normalizePhone(params.phone) || undefined;
 
     const ref = adminDb.collection('visitors').doc();
     const now = Timestamp.now();

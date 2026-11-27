@@ -11,6 +11,7 @@ import { Icon3D, IconTile } from '@/components/brand/Icon3D';
 import { Star, MapPin, Phone, CheckCircle2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { errorMessage } from '@/lib/utils';
+import { apiGet, apiPost } from '@/lib/client/api';
 
 interface DetailPhoto {
   id: string;
@@ -109,8 +110,7 @@ export function PgDetailDrawer({
       setMyRating(0);
       setMyText('');
     });
-    fetch(`/api/discover/${propertyId}`)
-      .then((r) => (r.ok ? r.json() : Promise.reject()))
+    apiGet<Detail>(`/api/discover/${propertyId}`)
       .then(setDetail)
       .catch(() => toast.error('Could not load PG details'))
       .finally(() => setLoading(false));
@@ -123,22 +123,16 @@ export function PgDetailDrawer({
     }
     setSubmitting(true);
     try {
-      const res = await fetch('/api/reviews', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ownerId: detail.listing.ownerId,
-          propertyId: detail.listing.propertyId,
-          rating: myRating,
-          text: myText.trim() || undefined,
-        }),
+      await apiPost('/api/reviews', {
+        ownerId: detail.listing.ownerId,
+        propertyId: detail.listing.propertyId,
+        rating: myRating,
+        text: myText.trim() || undefined,
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Could not submit review');
       toast.success('Thanks! Your review is posted.');
-      // Refresh detail to show the new review.
-      const refreshed = await fetch(`/api/discover/${detail.listing.propertyId}`);
-      if (refreshed.ok) setDetail(await refreshed.json());
+      // Refresh detail to show the new review (best-effort).
+      const refreshed = await apiGet<Detail>(`/api/discover/${detail.listing.propertyId}`).catch(() => null);
+      if (refreshed) setDetail(refreshed);
       setMyText('');
     } catch (e: unknown) {
       toast.error(errorMessage(e, 'Could not submit review'));

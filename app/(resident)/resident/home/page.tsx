@@ -1,7 +1,9 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import Link from 'next/link';
+import { useAsyncData, fetchJson } from '@/hooks/useAsyncData';
+import { LoadError } from '@/components/ui/load-error';
 import { CardListSkeleton } from '@/components/ui/skeletons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -20,24 +22,14 @@ interface Tenancy {
 }
 
 export default function ResidentHome() {
-  const [resident, setResident] = useState<{ name?: string } | null>(null);
-  const [tenancies, setTenancies] = useState<Tenancy[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch('/api/resident/me');
-        if (res.ok) {
-          const data = await res.json();
-          setResident(data.resident);
-          setTenancies(data.tenancies || []);
-        }
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
+  // A transient server error no longer looks like "you have no PG" — a genuine
+  // empty response still shows the discover state; a failure shows error + Retry.
+  const { data, loading, error, reload } = useAsyncData(
+    () => fetchJson<{ resident?: { name?: string }; tenancies?: Tenancy[] }>('/api/resident/me'),
+    []
+  );
+  const resident = data?.resident ?? null;
+  const tenancies = data?.tenancies ?? [];
 
   if (loading) {
     return (
@@ -52,6 +44,14 @@ export default function ResidentHome() {
           <Skeleton className="h-28 w-36 rounded-[28px]" />
         </div>
         <CardListSkeleton rows={2} height="h-[84px]" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="pt-2">
+        <LoadError message={error} onRetry={reload} title="Couldn’t load your home" />
       </div>
     );
   }

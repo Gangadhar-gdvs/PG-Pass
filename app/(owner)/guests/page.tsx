@@ -1,9 +1,12 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import { useOwnerSession } from '@/hooks/useOwner';
 import { useBeds } from '@/hooks/useBeds';
-import { formatCurrency, formatDateIN, errorMessage, readApiError } from '@/lib/utils';
+import { useAsyncData, fetchJson } from '@/hooks/useAsyncData';
+import { apiPost } from '@/lib/client/api';
+import { LoadError } from '@/components/ui/load-error';
+import { formatCurrency, formatDateIN, errorMessage } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -21,44 +24,29 @@ export default function GuestsPage() {
   const propertyFilter = properties.length > 1 ? selectedPropertyId : undefined;
   const { beds } = useBeds(ownerId, propertyFilter);
 
-  const [guests, setGuests] = useState<GuestStay[]>([]);
   const [tab, setTab] = useState<'active' | 'completed'>('active');
-  const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [bedToCheckIn, setBedToCheckIn] = useState<Bed | null>(null);
 
   const vacantBeds = beds.filter((b) => b.status === 'vacant');
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/guests?status=${tab}`);
-      if (res.ok) setGuests((await res.json()).guests || []);
-    } finally {
-      setLoading(false);
-    }
-  }, [tab]);
-
-  useEffect(() => {
-    if (!ownerId) return;
-    // Defer so setState runs after commit, not in the effect body (cascading-render lint rule).
-    let active = true;
-    queueMicrotask(() => {
-      if (active) load();
-    });
-    return () => {
-      active = false;
-    };
-  }, [ownerId, load]);
+  // Loads (re-running per tab) through the shared hook so a failed load shows an
+  // error + Retry instead of a silently-empty guest list.
+  const { data, loading, error, reload } = useAsyncData(
+    () => fetchJson<{ guests?: GuestStay[] }>(`/api/guests?status=${tab}`),
+    [ownerId, tab],
+    { enabled: !!ownerId }
+  );
+  const load = reload;
+  const guests = data?.guests ?? [];
 
   const checkout = async (id: string) => {
     if (busyId) return;
     setBusyId(id);
     try {
-      const res = await fetch(`/api/guests/${id}/checkout`, { method: 'POST' });
-      if (!res.ok) throw new Error(await readApiError(res, 'Checkout failed'));
+      await apiPost(`/api/guests/${id}/checkout`);
       toast.success('Guest checked out · bed freed');
-      await load();
+      load();
     } catch (e: unknown) {
       toast.error(errorMessage(e, 'Checkout failed'));
     } finally {
@@ -89,6 +77,10 @@ export default function GuestsPage() {
         }
       />
 
+      {error ? (
+        <LoadError message={error} onRetry={reload} />
+      ) : (
+        <>
       {loading ? (
         <StatGridSkeleton count={4} />
       ) : (
@@ -208,6 +200,8 @@ export default function GuestsPage() {
             })}
           </ul>
         </SectionCard>
+      )}
+        </>
       )}
 
       {bedToCheckIn && (

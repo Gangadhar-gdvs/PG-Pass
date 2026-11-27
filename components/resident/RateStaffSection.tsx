@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Star } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { errorMessage } from '@/lib/utils';
+import { apiPost } from '@/lib/client/api';
 import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/input';
@@ -53,13 +54,7 @@ export function RateStaffSection({ staff }: { staff: StaffRow[] }) {
     }
     setBusy(true);
     try {
-      const res = await fetch('/api/reviews/staff', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ staffUid, rating, note: note.trim() || undefined }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Could not submit rating');
+      await apiPost('/api/reviews/staff', { staffUid, rating, note: note.trim() || undefined });
       toast.success('Thanks for rating!');
       setOpenUid(null);
       setRating(0);

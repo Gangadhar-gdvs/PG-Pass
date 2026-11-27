@@ -7,7 +7,8 @@ import { MAX_LIST_LIMIT } from '@/lib/constants/limits';
 import { smsService } from './sms.service';
 import { emailService } from './email.service';
 import { recordEvent } from './systemLogs.service';
-import { errorMessage } from '@/lib/utils';
+import { errorMessage, normalizePhone } from '@/lib/utils';
+import { hashUtr } from '../security/tokens';
 import { Timestamp, Transaction, DocumentReference } from 'firebase-admin/firestore';
 
 export interface CreateRentRecordInput {
@@ -409,10 +410,12 @@ export class RentService {
         throw new AppError(400, 'Can only reject records that are in verify status');
       }
 
-      // Release UTR lock if reference was present
+      // Release the UTR lock if a reference was present. MUST use the same
+      // hashed key the claim route wrote (`hashUtr`) — a plaintext key here
+      // never matched, so rejected claims used to leave the UTR locked forever
+      // and the resident could never re-submit that reference.
       if (data.paymentReference) {
-        const utrHash = `${ownerId}_${data.paymentReference.trim().toUpperCase()}`;
-        const utrDoc = adminDb.collection('utr_claims').doc(utrHash);
+        const utrDoc = adminDb.collection('utr_claims').doc(hashUtr(ownerId, data.paymentReference));
         transaction.delete(utrDoc);
       }
 
@@ -421,6 +424,60 @@ export class RentService {
         paymentReference: null,
         proofPhotoId: null,
         rejectionReason: reason.trim(),
+        updatedAt: Timestamp.now(),
+      });
+    });
+  }
+
+  /**
+   * Resident-submitted payment claim: atomically dedup the UTR (so the same UPI
+   * reference can't be claimed twice) and transition the resident's own rent
+   * record from pending → verify. The caller MUST have already verified the
+   * portal session + PIN and pass the resolved ownerId/tenantId. Owns the
+   * Firestore transaction so the API route stays thin.
+   */
+  async claimPayment(params: {
+    rentRecordId: string;
+    ownerId: string;
+    tenantId: string;
+    normalizedUtr: string;
+    proofPhotoId?: string;
+  }): Promise<void> {
+    const { rentRecordId, ownerId, tenantId, normalizedUtr, proofPhotoId } = params;
+    const utrClaimRef = adminDb.collection('utr_claims').doc(hashUtr(ownerId, normalizedUtr));
+    const rentRecordRef = adminDb.collection('rent_records').doc(rentRecordId);
+
+    await adminDb.runTransaction(async (transaction) => {
+      const existingUtr = await transaction.get(utrClaimRef);
+      if (existingUtr.exists) {
+        throw new AppError(
+          409,
+          'This UPI UTR number has already been claimed for another payment. Please verify the 12-digit number.'
+        );
+      }
+
+      const rentRecordDoc = await transaction.get(rentRecordRef);
+      if (!rentRecordDoc.exists) throw new AppError(404, 'Rent record not found');
+
+      const rentData = rentRecordDoc.data()!;
+      if (rentData.tenantId !== tenantId) {
+        throw new AppError(403, 'Unauthorized rent record access');
+      }
+      if (rentData.status === RENT_STATUS.PAID) {
+        throw new AppError(400, 'This rent record has already been marked as paid');
+      }
+
+      transaction.set(utrClaimRef, {
+        ownerId,
+        rentRecordId,
+        tenantId,
+        claimedAt: Timestamp.now(),
+      });
+      transaction.update(rentRecordRef, {
+        status: RENT_STATUS.VERIFY,
+        paymentReference: normalizedUtr,
+        proofPhotoId: proofPhotoId || null,
+        claimedAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
       });
     });
@@ -461,7 +518,7 @@ export class RentService {
         if (phone) {
           const resSnap = await adminDb
             .collection('residents')
-            .where('phone', '==', String(phone).replace(/\D/g, '').slice(-10))
+            .where('phone', '==', normalizePhone(String(phone)))
             .limit(1)
             .get();
           const email = resSnap.docs[0]?.data()?.email;

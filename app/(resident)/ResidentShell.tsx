@@ -34,8 +34,8 @@ export function ResidentShell({ children }: { children: React.ReactNode }) {
       {/* Top bar — logo left, profile right (reference layout). Home only. */}
       {isHome && (
       <header
-        className="sticky top-0 z-30 glass-bar"
-        style={{ paddingTop: 'max(0.6rem, env(safe-area-inset-top))', paddingBottom: '0.6rem' }}
+        className="sticky top-0 z-30 rounded-b-[26px] border-b border-[#EEE8FD] bg-white shadow-[0_10px_30px_-14px_rgba(70,40,160,0.30)]"
+        style={{ paddingTop: 'max(0.625rem, env(safe-area-inset-top))', paddingBottom: '0.625rem' }}
       >
         <div className="mx-auto flex w-full max-w-2xl items-center justify-between gap-3 px-4">
           <Link href="/resident/home" className="press" aria-label="PGPass home">

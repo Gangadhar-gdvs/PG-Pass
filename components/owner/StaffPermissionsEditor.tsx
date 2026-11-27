@@ -10,7 +10,8 @@ import { Button } from '@/components/ui/button';
 import { GlyphTile } from '@/components/brand/Icon3D';
 import { ShieldCheck } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { errorMessage, readApiError } from '@/lib/utils';
+import { errorMessage } from '@/lib/utils';
+import { apiPut } from '@/lib/client/api';
 
 /**
  * Per-staff permission toggles. Each staff member's access is independent — the
@@ -41,14 +42,7 @@ export function StaffPermissionsEditor({
     setSaving(true);
     try {
       const permissions = Array.from(selected);
-      const res = await fetch(`/api/staff/${staffUid}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ permissions }),
-      });
-      if (!res.ok) {
-        throw new Error(await readApiError(res, 'Could not save permissions'));
-      }
+      await apiPut(`/api/staff/${staffUid}`, { permissions });
       toast.success('Permissions updated');
       onSaved?.(permissions);
     } catch (e: unknown) {

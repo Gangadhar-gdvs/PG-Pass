@@ -22,7 +22,8 @@ import {
   StatTile,
 } from '@/components/ui/dashboard-kit';
 import { type Icon3DName, type Tint } from '@/components/brand/Icon3D';
-import { errorMessage, formatDateIN, readApiError } from '@/lib/utils';
+import { errorMessage, formatDateIN } from '@/lib/utils';
+import { apiGet, apiPost } from '@/lib/client/api';
 import {
   UTILITY_RULE_LABELS,
   UTILITY_TYPE_LABELS,
@@ -93,9 +94,6 @@ interface UtilityPreview {
   duplicate: { id: string; status: UtilityBillStatus } | null;
   overlaps: Array<{ id: string; label: string }>;
 }
-
-// Server errors are `{ error, code, requestId }` — shared extractor (R-A3).
-const readError = readApiError;
 
 const paiseToInput = (p: number) => (p % 100 === 0 ? String(p / 100) : (p / 100).toFixed(2));
 
@@ -259,21 +257,15 @@ function NewBillDrawer({
     const timer = setTimeout(async () => {
       setPreviewing(true);
       try {
-        const res = await fetch('/api/utilities/preview', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: previewKey,
-        });
+        const data = await apiPost<{ preview: UtilityPreview }>(
+          '/api/utilities/preview',
+          JSON.parse(previewKey)
+        );
         if (!active) return;
-        if (res.ok) {
-          const data = await res.json();
-          setPreviewState({ key: previewKey, data: data.preview as UtilityPreview });
-          setPreviewFailure(null);
-        } else {
-          setPreviewFailure(await readError(res, 'Could not calculate the split'));
-        }
-      } catch {
-        if (active) setPreviewFailure('Could not reach the server. Check your connection and try again.');
+        setPreviewState({ key: previewKey, data: data.preview });
+        setPreviewFailure(null);
+      } catch (e: unknown) {
+        if (active) setPreviewFailure(errorMessage(e, 'Could not calculate the split'));
       } finally {
         if (active) setPreviewing(false);
       }
@@ -304,15 +296,9 @@ function NewBillDrawer({
     if (saving || !requestBody || blocking) return;
     setSaving(true);
     try {
-      const res = await fetch('/api/utilities', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
-      });
-      if (!res.ok) throw new Error(await readError(res, 'Could not save the bill'));
-      const data = await res.json();
+      const data = await apiPost<{ bill?: UtilityBill }>('/api/utilities', requestBody);
       toast.success('Bill saved — review and apply it to rent');
-      onSaved(data.bill as UtilityBill);
+      if (data.bill) onSaved(data.bill);
     } catch (e: unknown) {
       toast.error(errorMessage(e, 'Could not save the bill'));
     } finally {
@@ -586,15 +572,16 @@ function BillDetailDrawer({
   const apply = async () => {
     setBusy(true);
     try {
-      const res = await fetch(`/api/utilities/${bill.id}/apply`, { method: 'POST' });
-      if (!res.ok) throw new Error(await readError(res, 'Could not apply the bill'));
-      const data = await res.json();
+      const data = await apiPost<{
+        result?: { charged?: unknown[]; skipped?: unknown[] };
+        bill?: UtilityBill;
+      }>(`/api/utilities/${bill.id}/apply`);
       const charged = data.result?.charged?.length || 0;
       const skippedN = data.result?.skipped?.length || 0;
       if (charged > 0) toast.success(`Added to ${charged} resident${charged === 1 ? "'s" : "s'"} rent`);
       else if (skippedN === 0) toast.success('Already applied — nothing new to charge');
       if (skippedN > 0) toast.error(`${skippedN} resident${skippedN === 1 ? '' : 's'} skipped — see the reasons below`);
-      onChanged(data.bill as UtilityBill);
+      if (data.bill) onChanged(data.bill);
       setConfirmApply(false);
     } catch (e: unknown) {
       toast.error(errorMessage(e, 'Could not apply the bill'));
@@ -606,15 +593,12 @@ function BillDetailDrawer({
   const voidBill = async (reason: string) => {
     setBusy(true);
     try {
-      const res = await fetch(`/api/utilities/${bill.id}/void`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason }),
-      });
-      if (!res.ok) throw new Error(await readError(res, 'Could not void the bill'));
-      const data = await res.json();
-      const credits: Array<{ tenantName: string; paise: number }> = data.result?.credits || [];
-      const covered: string[] = data.result?.covered || [];
+      const data = await apiPost<{
+        result?: { credits?: Array<{ tenantName: string; paise: number }>; covered?: string[] };
+        bill?: UtilityBill;
+      }>(`/api/utilities/${bill.id}/void`, { reason });
+      const credits = data.result?.credits || [];
+      const covered = data.result?.covered || [];
       toast.success('Bill voided and charges reversed');
       if (covered.length > 0) {
         toast(`${covered.join(', ')}: rent is now fully covered by payments already made — confirm it to issue the receipt.`, {
@@ -626,7 +610,7 @@ function BillDetailDrawer({
           duration: 7000,
         });
       }
-      onChanged(data.bill as UtilityBill);
+      if (data.bill) onChanged(data.bill);
       setConfirmVoid(false);
     } catch (e: unknown) {
       toast.error(errorMessage(e, 'Could not void the bill'));
@@ -807,9 +791,7 @@ function UtilitiesView() {
     try {
       const qs = new URLSearchParams({ period });
       if (propertyFilter) qs.set('propertyId', propertyFilter);
-      const res = await fetch(`/api/utilities?${qs.toString()}`);
-      if (!res.ok) throw new Error(await readError(res, 'Could not load utility bills'));
-      const data = await res.json();
+      const data = await apiGet<{ bills?: UtilityBill[] }>(`/api/utilities?${qs.toString()}`);
       setBills(data.bills || []);
       setLoadError(null);
     } catch (e: unknown) {

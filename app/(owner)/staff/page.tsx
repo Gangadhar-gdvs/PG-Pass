@@ -19,16 +19,20 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Input } from '@/components/ui/input';
 import { PhoneInput } from '@/components/ui/phone-input';
 import { Drawer } from '@/components/ui/drawer';
 import { Avatar } from '@/components/ui/avatar';
 import { EmptyState } from '@/components/ui/empty-state';
-import { HeaderSkeleton, CardListSkeleton, ListSkeleton } from '@/components/ui/skeletons';
+import { CardListSkeleton, ListSkeleton } from '@/components/ui/skeletons';
 import { PageHeader, SectionCard, InfoBanner } from '@/components/ui/dashboard-kit';
 import { GlyphTile, IconBubble } from '@/components/brand/Icon3D';
 import { validatePhone, sanitizeText } from '@/lib/security';
-import { errorMessage, ownerPlanTier, readApiError, apiErrorMessage } from '@/lib/utils';
+import { errorMessage, ownerPlanTier } from '@/lib/utils';
+import { fetchJson } from '@/hooks/useAsyncData';
+import { apiPost, apiPatch, apiDelete } from '@/lib/client/api';
+import { LoadError } from '@/components/ui/load-error';
 import { OwnerOnlyGuard } from '@/components/owner/OwnerOnlyGuard';
 import { StaffPermissionsEditor } from '@/components/owner/StaffPermissionsEditor';
 import {
@@ -61,6 +65,7 @@ function StaffPageInner() {
   const [askConfirm, confirmDialogEl] = useConfirm();
   const [profile, setProfile] = useState<{ plan?: PlanTier; planTier?: PlanTier } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [permsOpenUid, setPermsOpenUid] = useState<string | null>(null);
 
   // Invite modal state
@@ -74,21 +79,18 @@ function StaffPageInner() {
 
   const loadData = async () => {
     try {
-      const [ownerRes, staffRes] = await Promise.all([
-        fetch('/api/owners'),
-        fetch('/api/staff'),
+      // Staff list is the critical payload; the owner profile (for the plan tier)
+      // is best-effort. A failed staff load now surfaces an error + Retry instead
+      // of silently rendering an empty roster.
+      const [ownerData, staffData] = await Promise.all([
+        fetchJson<{ plan?: PlanTier; planTier?: PlanTier }>('/api/owners').catch(() => null),
+        fetchJson<{ staff?: StaffMember[] }>('/api/staff'),
       ]);
-
-      if (ownerRes.ok) {
-        const ownerData = await ownerRes.json();
-        setProfile(ownerData);
-      }
-      if (staffRes.ok) {
-        const data = await staffRes.json();
-        setStaffList(data.staff || []);
-      }
+      if (ownerData) setProfile(ownerData);
+      setStaffList(staffData.staff || []);
+      setLoadError(null);
     } catch (e) {
-      console.error('Error fetching staff list:', e);
+      setLoadError(errorMessage(e, "Couldn't load your staff. Please try again."));
     } finally {
       setLoading(false);
     }
@@ -128,20 +130,11 @@ function StaffPageInner() {
 
     setSubmitting(true);
     try {
-      const res = await fetch('/api/staff', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: cleanName,
-          email: email.trim().toLowerCase(),
-          phone: phoneValidation.cleaned,
-        }),
+      const data = await apiPost<{ setupLink?: string }>('/api/staff', {
+        name: cleanName,
+        email: email.trim().toLowerCase(),
+        phone: phoneValidation.cleaned,
       });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(apiErrorMessage(data, 'Failed to invite staff member'));
-      }
 
       toast.success(`Warden account provisioned for ${cleanName}`);
       setIsInviteOpen(false);
@@ -168,16 +161,7 @@ function StaffPageInner() {
         : ACCOUNT_STATUS.ACTIVE;
 
     try {
-      const res = await fetch(`/api/staff/${staff.uid}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
-      });
-
-      if (!res.ok) {
-        throw new Error(await readApiError(res, 'Status update failed'));
-      }
-
+      await apiPatch(`/api/staff/${staff.uid}`, { status: newStatus });
       toast.success(
         `Staff access ${newStatus === ACCOUNT_STATUS.ACTIVE ? 'restored' : 'suspended'}`
       );
@@ -196,14 +180,7 @@ function StaffPageInner() {
     if (!ok) return;
 
     try {
-      const res = await fetch(`/api/staff/${staff.uid}`, {
-        method: 'DELETE',
-      });
-
-      if (!res.ok) {
-        throw new Error(await readApiError(res, 'Revocation failed'));
-      }
-
+      await apiDelete(`/api/staff/${staff.uid}`);
       toast.success('Staff access revoked permanently');
       await loadData();
     } catch (err: unknown) {
@@ -212,11 +189,34 @@ function StaffPageInner() {
   };
 
   if (loading) {
+    // Real header during load so its shape doesn't change when data arrives;
+    // body matches the page: plan/quota card → staff list.
     return (
       <div className="max-w-4xl mx-auto space-y-5">
-        <HeaderSkeleton />
+        <PageHeader
+          icon="staff"
+          tint="indigo"
+          title="Staff & Warden"
+          highlight="Delegation"
+          subtitle="Delegate resident check-ins and rent payment recording with scoped RBAC."
+        />
         <CardListSkeleton rows={1} height="h-24" />
         <ListSkeleton rows={3} />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="max-w-4xl mx-auto">
+        <LoadError
+          message={loadError}
+          onRetry={() => {
+            setLoading(true);
+            setLoadError(null);
+            void loadData();
+          }}
+        />
       </div>
     );
   }
@@ -313,9 +313,8 @@ function StaffPageInner() {
                       <div className="min-w-0 flex-1 space-y-1.5">
                         <div className="flex flex-wrap items-center gap-1.5">
                           <span className="mr-0.5 text-[15px] font-bold text-ink">{staff.name}</span>
-                          <Badge variant={isActive ? 'paid' : 'danger'} dot className="capitalize">
-                            {(staff.accountStatus || '').replace(/_/g, ' ')}
-                          </Badge>
+                          <StatusBadge domain="account" status={staff.accountStatus} />
+
                           {staff.role && (
                             <Badge variant="brand" className="capitalize">
                               {staff.role}

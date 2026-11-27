@@ -9,12 +9,13 @@ import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
-import { HeaderSkeleton, FormSkeleton, StatGridSkeleton } from '@/components/ui/skeletons';
+import { PanelSkeleton, StatGridSkeleton } from '@/components/ui/skeletons';
 import { OwnerAvatarEditor } from '@/components/owner/OwnerAvatarEditor';
 import { Icon3D } from '@/components/brand/Icon3D';
 import { useOwnerAvatarUrl } from '@/lib/client/ownerAvatar';
 import { PG_AMENITIES_LIST } from '@/lib/constants/amenities';
 import { formatCurrency, ownerPlanTier, errorMessage } from '@/lib/utils';
+import { apiGet } from '@/lib/client/api';
 import type { Owner } from '@/types';
 import { Check, ChevronRight, LogOut, Pencil, Plus } from 'lucide-react';
 
@@ -46,10 +47,14 @@ export default function ProfilePage() {
     setLoading(true);
     setError('');
     try {
-      const [pRes, sRes] = await Promise.all([fetch('/api/owners'), fetch('/api/owners/summary')]);
-      if (!pRes.ok) throw new Error('Could not load your profile');
-      setOwner((await pRes.json()) as Owner);
-      if (sRes.ok) setSummary((await sRes.json()) as Summary);
+      // Owner profile is required; the summary is best-effort (a failure there
+      // doesn't block the page).
+      const [ownerData, summaryData] = await Promise.all([
+        apiGet<Owner>('/api/owners'),
+        apiGet<Summary>('/api/owners/summary').catch(() => null),
+      ]);
+      setOwner(ownerData);
+      if (summaryData) setSummary(summaryData);
     } catch (e: unknown) {
       setError(errorMessage(e, 'Could not load your profile'));
     } finally {
@@ -82,10 +87,12 @@ export default function ProfilePage() {
   const plan = ownerPlanTier(owner);
 
   if (loading) {
+    // Real header during load (shape never changes); body is a skeleton matching
+    // the page order: identity card → stat tiles.
     return (
       <div className="space-y-5">
-        <HeaderSkeleton action={false} />
-        <FormSkeleton fields={3} />
+        <PageHeader icon="person" tint="mint" title="My" highlight="Profile" subtitle="Your account & PG details" />
+        <PanelSkeleton height="h-24" />
         <StatGridSkeleton count={4} />
       </div>
     );

@@ -3,10 +3,10 @@ import { adminAuth, adminDb } from '../firebase-admin';
 import { AppError } from '../api/withErrorHandler';
 import { Resident, Tenant } from '@/types';
 import { Timestamp } from 'firebase-admin/firestore';
+import { normalizePhone } from '@/lib/utils';
 
-function cleanPhone(raw: string): string {
-  return (raw || '').replace(/\D/g, '').slice(-10);
-}
+// Canonical 10-digit phone key (shared helper — see lib/utils normalizePhone).
+const cleanPhone = normalizePhone;
 
 export class ResidentsService {
   /**
@@ -64,6 +64,54 @@ export class ResidentsService {
     return snap.docs
       .map((d) => ({ ...d.data(), id: d.id } as Tenant))
       .sort((a, b) => (a.deletedAt ? 1 : 0) - (b.deletedAt ? 1 : 0));
+  }
+
+  /**
+   * The resident's tenancies enriched with the PG name + UPI id (resolved from
+   * the property doc, falling back to the legacy owner doc) and an `active` flag.
+   * Owns the per-tenancy lookups so API routes stay thin (no direct Firestore).
+   */
+  async myTenanciesEnriched(uid: string): Promise<
+    Array<{
+      tenantId: string;
+      ownerId: string;
+      propertyId: string;
+      pgName: string;
+      upiId: string;
+      bedLabel?: string;
+      roomNumber?: string;
+      moveInDate?: string;
+      active: boolean;
+    }>
+  > {
+    const tenancies = await this.myTenancies(uid);
+    return Promise.all(
+      tenancies.map(async (t) => {
+        let pgName = '';
+        let upiId = '';
+        const propSnap = await adminDb
+          .collection('properties')
+          .doc(t.propertyId || t.ownerId)
+          .get();
+        if (propSnap.exists) pgName = propSnap.data()?.pgName || '';
+        const ownerSnap = await adminDb.collection('owners').doc(t.ownerId).get();
+        if (ownerSnap.exists) {
+          pgName = pgName || ownerSnap.data()?.pgName || 'PG';
+          upiId = ownerSnap.data()?.upiId || '';
+        }
+        return {
+          tenantId: t.id,
+          ownerId: t.ownerId,
+          propertyId: t.propertyId || t.ownerId,
+          pgName,
+          upiId,
+          bedLabel: t.bedLabel,
+          roomNumber: t.roomNumber,
+          moveInDate: t.moveInDate,
+          active: !t.deletedAt && t.accountStatus !== 'suspended',
+        };
+      })
+    );
   }
 
   /** Assert a tenant belongs to this resident (phone match) and return it. */

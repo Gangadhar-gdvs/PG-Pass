@@ -1,10 +1,14 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import { useOwnerSession } from '@/hooks/useOwner';
-import { formatDateIN, tsToDate, errorMessage, readApiError } from '@/lib/utils';
+import { useAsyncData, fetchJson } from '@/hooks/useAsyncData';
+import { apiPatch } from '@/lib/client/api';
+import { LoadError } from '@/components/ui/load-error';
+import { formatDateIN, tsToDate, errorMessage } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Badge, type BadgeProps } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { statusMeta } from '@/lib/statusMeta';
 import { CardListSkeleton, StatGridSkeleton } from '@/components/ui/skeletons';
 import { EmptyState } from '@/components/ui/empty-state';
 import { FilterChips, PageHeader, StatTile } from '@/components/ui/dashboard-kit';
@@ -32,12 +36,6 @@ const CATEGORY_VISUAL: Record<string, { icon: Icon3DName; tint: Tint }> = {
   cleaning: { icon: 'tools', tint: 'mint' },
   appliance: { icon: 'tools-purple', tint: 'rose' },
   other: { icon: 'wrench-orange', tint: 'peach' },
-};
-
-const STATUS_META: Record<MaintenanceStatus, { label: string; badge: NonNullable<BadgeProps['variant']> }> = {
-  open: { label: 'Open', badge: 'pending' },
-  in_progress: { label: 'In progress', badge: 'verify' },
-  resolved: { label: 'Resolved', badge: 'paid' },
 };
 
 const STEPS: MaintenanceStatus[] = ['open', 'in_progress', 'resolved'];
@@ -70,7 +68,7 @@ function TicketProgress({ status }: { status: MaintenanceStatus }) {
               ) : (
                 <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${reached ? 'bg-brand' : 'bg-brand-200'}`} />
               )}
-              <span className="truncate">{STATUS_META[s].label}</span>
+              <span className="truncate">{statusMeta('maintenance', s).label}</span>
             </span>
           </div>
         );
@@ -81,53 +79,29 @@ function TicketProgress({ status }: { status: MaintenanceStatus }) {
 
 export default function MaintenancePage() {
   const { ownerId } = useOwnerSession();
-  const [tickets, setTickets] = useState<MaintenanceTicket[]>([]);
-  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | MaintenanceStatus>('all');
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
+  // Loads (re-running on filter change) through the shared hook so a failed load
+  // shows an error + Retry instead of a silently-empty ticket list.
+  const { data, loading, error, reload } = useAsyncData(
+    () => {
       const qs = filter === 'all' ? '' : `?status=${filter}`;
-      const res = await fetch(`/api/maintenance${qs}`);
-      if (res.ok) {
-        const data = await res.json();
-        setTickets(data.tickets || []);
-      }
-    } catch {
-      /* non-fatal */
-    } finally {
-      setLoading(false);
-    }
-  }, [filter]);
-
-  useEffect(() => {
-    if (!ownerId) return;
-    // Defer so setState runs after commit, not in the effect body (cascading-render lint rule).
-    let active = true;
-    queueMicrotask(() => {
-      if (active) load();
-    });
-    return () => {
-      active = false;
-    };
-  }, [ownerId, load]);
+      return fetchJson<{ tickets?: MaintenanceTicket[] }>(`/api/maintenance${qs}`);
+    },
+    [ownerId, filter],
+    { enabled: !!ownerId }
+  );
+  const load = reload;
+  const tickets = data?.tickets ?? [];
 
   const transition = async (ticket: MaintenanceTicket, status: MaintenanceStatus) => {
     if (busyId) return;
     setBusyId(ticket.id);
     try {
-      const res = await fetch(`/api/maintenance/${ticket.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
-      });
-      if (!res.ok) {
-        throw new Error(await readApiError(res, 'Could not update ticket'));
-      }
+      await apiPatch(`/api/maintenance/${ticket.id}`, { status });
       toast.success(status === 'resolved' ? 'Marked resolved' : 'Marked in progress');
-      await load();
+      load();
     } catch (e: unknown) {
       toast.error(errorMessage(e, 'Could not update ticket'));
     } finally {
@@ -152,6 +126,10 @@ export default function MaintenancePage() {
         subtitle={`Issues raised by your residents${openCount > 0 ? ` · ${openCount} open` : ''}.`}
       />
 
+      {error ? (
+        <LoadError message={error} onRetry={reload} />
+      ) : (
+        <>
       {loading ? (
         <StatGridSkeleton count={4} />
       ) : (
@@ -193,7 +171,6 @@ export default function MaintenancePage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 stagger">
           {tickets.map((t) => {
             const v = CATEGORY_VISUAL[t.category] || CATEGORY_VISUAL.other;
-            const meta = STATUS_META[t.status];
             const created = formatDateIN(tsToDate(t.createdAt));
             return (
               <article key={t.id} className="app-card flex flex-col gap-3.5 p-4 sm:p-5">
@@ -204,9 +181,7 @@ export default function MaintenancePage() {
                       <h3 className="text-[15px] font-bold leading-snug text-ink">
                         {CATEGORY_LABELS[t.category] || 'Issue'}
                       </h3>
-                      <Badge variant={meta.badge} dot className="shrink-0">
-                        {meta.label}
-                      </Badge>
+                      <StatusBadge domain="maintenance" status={t.status} className="shrink-0" />
                     </div>
                     <div className="mt-1 flex flex-wrap items-center gap-1.5">
                       <span className="inline-flex min-w-0 items-center gap-1 text-[12.5px] font-medium text-muted">
@@ -260,6 +235,8 @@ export default function MaintenancePage() {
             );
           })}
         </div>
+      )}
+        </>
       )}
     </div>
   );

@@ -453,6 +453,93 @@ Firestore rules (from `tests/rules`)
 - ⚪ Restores larger than the free tier's 20,000 writes/day can't finish in one day at ₹0 — needs a temporary paid
   upgrade (owner approval, AGENTS §8) or a multi-day restore. Documented in the runbook.
 
+## Exploration pass — DRY / middle-layer / silent-failure (27 Nov 2026)
+Full project exploration logged in `docs/EXPLORATION-FINDINGS.md`. Fixes landed so far:
+- 🟢 **Fixed: onboarding wizard still persisted the fake phone `9876543210`.** The Settings fix (above)
+  never covered `PropertySetupWizard` — it took `initialOwnerPhone` and, when the signed-in user had no
+  phone (email signup), wrote the fake number as the owner's real phone. Now step 1 has a required,
+  pre-filled, editable `PhoneInput`; validated `^[6-9]\d{9}$` before submit; dashboard no longer injects
+  the fake fallback. `PropertySetupWizard.tsx`, `dashboard/page.tsx`.
+- 🟢 **Built shared single-source-of-truth layers** (so "change once, reflects everywhere"):
+  `lib/client/api.ts` (client API middle layer + interceptors), `hooks/useAsyncData.ts` (loader with
+  real error + Retry — kills silent-failure empty pages), `lib/statusMeta.ts` + `components/ui/status-badge.tsx`,
+  `normalizePhone()`/`toIndiaMsisdn()` in `lib/utils`, `components/ui/load-error.tsx`.
+  Tests: `sharedHelpers.test.ts` (7).
+- 🟢 **Silent-failure fix rolled out to 11 pages** — `tasks`, `expenses`, `notices`, `maintenance`,
+  `guests`, `visitors`, `reports`, `staff`, `billing`, `settings`, resident `home` now show an error +
+  Retry (or inline error) instead of a blank page when a load fails. Optimistic mutations preserved.
+  Gate: lint 0 · tsc 0 · 197 unit.
+- 🟢 **normalizePhone rollout** — 6 canonical last-10 phone-key sites now use the shared helper
+  (`rent`/`visitors`/`guests`/`residents` services, `AddTenantModal`); country-code-aware and
+  OTP/full-digit sites deliberately left (see `EXPLORATION-FINDINGS.md` §normalizePhone).
+- 🟢 **StatusBadge adoption** — maintenance (deleted its local `STATUS_META`) + staff account pill now
+  use the shared `statusMeta`/`<StatusBadge>`; composite rent/bed badges left as-is (regression risk).
+- 🟢 **PageHeader reshaped to match the bottom nav bar (edge-curved).** On phones the header is now
+  full-bleed to the screen edges with curved BOTTOM corners (`rounded-b-[26px]`), solid white, bottom
+  border + downward shadow — a mirror of the bottom tab bar's `rounded-t-[26px]` — instead of the old
+  inset floating pill with gaps on all sides. `-mx-4` cancels `<main>`'s `px-4`; resets to the floating
+  pill at `sm` (where main padding grows to `px-6`, so no partial-inset gap). `components/ui/dashboard-kit.tsx`.
+- 🟢 **Skeletons now match the real page structure.** `settings`, `profile`, `staff`, `billing`,
+  `analytics` used to replace the whole page (incl. the header) with a generic `HeaderSkeleton`, so the
+  header shape JUMPED when data arrived. They now render the REAL `PageHeader` during load with only the
+  body as a skeleton — the header is identical loading→loaded. (Other pages already kept their header.)
+- 🟢 **`fetch` → `apiClient` migration — DONE (110 → 27 calls; every remaining one is intentionally raw).**
+  Routed all eligible client calls through `lib/client/api.ts` (`apiGet/apiPost/apiPatch/apiPut/apiDelete`)
+  so headers, JSON, and non-ok→error are handled in ONE place. Migrated across ~30 files: tasks, expenses,
+  notices, maintenance, guests, visitors, staff, billing, settings, profile, inventory, utilities, support,
+  discover, resident-tenancy, **dashboard (11/15), admin console (7/9) + AdminPgManage/PgFeatures/UsersPanel/
+  AdminSupportPanel**, and the owner/resident/tenant components (AddTenant, CheckInGuest, AddProperty,
+  StaffPermissions, RaiseIssue, RateStaff, RentStatusCard, GmailConnectCard, Pg/TenantPhotoGallery,
+  BankCsvReconciler, PropertySetupWizard, PgDetailDrawer). ~15 now-dead readApiError/apiErrorMessage
+  imports removed. Gate after every file: tsc 0 · lint 0; build ✓; 197 tests.
+  - **The 27 remaining raw `fetch` calls are deliberately raw** (migrating would change behaviour):
+    auth/session (login×2, useAuth, IdleLogout, admin+dashboard session POSTs — 409 SESSION_SUPERSEDED,
+    no redirect-on-401); uploads (uploader, ownerAvatar — presigned PUTs); logger beacon; analytics
+    (inspects 403+FEATURE_DISABLED + requestId header); TenantPortalView (429 lockout); useOwner background
+    reload; dashboard send-reminders (reads body code on non-ok); support/AdminSupportPanel markRead +
+    WhatsAppReminderModal (best-effort fire-and-forget).
+- 🟢 **Service-layer refactor — DONE (scoped to business/admin routes).** Moved Firestore access out of
+  routes and into services so each module's data logic has ONE home:
+  - `resident/me` → `residentsService.myTenanciesEnriched()` (PG-name/UPI enrichment).
+  - `rent/[id]/claim` → `rentService.claimPayment()` (UTR dedup + pending→verify transaction).
+  - `admin/features` → new `adminPgService` (getFeatures/setFeature + property mirror + cache invalidation).
+  - `admin/manage` (updateOwner) → `ownersService.adminMergeUpdate()` (read-merge-validate-upsert).
+  - `admin/accounts` → new `adminAccountsService.setAccountStatus()` (owner/staff/tenant suspend: claims +
+    token revoke + portal-token invalidation + audit). **Also added the missing PATCH handler** — the PG
+    detail panel's suspend/reactivate button POSTed `PATCH {ownerId, accountStatus}` to a route that had
+    only POST with a different schema, so it silently 405'd; now wired + working.
+  - `admin/claims` → `adminUsersService.grantSuperAdmin()`.
+  - All 6 routes now 0 direct `adminDb`. Gate: tsc 0 · lint 0 · 198 tests · build ✓.
+  - **Deliberately LEFT route-level (not business modules):** cron jobs (metrics/cleanup/backup —
+    cross-collection batch orchestration), auth/session + health + flags (infra/security plumbing),
+    portal/unlock + send-reminders + subscriptions + resident/tenancy (already thin / justified).
+- ⚪ Earlier context:
+  (~18 sites), raw `fetch` → `apiGet/apiPost` (105 sites), ~15 routes onto their services. See
+  `docs/EXPLORATION-FINDINGS.md` §B/§G.
+
+## Found during service-layer refactor (27 Nov 2026)
+- 🟢 **Fixed: UTR lock was never released on claim rejection (pre-existing bug).** `rent/[id]/claim` locks
+  the UTR under `hashUtr(ownerId, utr)` = **SHA-256** (`utr_claims/{sha256}`), but `rentService.rejectClaim`
+  deleted `utr_claims/{ownerId}_{UTR}` = **plaintext key** — they never matched, so a rejected claim's UTR
+  stayed locked forever and the resident could never re-submit that same UPI reference. *Fix:* `rejectClaim`
+  now deletes `hashUtr(data.ownerId, data.paymentReference)`. Regression test:
+  `tokens.test.ts` ("UTR lock key is hashUtr, NOT the plaintext …").
+
+## Section-F visual / responsive audit (27 Nov 2026)
+Full write-up in `docs/EXPLORATION-FINDINGS.md` §F. Fixes:
+- 🟢 **Drawer focus trap** — the docstring claimed a focus trap but only did focus entry; Tab escaped to
+  the page behind. Added a real Tab/Shift+Tab wrap. `components/ui/drawer.tsx`.
+- 🟢 **ConfirmDialog a11y** — had no focus entry/trap/restore at all (it's an `alertdialog`, often
+  destructive). Added focus entry + trap + restore. `components/ui/confirm-dialog.tsx`.
+- 🟢 **Dialog height on short landscape** — `ConfirmDialog` + `IdleLogout` had no max-height, so a dialog
+  with a reason textarea could push its buttons off a landscape phone. Added
+  `max-h-[calc(100dvh-1.5rem)] overflow-y-auto`.
+- 🟢 **Admin bottom-nav overflow** — `min-w-[56px]` per tab × 4 + centre FAB could exceed a 320px viewport;
+  now `min-w-0` + truncating label (the `flex-1` button keeps the tap area). `app/admin/page.tsx`.
+- 🟢 **z-index scale documented** in `globals.css` (overlays stack intentionally, not ad-hoc).
+- 🟢 Verified fine (no change): tablet data-tables/bed-grid (sidebar-aware), `t/[token]`+`portal/[token]`
+  (`TenantPortalView` fully responsive), reports/analytics charts at 320px. Gate: tsc 0 · lint 0 · 198 tests · build ✓.
+
 ## Follow-ups (explicitly deferred, not forgotten)
 - 🟢 **#6 avatar image upload — BUILT.** Private storage (never a public URL): client compresses to
   ≤512px WebP (EXIF stripped) → presigned PUT into `pending/{ownerId}/avatar/` → `POST /api/owners/avatar`

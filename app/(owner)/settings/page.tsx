@@ -2,7 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { useOwnerSession } from '@/hooks/useOwner';
-import { errorMessage, readApiError } from '@/lib/utils';
+import { errorMessage, normalizePhone } from '@/lib/utils';
+import { fetchJson } from '@/hooks/useAsyncData';
+import { apiPut } from '@/lib/client/api';
+import { LoadError } from '@/components/ui/load-error';
 import { AddPropertyCard } from '@/components/owner/AddPropertyCard';
 import { OwnerOnlyGuard } from '@/components/owner/OwnerOnlyGuard';
 import { PgPhotoGallery } from '@/components/owner/PgPhotoGallery';
@@ -12,7 +15,7 @@ import { Input } from '@/components/ui/input';
 import { PhoneInput } from '@/components/ui/phone-input';
 import { OwnerAvatarEditor } from '@/components/owner/OwnerAvatarEditor';
 import { useOwnerAvatarUrl } from '@/lib/client/ownerAvatar';
-import { HeaderSkeleton, FormSkeleton } from '@/components/ui/skeletons';
+import { FormSkeleton } from '@/components/ui/skeletons';
 import { Button } from '@/components/ui/button';
 import { PageHeader, SectionCard, InfoBanner } from '@/components/ui/dashboard-kit';
 import { validateUpi, validatePhone, sanitizeText } from '@/lib/security';
@@ -23,6 +26,8 @@ function SettingsPageInner() {
   const { ownerId, selectedPropertyId } = useOwnerSession();
 
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
   const [saving, setSaving] = useState(false);
 
   const [pgName, setPgName] = useState('');
@@ -39,26 +44,29 @@ function SettingsPageInner() {
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch('/api/owners');
-        if (res.ok) {
-          const profile = await res.json();
-          setPgName(profile.pgName || '');
-          setOwnerName(profile.name || '');
-          setPgAddress(profile.address || profile.pgAddress || '');
-          setUpiId(profile.upiId || '');
-          setPhone(String(profile.phone || '').replace(/\D/g, '').slice(-10));
-          setRentDueDay(String(profile.rentDueDay ?? 5));
-          setLateFeePerDay(String(Math.round((profile.lateFeePerDayPaise ?? 0) / 100)));
-          setLateFeeGraceDays(String(profile.lateFeeGraceDays ?? 0));
-        }
+        // Surface a load failure instead of silently showing a blank settings
+        // form (which an owner could accidentally SAVE over their real profile).
+        const profile = await fetchJson<{
+          pgName?: string; name?: string; address?: string; pgAddress?: string; upiId?: string;
+          phone?: string | number; rentDueDay?: number; lateFeePerDayPaise?: number; lateFeeGraceDays?: number;
+        }>('/api/owners');
+        setPgName(profile.pgName || '');
+        setOwnerName(profile.name || '');
+        setPgAddress(profile.address || profile.pgAddress || '');
+        setUpiId(profile.upiId || '');
+        setPhone(normalizePhone(String(profile.phone ?? '')));
+        setRentDueDay(String(profile.rentDueDay ?? 5));
+        setLateFeePerDay(String(Math.round((profile.lateFeePerDayPaise ?? 0) / 100)));
+        setLateFeeGraceDays(String(profile.lateFeeGraceDays ?? 0));
+        setLoadError(null);
       } catch (e) {
-        console.error('Error fetching settings:', e);
+        setLoadError(errorMessage(e, "Couldn't load your settings. Please try again."));
       } finally {
         setLoading(false);
       }
     }
     if (ownerId) load();
-  }, [ownerId]);
+  }, [ownerId, reloadKey]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,24 +98,16 @@ function SettingsPageInner() {
 
     setSaving(true);
     try {
-      const res = await fetch('/api/owners', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          pgName: sanitizedPgName,
-          name: sanitizedOwnerName,
-          address: sanitizedPgAddress || 'PG Address',
-          upiId: upiValidation.formatted,
-          phone: phoneValidation.cleaned,
-          rentDueDay: Math.min(28, Math.max(1, Number(rentDueDay) || 5)),
-          lateFeePerDayPaise: Math.max(0, Math.round((Number(lateFeePerDay) || 0) * 100)),
-          lateFeeGraceDays: Math.max(0, Math.min(28, Number(lateFeeGraceDays) || 0)),
-        }),
+      await apiPut('/api/owners', {
+        pgName: sanitizedPgName,
+        name: sanitizedOwnerName,
+        address: sanitizedPgAddress || 'PG Address',
+        upiId: upiValidation.formatted,
+        phone: phoneValidation.cleaned,
+        rentDueDay: Math.min(28, Math.max(1, Number(rentDueDay) || 5)),
+        lateFeePerDayPaise: Math.max(0, Math.round((Number(lateFeePerDay) || 0) * 100)),
+        lateFeeGraceDays: Math.max(0, Math.min(28, Number(lateFeeGraceDays) || 0)),
       });
-
-      if (!res.ok) {
-        throw new Error(await readApiError(res, 'Failed to update settings'));
-      }
 
       toast.success('Settings updated successfully');
     } catch (err: unknown) {
@@ -118,10 +118,26 @@ function SettingsPageInner() {
   };
 
   if (loading) {
+    // Render the REAL header during load so its shape never changes when data
+    // arrives; only the body is a skeleton.
     return (
       <div className="max-w-3xl mx-auto space-y-5">
-        <HeaderSkeleton action={false} />
+        <PageHeader
+          icon="tools-purple"
+          tint="slate"
+          title="Property & Banking"
+          highlight="Settings"
+          subtitle="Configure payment endpoints and official details for compliant rent receipts."
+        />
         <FormSkeleton fields={5} />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="max-w-3xl mx-auto">
+        <LoadError message={loadError} onRetry={() => { setLoading(true); setLoadError(null); setReloadKey((k) => k + 1); }} />
       </div>
     );
   }

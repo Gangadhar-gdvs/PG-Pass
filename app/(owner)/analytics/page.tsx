@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useOwnerSession } from '@/hooks/useOwner';
 import { formatCurrency } from '@/lib/utils';
-import { HeaderSkeleton, StatGridSkeleton, PanelSkeleton } from '@/components/ui/skeletons';
+import { StatGridSkeleton, PanelSkeleton } from '@/components/ui/skeletons';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -187,9 +187,10 @@ export default function AnalyticsPage() {
   }, [ownerId, load]);
 
   if (loading) {
+    // Real header during load so its shape doesn't change when data arrives.
     return (
       <div className="max-w-5xl mx-auto space-y-5">
-        <HeaderSkeleton action={false} />
+        <AnalyticsHeader />
         <StatGridSkeleton count={4} />
         <PanelSkeleton height="h-64" />
       </div>

@@ -3,6 +3,7 @@ import { adminDb } from '../firebase-admin';
 import { AppError } from '../api/withErrorHandler';
 import { GuestStay, Bed } from '@/types';
 import { BED_STATUS } from '@/lib/constants/status';
+import { normalizePhone } from '@/lib/utils';
 import { recordEvent } from './systemLogs.service';
 import { Timestamp, Query, QueryDocumentSnapshot } from 'firebase-admin/firestore';
 
@@ -75,7 +76,7 @@ export class GuestsService {
         bedLabel: bed.bedLabel,
         roomNumber: bed.roomNumber,
         name: input.name.trim(),
-        phone: input.phone?.replace(/\D/g, '').slice(-10) || undefined,
+        phone: normalizePhone(input.phone) || undefined,
         checkInDate: input.checkInDate,
         checkOutDate: input.checkOutDate,
         nights,

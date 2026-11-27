@@ -8,7 +8,8 @@ import { Drawer } from '@/components/ui/drawer';
 import { InfoBanner, KeyValue } from '@/components/ui/dashboard-kit';
 import { IconBubble, type Icon3DName, type Tint } from '@/components/brand/Icon3D';
 import { CalendarDays, Moon, UserRound, Wallet } from 'lucide-react';
-import { formatCurrency, errorMessage, apiErrorMessage, todayIST, addDaysToIsoDate } from '@/lib/utils';
+import { formatCurrency, errorMessage, todayIST, addDaysToIsoDate } from '@/lib/utils';
+import { apiPost } from '@/lib/client/api';
 import toast from 'react-hot-toast';
 
 function nightsBetween(a: string, b: string): number {
@@ -80,22 +81,16 @@ export function CheckInGuestModal({
     if (total <= 0) return toast.error('Enter a valid amount');
     setLoading(true);
     try {
-      const res = await fetch('/api/guests', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          bedId: bed.id,
-          name: name.trim(),
-          phone,
-          checkInDate: checkIn,
-          checkOutDate: checkOut,
-          billingMode: mode,
-          nightlyRateRupees: mode === 'per_night' ? Number(rate) : undefined,
-          flatTotalRupees: mode === 'flat' ? Number(flat) : undefined,
-        }),
+      await apiPost('/api/guests', {
+        bedId: bed.id,
+        name: name.trim(),
+        phone,
+        checkInDate: checkIn,
+        checkOutDate: checkOut,
+        billingMode: mode,
+        nightlyRateRupees: mode === 'per_night' ? Number(rate) : undefined,
+        flatTotalRupees: mode === 'flat' ? Number(flat) : undefined,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(apiErrorMessage(data, 'Check-in failed'));
       toast.success(`${name.trim()} checked in to Bed ${bed.bedLabel}`);
       onSuccess();
       onClose();

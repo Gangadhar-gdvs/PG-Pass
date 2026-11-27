@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { ALL_PG_FEATURES, PG_FEATURE_LABELS, PgFeature } from '@/lib/constants/permissions';
+import { apiGet, apiPatch } from '@/lib/client/api';
 import { Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { SectionCard } from '@/components/ui/dashboard-kit';
@@ -21,8 +22,7 @@ export function AdminPgFeatures({ ownerId }: { ownerId: string }) {
     queueMicrotask(() => {
       setFeatures(null);
     });
-    fetch(`/api/admin/features?ownerId=${encodeURIComponent(ownerId)}`)
-      .then((r) => (r.ok ? r.json() : Promise.reject()))
+    apiGet<{ features: Record<string, boolean> }>(`/api/admin/features?ownerId=${encodeURIComponent(ownerId)}`)
       .then((d) => setFeatures(d.features))
       .catch(() => setFeatures({}));
   }, [ownerId]);
@@ -32,12 +32,7 @@ export function AdminPgFeatures({ ownerId }: { ownerId: string }) {
     // Optimistic update.
     setFeatures((f) => ({ ...(f || {}), [feature]: next }));
     try {
-      const res = await fetch('/api/admin/features', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ownerId, feature, enabled: next }),
-      });
-      if (!res.ok) throw new Error();
+      await apiPatch('/api/admin/features', { ownerId, feature, enabled: next });
       toast.success(`${PG_FEATURE_LABELS[feature]} ${next ? 'enabled' : 'disabled'}`);
     } catch {
       setFeatures((f) => ({ ...(f || {}), [feature]: !next })); // revert

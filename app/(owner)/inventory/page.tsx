@@ -13,7 +13,8 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { CardListSkeleton, StatGridSkeleton } from '@/components/ui/skeletons';
 import { ActivityRow, FilterChips, InfoBanner, PageHeader, SectionCard, StatTile } from '@/components/ui/dashboard-kit';
 import { type Icon3DName, type Tint } from '@/components/brand/Icon3D';
-import { errorMessage, formatDateIN, readApiError } from '@/lib/utils';
+import { errorMessage, formatDateIN } from '@/lib/utils';
+import { apiGet, apiPost, apiPatch, apiDelete } from '@/lib/client/api';
 import {
   ASSET_CATEGORY_LABELS,
   ASSET_CONDITION_LABELS,
@@ -58,7 +59,6 @@ const EMPTY_SUMMARY: AssetSummary = {
 };
 
 // Server errors are `{ error, code, requestId }` — shared extractor (R-A3).
-const readError = readApiError;
 
 function historyText(h: AssetHistoryEntry): { title: string; icon: Icon3DName; tint: Tint } {
   switch (h.action) {
@@ -158,15 +158,11 @@ function AssetDrawer({
             warrantyUntil: warrantyUntil || null,
             notes: notes.trim() || undefined,
           };
-      const res = await fetch(editing ? `/api/assets/${asset.id}` : '/api/assets', {
-        method: editing ? 'PATCH' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) throw new Error(await readError(res, 'Could not save the item'));
-      const data = await res.json();
+      const data = editing
+        ? await apiPatch<{ asset: Asset }>(`/api/assets/${asset.id}`, payload)
+        : await apiPost<{ asset: Asset }>('/api/assets', payload);
       toast.success(editing ? 'Item updated' : 'Item added');
-      onSaved(data.asset as Asset);
+      onSaved(data.asset);
     } catch (e: unknown) {
       toast.error(errorMessage(e, 'Could not save the item'));
     } finally {
@@ -178,8 +174,7 @@ function AssetDrawer({
     if (!asset) return;
     setSaving(true);
     try {
-      const res = await fetch(`/api/assets/${asset.id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error(await readError(res, 'Could not remove the item'));
+      await apiDelete(`/api/assets/${asset.id}`);
       toast.success('Item removed');
       onDeleted(asset.id);
     } catch (e: unknown) {
@@ -389,9 +384,7 @@ export default function InventoryPage() {
     if (!silent) setLoading(true);
     try {
       const qs = propertyFilter ? `?propertyId=${encodeURIComponent(propertyFilter)}` : '';
-      const res = await fetch(`/api/assets${qs}`);
-      if (!res.ok) throw new Error(await readError(res, 'Could not load the inventory'));
-      const data = await res.json();
+      const data = await apiGet<{ assets?: Asset[]; summary?: typeof EMPTY_SUMMARY }>(`/api/assets${qs}`);
       setAssets(data.assets || []);
       setSummary(data.summary || EMPTY_SUMMARY);
       setLoadError(null);

@@ -1,6 +1,7 @@
 'use client';
 
-import { apiErrorMessage } from '@/lib/utils';
+import { errorMessage } from '@/lib/utils';
+import { apiPost } from '@/lib/client/api';
 import React, { useEffect, useState } from 'react';
 import { subscribeToSupportThreads } from '@/lib/firestore';
 import { SupportChat } from '@/components/support/SupportChat';
@@ -74,15 +75,12 @@ export function AdminSupportPanel() {
   };
 
   const send = async (ownerId: string, text: string) => {
-    const res = await fetch('/api/admin/support', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ownerId, text }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      toast.error(apiErrorMessage(err, 'Could not send reply'));
-      throw new Error('send failed');
+    try {
+      await apiPost('/api/admin/support', { ownerId, text });
+    } catch (e) {
+      // Surface the error AND rethrow so the chat keeps the unsent text.
+      toast.error(errorMessage(e, 'Could not send reply'));
+      throw e;
     }
   };
 

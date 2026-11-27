@@ -4,6 +4,7 @@ import React, { useState, useRef } from 'react';
 import { Drawer } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/utils';
+import { apiPost } from '@/lib/client/api';
 import {
   parseBankStatementCsv,
   matchBankTransactions,
@@ -125,14 +126,13 @@ export function BankCsvReconciler({
         const match = matches.find((m) => m.rentRecord?.id === recordId);
         const ref = match?.transaction.utr || match?.rentRecord?.paymentReference || 'Bank CSV matched';
 
-        const res = await fetch(`/api/rent/${recordId}/confirm`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            paymentReference: ref,
-          }),
-        });
-        if (res.ok) successCount++;
+        // Tolerate partial failures: one record's error must not abort the batch.
+        try {
+          await apiPost(`/api/rent/${recordId}/confirm`, { paymentReference: ref });
+          successCount++;
+        } catch {
+          /* counted as not-confirmed; reported below */
+        }
       });
 
       await Promise.all(promises);

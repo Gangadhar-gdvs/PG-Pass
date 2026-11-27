@@ -46,6 +46,22 @@ describe('Security Tokens & Cryptography', () => {
     expect(hash1).not.toBe(hashDiffOwner);
   });
 
+  it('UTR lock key is hashUtr, NOT the plaintext `${ownerId}_${UTR}` (reject-release regression)', () => {
+    // Regression for the bug where rent/[id]/claim LOCKED the UTR under
+    // hashUtr(...) but rejectClaim DELETED a plaintext `${ownerId}_${UTR}` key —
+    // the two never matched, so a rejected claim left the UTR locked forever.
+    // Both sites must derive the SAME key from hashUtr; this asserts the correct
+    // key is the hash and that the old plaintext key was indeed different.
+    const ownerId = 'owner_abc';
+    const utr = '123456789012';
+    const correctKey = hashUtr(ownerId, utr);
+    const oldPlaintextKey = `${ownerId}_${utr.trim().toUpperCase()}`;
+    expect(correctKey).toMatch(/^[0-9a-f]{64}$/);
+    expect(correctKey).not.toBe(oldPlaintextKey);
+    // Claim and reject now both call hashUtr → identical, case/space-insensitive.
+    expect(hashUtr(ownerId, ` ${utr} `)).toBe(correctKey);
+  });
+
   it('should perform constant-time string comparison', () => {
     expect(constantTimeEqual('1234', '1234')).toBe(true);
     expect(constantTimeEqual('1234', '1235')).toBe(false);

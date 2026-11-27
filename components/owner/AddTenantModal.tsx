@@ -10,7 +10,8 @@ import { Drawer } from '@/components/ui/drawer';
 import { IconBubble, Icon3D, type Icon3DName, type Tint } from '@/components/brand/Icon3D';
 import { UserRound } from 'lucide-react';
 import { validatePhone, sanitizeText } from '@/lib/security';
-import { errorMessage, apiErrorMessage, todayIST } from '@/lib/utils';
+import { errorMessage, todayIST, normalizePhone } from '@/lib/utils';
+import { apiPost } from '@/lib/client/api';
 import toast from 'react-hot-toast';
 
 /** Glass form section with a small 3D icon header (local to this drawer). */
@@ -119,28 +120,19 @@ export function AddTenantModal({
 
     setLoading(true);
     try {
-      const res = await fetch('/api/tenants', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          bedId: bed.id,
-          name: sanitizedName,
-          phone: cleanPhone,
-          moveInDate,
-          idProofType,
-          emergencyContactName: emName.trim() || undefined,
-          emergencyContactPhone: emPhone.replace(/\D/g, '').slice(-10) || undefined,
-          emergencyContactRelation: emRelation.trim() || undefined,
-          securityDepositPaise: Math.round(depositVal * 100),
-          depositPaidPaise: Math.round(depositVal * 100),
-          initialRentAmountPaise: Math.round(rentVal * 100),
-        }),
+      const data = await apiPost<{ tenant: { id: string }; rawPortalToken?: string }>('/api/tenants', {
+        bedId: bed.id,
+        name: sanitizedName,
+        phone: cleanPhone,
+        moveInDate,
+        idProofType,
+        emergencyContactName: emName.trim() || undefined,
+        emergencyContactPhone: normalizePhone(emPhone) || undefined,
+        emergencyContactRelation: emRelation.trim() || undefined,
+        securityDepositPaise: Math.round(depositVal * 100),
+        depositPaidPaise: Math.round(depositVal * 100),
+        initialRentAmountPaise: Math.round(rentVal * 100),
       });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(apiErrorMessage(data, 'Failed to assign resident'));
-      }
 
       toast.success(`${sanitizedName} assigned to Bed ${bed.bedLabel}`);
       onSuccess(data.tenant.id, data.rawPortalToken);

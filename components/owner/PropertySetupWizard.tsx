@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useOwnerSession } from '@/hooks/useOwner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PhoneInput } from '@/components/ui/phone-input';
 import { Dropdown } from '@/components/ui/dropdown';
 import { Badge } from '@/components/ui/badge';
 import { StatTile } from '@/components/ui/dashboard-kit';
@@ -47,7 +48,8 @@ import {
   FoodCuisine,
 } from '@/lib/constants/amenities';
 import { Owner } from '@/types';
-import { formatCurrency, errorMessage, readApiError } from '@/lib/utils';
+import { formatCurrency, errorMessage, normalizePhone } from '@/lib/utils';
+import { apiPost, apiPut } from '@/lib/client/api';
 import { validateUpi, sanitizeText } from '@/lib/security';
 import toast from 'react-hot-toast';
 
@@ -257,6 +259,11 @@ export function PropertySetupWizard({
   // Step 1: Property Identity
   const [pgName, setPgName] = useState(existingOwner?.pgName || '');
   const [ownerName, setOwnerName] = useState(existingOwner?.name || '');
+  // Owner's contact number. Pre-filled from the signed-in phone (or the existing
+  // profile) but EDITABLE and REQUIRED — we never persist a fake placeholder.
+  const [ownerPhone, setOwnerPhone] = useState(
+    normalizePhone(existingOwner?.phone) || normalizePhone(initialOwnerPhone)
+  );
   const [pgAddress, setPgAddress] = useState(existingOwner?.pgAddress || existingOwner?.address || '');
   const [upiId, setUpiId] = useState(existingOwner?.upiId || '');
   const [pgCategory, setPgCategory] = useState<PgCategory>(existingOwner?.pgCategory || 'coliving');
@@ -420,6 +427,11 @@ export function PropertySetupWizard({
       return false;
     }
 
+    if (!/^[6-9]\d{9}$/.test(ownerPhone)) {
+      toast.error('Please enter a valid 10-digit mobile number');
+      return false;
+    }
+
     const upiRes = validateUpi(upiId);
     if (!upiRes.valid) {
       toast.error(upiRes.error || 'Please enter a valid UPI ID (e.g. name@bank)');
@@ -457,29 +469,19 @@ export function PropertySetupWizard({
       const cleanAddress = sanitizeText(pgAddress, 200) || 'Prime Location';
 
       // 1. Create Owner Profile
-      const ownerRes = await fetch('/api/owners', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: cleanOwner,
-          phone: initialOwnerPhone.replace(/\D/g, '').slice(-10),
-          pgName: cleanPg,
-          address: cleanAddress,
-          upiId: upiId.trim().toLowerCase(),
-          pgCategory,
-          foodPlan,
-          foodCuisine: foodPlan !== 'no_food' ? foodCuisine : undefined,
-          noticePeriodDays,
-          pgAmenities: selectedPgAmenities,
-          totalFloors: totalFloorsCount,
-        }),
+      const updatedOwner = await apiPut<Owner>('/api/owners', {
+        name: cleanOwner,
+        phone: ownerPhone,
+        pgName: cleanPg,
+        address: cleanAddress,
+        upiId: upiId.trim().toLowerCase(),
+        pgCategory,
+        foodPlan,
+        foodCuisine: foodPlan !== 'no_food' ? foodCuisine : undefined,
+        noticePeriodDays,
+        pgAmenities: selectedPgAmenities,
+        totalFloors: totalFloorsCount,
       });
-
-      if (!ownerRes.ok) {
-        throw new Error(await readApiError(ownerRes, 'Failed to save property profile'));
-      }
-
-      const updatedOwner = (await ownerRes.json()) as Owner;
 
       // 2. Build Bed Objects List
       const generatedBeds: Array<{
@@ -520,18 +522,10 @@ export function PropertySetupWizard({
       });
 
       // 3. Batch Create Beds
-      const bedsRes = await fetch('/api/beds/batch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          beds: generatedBeds,
-          ...(targetPropertyId ? { propertyId: targetPropertyId } : {}),
-        }),
+      await apiPost('/api/beds/batch', {
+        beds: generatedBeds,
+        ...(targetPropertyId ? { propertyId: targetPropertyId } : {}),
       });
-
-      if (!bedsRes.ok) {
-        throw new Error(await readApiError(bedsRes, 'Failed to generate beds inventory'));
-      }
 
       toast.success(`Generated ${generatedBeds.length} beds across ${floors.length} floors!`);
       onComplete(updatedOwner);
@@ -647,6 +641,12 @@ export function PropertySetupWizard({
                   required
                 />
               </div>
+
+              <PhoneInput
+                label="Owner Contact Number"
+                value={ownerPhone}
+                onChange={setOwnerPhone}
+              />
 
               <Input
                 label="Complete Property Address & Locality"

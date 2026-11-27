@@ -228,6 +228,21 @@ body::before {
 }
 
 @layer components {
+/* ----------------------------------------------------------------------------
+ * Z-INDEX SCALE (document once — keep overlays intentional, not ad-hoc).
+ * Use these tiers so new overlays stack predictably:
+ *   z-10          in-card accents / sticky sub-elements
+ *   z-30          sticky page headers (PageHeader, OwnerTopBar, admin bar)
+ *   z-40          bottom nav bar · inline dropdown menus anchored to a trigger
+ *   z-50          drawers · bottom-tab "More"/quick sheets (full-screen modals)
+ *   z-[60]/[61]   confirm-dialog (must sit ABOVE a drawer that triggered it)
+ *   z-[70]        floating dropdown popovers · photo lightbox (above a dialog's
+ *                 own content, but these never co-occur with a lightbox)
+ *   z-[100]       idle-logout dialog (security — must top everything in-app)
+ *   toast (~9999) react-hot-toast — intentionally always visible, even over a
+ *                 dialog, so action success/error is never hidden.
+ * ---------------------------------------------------------------------------- */
+
 /* ---------------- Text treatments ---------------- */
 .text-gradient {
   background: var(--grad-text);

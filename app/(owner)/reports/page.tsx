@@ -1,10 +1,13 @@
 'use client';
 
 import { currentPeriodIST } from '@/lib/utils';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import { useOwnerSession } from '@/hooks/useOwner';
+import { useAsyncData, fetchJson } from '@/hooks/useAsyncData';
 import { PageHeader, StatTile, SectionCard } from '@/components/ui/dashboard-kit';
 import { StatGridSkeleton } from '@/components/ui/skeletons';
+import { Button } from '@/components/ui/button';
+import { RefreshCw } from 'lucide-react';
 import { Icon3D, IconBubble, type Icon3DName, type Tint } from '@/components/brand/Icon3D';
 import { ChevronLeft, ChevronRight, Download } from 'lucide-react';
 
@@ -26,31 +29,15 @@ export default function OwnerReportsPage() {
   const { ownerId } = useOwnerSession();
   const [period, setPeriod] = useState(() => currentPeriodIST());
   const [thisPeriod] = useState(() => currentPeriodIST());
-  const [summary, setSummary] = useState<Summary | null>(null);
-  const [loading, setLoading] = useState(true);
 
-  const load = useCallback(async (p: string) => {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/reports?period=${p}`);
-      if (res.ok) setSummary((await res.json()).summary);
-    } catch {
-      /* non-fatal */
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!ownerId) return;
-    let active = true;
-    queueMicrotask(() => {
-      if (active) load(period);
-    });
-    return () => {
-      active = false;
-    };
-  }, [ownerId, period, load]);
+  // Monthly summary loads (re-running per period) through the shared hook so a
+  // failed load shows an inline error + Retry instead of an endless skeleton.
+  const { data, loading, error, reload } = useAsyncData(
+    () => fetchJson<{ summary: Summary }>(`/api/reports?period=${period}`),
+    [ownerId, period],
+    { enabled: !!ownerId }
+  );
+  const summary = data?.summary ?? null;
 
   const monthLabel = (() => {
     const [y, m] = period.split('-').map(Number);
@@ -98,7 +85,17 @@ export default function OwnerReportsPage() {
         actions={periodNav}
       />
 
-      {loading || !summary ? (
+      {error ? (
+        <div className="app-card flex flex-col items-center gap-3 p-6 text-center sm:flex-row sm:text-left">
+          <div className="min-w-0 flex-1">
+            <p className="text-[14px] font-bold text-ink">Couldn’t load the {monthLabel} summary</p>
+            <p className="mt-0.5 text-[12.5px] font-medium text-muted">{error} You can still download the CSVs below.</p>
+          </div>
+          <Button variant="outline" onClick={reload} className="shrink-0">
+            <RefreshCw className="h-4 w-4" /> Retry
+          </Button>
+        </div>
+      ) : loading || !summary ? (
         <StatGridSkeleton count={4} />
       ) : (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 stagger">

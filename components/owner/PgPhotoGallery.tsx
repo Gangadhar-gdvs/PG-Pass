@@ -12,7 +12,8 @@ import { ProgressBar } from '@/components/ui/progress-bar';
 import { GlyphTile, IconBubble } from '@/components/brand/Icon3D';
 import { Camera, Trash2, ImagePlus } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { errorMessage, readApiError } from '@/lib/utils';
+import { errorMessage } from '@/lib/utils';
+import { apiGet, apiDelete } from '@/lib/client/api';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 
 interface GalleryPhoto {
@@ -50,12 +51,9 @@ export function PgPhotoGallery({ propertyId }: { propertyId?: string }) {
   const load = async (onResult?: (ok: boolean, photos: GalleryPhoto[]) => void) => {
     try {
       const qs = propertyId ? `?propertyId=${encodeURIComponent(propertyId)}` : '';
-      const res = await fetch(`/api/properties/photos${qs}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (onResult) onResult(true, data.photos || []);
-        else setPhotos(data.photos || []);
-      } else if (onResult) onResult(false, []);
+      const data = await apiGet<{ photos?: GalleryPhoto[] }>(`/api/properties/photos${qs}`);
+      if (onResult) onResult(true, data.photos || []);
+      else setPhotos(data.photos || []);
     } catch {
       if (onResult) onResult(false, []);
     } finally {
@@ -114,8 +112,7 @@ export function PgPhotoGallery({ propertyId }: { propertyId?: string }) {
     });
     if (!ok) return;
     try {
-      const res = await fetch(`/api/properties/photos/${id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error(await readApiError(res, 'Could not remove photo'));
+      await apiDelete(`/api/properties/photos/${id}`);
       setPhotos((list) => list.filter((p) => p.id !== id));
       toast.success('Photo removed');
     } catch (e: unknown) {

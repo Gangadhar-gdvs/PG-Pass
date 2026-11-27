@@ -185,6 +185,50 @@ export class AdminUsersService {
     });
     return { ...data, id: targetUid, accountStatus: status, updatedAt: now };
   }
+
+  /**
+   * Grant SUPER admin to an existing Firebase user by UID: preserves their other
+   * claims + sets `admin:true`, writes/merges an `admin_users` doc with role
+   * 'super' (full access via the entitlement system), and audit-logs it.
+   * Super-only (enforced at the route via `ADMINS_MANAGE`).
+   */
+  async grantSuperAdmin(actorUid: string, targetUid: string, reason: string): Promise<void> {
+    const user = await adminAuth.getUser(targetUid).catch(() => {
+      throw new AppError(404, 'Target user does not exist in Firebase Auth');
+    });
+
+    await adminAuth.setCustomUserClaims(targetUid, {
+      ...(user.customClaims || {}),
+      admin: true,
+    });
+
+    const now = Timestamp.now();
+    await adminDb.collection('admin_users').doc(targetUid).set(
+      {
+        id: targetUid,
+        email: (user.email || '').toLowerCase(),
+        name: user.displayName || undefined,
+        role: ADMIN_ROLE.SUPER,
+        permissions: [], // super holds everything implicitly
+        accountStatus: 'active',
+        createdBy: actorUid,
+        createdAt: now,
+        updatedAt: now,
+      },
+      { merge: true }
+    );
+    invalidateAdminEntitlements(targetUid);
+
+    await adminDb.collection('audit_logs').add({
+      actorUid,
+      actorRole: 'admin',
+      action: 'grant_super_admin_claim',
+      targetType: 'user',
+      targetId: targetUid,
+      reason,
+      createdAt: now,
+    });
+  }
 }
 
 export const adminUsersService = new AdminUsersService();

@@ -1,6 +1,7 @@
 'use client';
 
-import { apiErrorMessage } from '@/lib/utils';
+import { errorMessage } from '@/lib/utils';
+import { apiPost } from '@/lib/client/api';
 import React, { useEffect } from 'react';
 import { useOwnerSession } from '@/hooks/useOwner';
 import { SupportChat } from '@/components/support/SupportChat';
@@ -20,15 +21,12 @@ export default function OwnerSupportPage() {
   }, []);
 
   const send = async (text: string) => {
-    const res = await fetch('/api/support/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      toast.error(apiErrorMessage(err, 'Could not send message'));
-      throw new Error('send failed');
+    try {
+      await apiPost('/api/support/messages', { text });
+    } catch (e) {
+      // Surface the error AND rethrow so SupportChat keeps the unsent text.
+      toast.error(errorMessage(e, 'Could not send message'));
+      throw e;
     }
   };
 

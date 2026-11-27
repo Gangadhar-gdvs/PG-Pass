@@ -1,7 +1,10 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import { useOwnerSession } from '@/hooks/useOwner';
+import { useAsyncData, fetchJson } from '@/hooks/useAsyncData';
+import { apiPost, apiDelete } from '@/lib/client/api';
+import { LoadError } from '@/components/ui/load-error';
 import { PageHeader, SectionCard, StatTile } from '@/components/ui/dashboard-kit';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,13 +15,11 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { IconBubble } from '@/components/brand/Icon3D';
 import { Megaphone, Plus, Trash2, Pin, CalendarDays, Eye, Users } from 'lucide-react';
 import type { Notice } from '@/types';
-import { formatDateIN, errorMessage, tsToDate, readApiError } from '@/lib/utils';
+import { formatDateIN, errorMessage, tsToDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
 export default function OwnerNoticesPage() {
   const { ownerId } = useOwnerSession();
-  const [notices, setNotices] = useState<Notice[]>([]);
-  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
 
   // form
@@ -27,32 +28,20 @@ export default function OwnerNoticesPage() {
   const [audience, setAudience] = useState('all');
   const [pinned, setPinned] = useState(false);
   const [posting, setPosting] = useState(false);
+  const [removed, setRemoved] = useState<Set<string>>(new Set());
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch('/api/notices');
-      if (res.ok) {
-        const data = await res.json();
-        setNotices(data.notices || []);
-      }
-    } catch {
-      /* non-fatal */
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!ownerId) return;
-    let active = true;
-    queueMicrotask(() => {
-      if (active) load();
-    });
-    return () => {
-      active = false;
-    };
-  }, [ownerId, load]);
+  // Loads through the shared hook so a failed load shows an error + Retry instead
+  // of a silently-empty notices page.
+  const { data, loading, error, reload } = useAsyncData(
+    () => fetchJson<{ notices?: Notice[] }>('/api/notices'),
+    [ownerId],
+    { enabled: !!ownerId }
+  );
+  const load = () => {
+    setRemoved(new Set());
+    reload();
+  };
+  const notices = (data?.notices ?? []).filter((n) => !removed.has(n.id));
 
   const publish = async () => {
     if (!title.trim() || !body.trim()) {
@@ -61,13 +50,7 @@ export default function OwnerNoticesPage() {
     }
     setPosting(true);
     try {
-      const res = await fetch('/api/notices', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: title.trim(), body: body.trim(), audience, pinned }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Could not publish');
+      await apiPost('/api/notices', { title: title.trim(), body: body.trim(), audience, pinned });
       toast.success('Notice published');
       setTitle('');
       setBody('');
@@ -84,10 +67,9 @@ export default function OwnerNoticesPage() {
 
   const remove = async (id: string) => {
     try {
-      const res = await fetch(`/api/notices/${id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error(await readApiError(res, 'Could not remove notice'));
+      await apiDelete(`/api/notices/${id}`);
       toast.success('Notice removed');
-      setNotices((prev) => prev.filter((n) => n.id !== id));
+      setRemoved((prev) => new Set(prev).add(id));
     } catch (e: unknown) {
       toast.error(errorMessage(e, 'Could not remove notice'));
     }
@@ -114,6 +96,10 @@ export default function OwnerNoticesPage() {
         }
       />
 
+      {error ? (
+        <LoadError message={error} onRetry={reload} />
+      ) : (
+        <>
       {loading ? (
         <StatGridSkeleton count={4} />
       ) : (
@@ -248,6 +234,8 @@ export default function OwnerNoticesPage() {
             );
           })}
         </div>
+      )}
+        </>
       )}
     </div>
   );

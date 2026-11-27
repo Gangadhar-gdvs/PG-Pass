@@ -36,14 +36,39 @@ export function Drawer({
     // Move focus into the dialog so keyboard/screen-reader users land here and
     // Escape / tabbing operate within the drawer rather than the page behind it.
     const previouslyFocused = document.activeElement as HTMLElement | null;
+    const FOCUSABLE =
+      'input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])';
     const focusTarget =
-      panelRef.current?.querySelector<HTMLElement>(
-        'input, select, textarea, button, [href], [tabindex]:not([tabindex="-1"])'
-      ) || panelRef.current;
+      panelRef.current?.querySelector<HTMLElement>(FOCUSABLE) || panelRef.current;
     focusTarget?.focus?.();
 
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      // Focus trap: keep Tab / Shift+Tab inside the panel so focus can't escape
+      // to the page behind the modal (the docstring's "focus trap" was never
+      // actually enforced before — only focus ENTRY was).
+      if (e.key !== "Tab" || !panelRef.current) return;
+      const items = Array.from(
+        panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE)
+      ).filter((el) => el.offsetParent !== null || el === document.activeElement);
+      if (items.length === 0) {
+        e.preventDefault();
+        panelRef.current.focus();
+        return;
+      }
+      const first = items[0];
+      const last = items[items.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+      if (e.shiftKey && (active === first || active === panelRef.current)) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => {

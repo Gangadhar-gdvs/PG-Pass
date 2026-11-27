@@ -17,6 +17,7 @@ import { SectionCard, InfoBanner } from '@/components/ui/dashboard-kit';
 import { ShieldCheck, UserPlus, Crown, Ban, RotateCcw, Mail } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { errorMessage } from '@/lib/utils';
+import { apiGet, apiPost, apiPatch } from '@/lib/client/api';
 
 interface AdminRow {
   id: string;
@@ -96,9 +97,7 @@ export function AdminUsersPanel() {
     setLoading(true);
     setError(false);
     try {
-      const res = await fetch('/api/admin/admins');
-      if (!res.ok) throw new Error('failed');
-      const data = await res.json();
+      const data = await apiGet<{ admins?: typeof admins }>('/api/admin/admins');
       setAdmins(data.admins || []);
     } catch {
       setError(true);
@@ -139,13 +138,11 @@ export function AdminUsersPanel() {
     }
     setCreating(true);
     try {
-      const res = await fetch('/api/admin/admins', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), name: name.trim() || undefined, permissions: Array.from(newPerms) }),
+      await apiPost('/api/admin/admins', {
+        email: email.trim(),
+        name: name.trim() || undefined,
+        permissions: Array.from(newPerms),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Could not add admin');
       toast.success('Admin added');
       setEmail('');
       setName('');
@@ -161,13 +158,7 @@ export function AdminUsersPanel() {
   const savePerms = async (id: string) => {
     setBusyId(id);
     try {
-      const res = await fetch(`/api/admin/admins/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ permissions: Array.from(editPerms) }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Could not save');
+      await apiPatch(`/api/admin/admins/${id}`, { permissions: Array.from(editPerms) });
       toast.success('Permissions updated');
       setEditId(null);
       load();
@@ -181,13 +172,7 @@ export function AdminUsersPanel() {
   const setStatus = async (id: string, status: 'active' | 'suspended') => {
     setBusyId(id);
     try {
-      const res = await fetch(`/api/admin/admins/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Could not update');
+      await apiPatch(`/api/admin/admins/${id}`, { status });
       toast.success(status === 'suspended' ? 'Admin suspended' : 'Admin reactivated');
       load();
     } catch (e: unknown) {

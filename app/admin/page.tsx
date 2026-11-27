@@ -38,7 +38,8 @@ import { Button } from '@/components/ui/button';
 import { Input, SearchInput } from '@/components/ui/input';
 import { Dropdown } from '@/components/ui/dropdown';
 import { Drawer } from '@/components/ui/drawer';
-import { formatCurrency, errorMessage, apiErrorMessage, readApiError } from '@/lib/utils';
+import { formatCurrency, errorMessage, readApiError } from '@/lib/utils';
+import { apiGet, apiPost, apiPatch } from '@/lib/client/api';
 import type { SuperAdminPgOverview } from '@/lib/server/services/adminOverview.service';
 import type { SubscriptionRequest } from '@/types';
 import { config } from '@/lib/config';
@@ -85,6 +86,15 @@ interface SystemLog {
 }
 
 type AdminTab = 'telemetry' | 'upgrades' | 'logs' | 'support' | 'admins';
+
+interface PlatformStats {
+  allPgs: SuperAdminPgOverview[];
+  platformTotalPgs: number;
+  platformTotalBeds: number;
+  platformTotalResidents: number;
+  platformTotalVolume: number;
+  nextCursor?: string | null;
+}
 
 /** One console section, as shown in the desktop pill tabs and the mobile bottom nav. */
 interface AdminTabDef {
@@ -182,7 +192,10 @@ function AdminBottomNav({
         aria-label={t.count !== undefined ? `${t.short} (${t.count})` : t.short}
         className="flex min-h-[52px] flex-1 justify-center press"
       >
-        <span className="relative flex min-w-[56px] flex-col items-center justify-center gap-1 pt-1 pb-2">
+        {/* min-w-0 (not a fixed 56px floor): with 4 side tabs + the centre FAB a
+            fixed floor could exceed a 320px viewport. The flex-1 button already
+            provides the tap area, so the label just truncates instead. */}
+        <span className="relative flex min-w-0 flex-col items-center justify-center gap-1 px-0.5 pt-1 pb-2">
           <span className={`relative ${active ? 'text-brand' : 'text-muted'}`}>
             <Icon
               className="h-6 w-6"
@@ -201,7 +214,7 @@ function AdminBottomNav({
               </span>
             )}
           </span>
-          <span className={`text-[11px] leading-none ${active ? 'font-bold text-brand-700' : 'font-semibold text-muted'}`}>
+          <span className={`max-w-full truncate text-[11px] leading-none ${active ? 'font-bold text-brand-700' : 'font-semibold text-muted'}`}>
             {t.short}
           </span>
           <span
@@ -276,14 +289,7 @@ export default function SuperAdminPortalPage() {
   // session cookie — so the listener must not load admin data then (it 401s).
   // The form handler loads it once the session exists (R-A1).
   const formSignInRef = useRef(false);
-  const [stats, setStats] = useState<{
-    allPgs: SuperAdminPgOverview[];
-    platformTotalPgs: number;
-    platformTotalBeds: number;
-    platformTotalResidents: number;
-    platformTotalVolume: number;
-    nextCursor?: string | null;
-  } | null>(null);
+  const [stats, setStats] = useState<PlatformStats | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -310,11 +316,8 @@ export default function SuperAdminPortalPage() {
   const loadLogs = async (level = logFilter) => {
     setLoadingLogs(true);
     try {
-      const res = await fetch(`/api/admin/logs?level=${level}&limit=100`);
-      if (res.ok) {
-        const data = await res.json();
-        setSystemLogs(data.logs || []);
-      }
+      const data = await apiGet<{ logs?: typeof systemLogs }>(`/api/admin/logs?level=${level}&limit=100`);
+      setSystemLogs(data.logs || []);
     } catch (e) {
       console.error('Error fetching logs:', e);
       toast.error('Failed to load system error logs');
@@ -326,11 +329,8 @@ export default function SuperAdminPortalPage() {
   const loadUpgrades = async () => {
     setLoadingUpgrades(true);
     try {
-      const res = await fetch('/api/admin/subscriptions');
-      if (res.ok) {
-        const data = await res.json();
-        setUpgradeRequests(data.requests || []);
-      }
+      const data = await apiGet<{ requests?: typeof upgradeRequests }>('/api/admin/subscriptions');
+      setUpgradeRequests(data.requests || []);
     } catch (e) {
       console.error(e);
     } finally {
@@ -340,13 +340,7 @@ export default function SuperAdminPortalPage() {
 
   const handleApproveUpgrade = async (requestId: string) => {
     try {
-      const res = await fetch('/api/admin/subscriptions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId, action: 'approve' }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(apiErrorMessage(data, 'Approval failed'));
+      await apiPost('/api/admin/subscriptions', { requestId, action: 'approve' });
       toast.success('Subscription plan upgraded successfully');
       await loadUpgrades();
       await loadPlatformData();
@@ -369,13 +363,7 @@ export default function SuperAdminPortalPage() {
     if (!ok) return;
 
     try {
-      const res = await fetch('/api/admin/accounts', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ownerId, accountStatus: newStatus }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(apiErrorMessage(data, 'Status update failed'));
+      await apiPatch('/api/admin/accounts', { ownerId, accountStatus: newStatus });
       toast.success(`Account status set to ${newStatus}`);
       await loadPlatformData();
     } catch (e: unknown) {
@@ -388,19 +376,16 @@ export default function SuperAdminPortalPage() {
   // still gets a usable console scoped to what they CAN do.
   const loadMe = useCallback(async () => {
     try {
-      const res = await fetch('/api/admin/me');
-      if (res.ok) {
-        const data = await res.json();
-        const meData = { adminRole: data.adminRole, permissions: data.permissions || [] };
-        setMe(meData);
-        // Land on a tab the admin can actually see.
-        const can = (p: string) => meData.adminRole === 'super' || meData.permissions.includes(p);
-        if (can('platform.view')) setActiveTab('telemetry');
-        else if (can('subscriptions.manage')) setActiveTab('upgrades');
-        else if (can('support.manage')) setActiveTab('support');
-        else if (can('logs.view')) setActiveTab('logs');
-        else if (meData.adminRole === 'super') setActiveTab('admins');
-      }
+      const data = await apiGet<{ adminRole?: 'super' | 'staff'; permissions?: string[] }>('/api/admin/me');
+      const meData = { adminRole: data.adminRole, permissions: data.permissions || [] };
+      setMe(meData);
+      // Land on a tab the admin can actually see.
+      const can = (p: string) => meData.adminRole === 'super' || meData.permissions.includes(p);
+      if (can('platform.view')) setActiveTab('telemetry');
+      else if (can('subscriptions.manage')) setActiveTab('upgrades');
+      else if (can('support.manage')) setActiveTab('support');
+      else if (can('logs.view')) setActiveTab('logs');
+      else if (meData.adminRole === 'super') setActiveTab('admins');
     } catch {
       /* non-fatal; tabs just fall back to defaults */
     }
@@ -412,11 +397,7 @@ export default function SuperAdminPortalPage() {
   const loadPlatformData = useCallback(async () => {
     setLoadingStats(true);
     try {
-      const res = await fetch('/api/admin/overview');
-      if (!res.ok) {
-        throw new Error(await readApiError(res, 'Could not load platform telemetry'));
-      }
-      const data = await res.json();
+      const data = await apiGet<PlatformStats>('/api/admin/overview');
       setStats(data);
       if (data.allPgs.length > 0 && !selectedPgId) {
         setSelectedPgId(data.allPgs[0].owner.id);
@@ -477,9 +458,7 @@ export default function SuperAdminPortalPage() {
     if (!stats?.nextCursor || loadingMore) return;
     setLoadingMore(true);
     try {
-      const res = await fetch(`/api/admin/overview?cursor=${encodeURIComponent(stats.nextCursor)}`);
-      if (!res.ok) throw new Error(await readApiError(res, 'Could not load more PGs'));
-      const data = await res.json();
+      const data = await apiGet<PlatformStats>(`/api/admin/overview?cursor=${encodeURIComponent(stats.nextCursor)}`);
       setStats((prev) =>
         prev
           ? { ...data, allPgs: [...prev.allPgs, ...data.allPgs] }
@@ -876,7 +855,7 @@ export default function SuperAdminPortalPage() {
 
       {/* Sticky glass top bar: logo · bell · avatar (+ pill tabs on md+) */}
       <header
-        className="glass-bar sticky top-0 z-30 border-b border-white/70 shadow-[0_10px_30px_-24px_rgba(70,40,160,0.5)]"
+        className="sticky top-0 z-30 rounded-b-[26px] border-b border-[#EEE8FD] bg-white shadow-[0_10px_30px_-14px_rgba(70,40,160,0.30)] md:rounded-none"
         style={{ paddingTop: 'env(safe-area-inset-top)' }}
       >
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-2.5 sm:px-6 lg:px-8">

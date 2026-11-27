@@ -1,7 +1,10 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import { useOwnerSession } from '@/hooks/useOwner';
+import { useAsyncData, fetchJson } from '@/hooks/useAsyncData';
+import { apiPost, apiPatch, apiDelete } from '@/lib/client/api';
+import { LoadError } from '@/components/ui/load-error';
 import { PageHeader, SectionCard, StatTile } from '@/components/ui/dashboard-kit';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -11,7 +14,7 @@ import { ListSkeleton, StatGridSkeleton } from '@/components/ui/skeletons';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Plus, Check, Trash2, CalendarDays, UserRound } from 'lucide-react';
 import type { StaffTask } from '@/types';
-import { formatDateIN, errorMessage, tsToDate, readApiError, todayIST } from '@/lib/utils';
+import { formatDateIN, errorMessage, tsToDate, todayIST } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
 interface StaffLite {
@@ -27,9 +30,6 @@ function localToday(): string {
 export default function OwnerTasksPage() {
   const { ownerId, role } = useOwnerSession();
   const isStaff = role === 'staff';
-  const [tasks, setTasks] = useState<StaffTask[]>([]);
-  const [staff, setStaff] = useState<StaffLite[]>([]);
-  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [today] = useState(localToday);
@@ -40,34 +40,42 @@ export default function OwnerTasksPage() {
   const [dueDate, setDueDate] = useState('');
   const [posting, setPosting] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const reqs: Promise<Response>[] = [fetch('/api/tasks')];
-      if (!isStaff) reqs.push(fetch('/api/staff'));
-      const [tRes, sRes] = await Promise.all(reqs);
-      if (tRes.ok) setTasks((await tRes.json()).tasks || []);
-      if (sRes && sRes.ok) {
-        const sd = await sRes.json();
-        setStaff((sd.staff || []).map((s: { id: string; name: string }) => ({ id: s.id, name: s.name })));
-      }
-    } catch {
-      /* non-fatal */
-    } finally {
-      setLoading(false);
-    }
-  }, [isStaff]);
+  // Loads via the shared hook: a failed load now surfaces an error + Retry
+  // instead of silently rendering an empty page. `staff` is only fetched for
+  // owners (staff can't assign) and a staff-list failure is non-fatal to tasks.
+  const { data, loading, error, reload } = useAsyncData(
+    async () => {
+      const tasksP = fetchJson<{ tasks?: StaffTask[] }>('/api/tasks');
+      const staffP = isStaff
+        ? Promise.resolve({ staff: [] as StaffLite[] })
+        : fetchJson<{ staff?: StaffLite[] }>('/api/staff').catch(() => ({ staff: [] as StaffLite[] }));
+      const [t, s] = await Promise.all([tasksP, staffP]);
+      return {
+        tasks: t.tasks || [],
+        staff: (s.staff || []).map((x: { id: string; name: string }) => ({ id: x.id, name: x.name })),
+      };
+    },
+    [ownerId, isStaff],
+    { enabled: !!ownerId }
+  );
 
-  useEffect(() => {
-    if (!ownerId) return;
-    let active = true;
-    queueMicrotask(() => {
-      if (active) load();
+  // Optimistic overlay: handlers patch status/removal locally for snappy UX; the
+  // overlay is reconciled against server data on the next reload. Keyed by task id.
+  const [overlay, setOverlay] = useState<Record<string, StaffTask['status'] | 'removed'>>({});
+
+  const staff = data?.staff ?? [];
+  const tasks = (data?.tasks ?? [])
+    .filter((t) => overlay[t.id] !== 'removed')
+    .map((t) => {
+      const o = overlay[t.id];
+      return o && o !== 'removed' ? { ...t, status: o } : t;
     });
-    return () => {
-      active = false;
-    };
-  }, [ownerId, load]);
+
+  const reloadAndClear = () => {
+    setOverlay({});
+    reload();
+  };
+  const load = reloadAndClear;
 
   const addTask = async () => {
     if (!title.trim()) {
@@ -77,19 +85,13 @@ export default function OwnerTasksPage() {
     setPosting(true);
     try {
       const chosen = staff.find((s) => s.id === assignee);
-      const res = await fetch('/api/tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: title.trim(),
-          note: note.trim() || undefined,
-          assignedToUid: assignee || undefined,
-          assignedToName: chosen?.name,
-          dueDate: dueDate || undefined,
-        }),
+      await apiPost('/api/tasks', {
+        title: title.trim(),
+        note: note.trim() || undefined,
+        assignedToUid: assignee || undefined,
+        assignedToName: chosen?.name,
+        dueDate: dueDate || undefined,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Could not add task');
       toast.success('Task added');
       setTitle('');
       setNote('');
@@ -108,13 +110,8 @@ export default function OwnerTasksPage() {
     setBusyId(t.id);
     try {
       const next = t.status === 'done' ? 'open' : 'done';
-      const res = await fetch(`/api/tasks/${t.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: next }),
-      });
-      if (!res.ok) throw new Error(await readApiError(res, 'Could not update task'));
-      setTasks((prev) => prev.map((x) => (x.id === t.id ? { ...x, status: next } : x)));
+      await apiPatch(`/api/tasks/${t.id}`, { status: next });
+      setOverlay((prev) => ({ ...prev, [t.id]: next }));
     } catch (e: unknown) {
       toast.error(errorMessage(e, 'Could not update task'));
     } finally {
@@ -124,9 +121,8 @@ export default function OwnerTasksPage() {
 
   const remove = async (id: string) => {
     try {
-      const res = await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error(await readApiError(res, 'Could not remove task'));
-      setTasks((prev) => prev.filter((x) => x.id !== id));
+      await apiDelete(`/api/tasks/${id}`);
+      setOverlay((prev) => ({ ...prev, [id]: 'removed' }));
     } catch (e: unknown) {
       toast.error(errorMessage(e, 'Could not remove task'));
     }
@@ -152,6 +148,10 @@ export default function OwnerTasksPage() {
         }
       />
 
+      {error ? (
+        <LoadError message={error} onRetry={reload} />
+      ) : (
+        <>
       {loading ? (
         <StatGridSkeleton count={4} />
       ) : (
@@ -243,6 +243,8 @@ export default function OwnerTasksPage() {
             </SectionCard>
           )}
         </div>
+      )}
+        </>
       )}
     </div>
   );

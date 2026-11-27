@@ -3,7 +3,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { formatCurrency, formatDateIN, errorMessage, tsToDate, readApiError, todayIST } from '@/lib/utils';
+import { formatCurrency, formatDateIN, errorMessage, tsToDate, todayIST } from '@/lib/utils';
+import { apiGet, apiPost } from '@/lib/client/api';
 import { StatCardSkeleton, PanelSkeleton } from '@/components/ui/skeletons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -96,15 +97,14 @@ export default function TenancyDetail() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [res, nRes] = await Promise.all([
-        fetch(`/api/resident/tenancy/${tenantId}`),
-        fetch(`/api/resident/tenancy/${tenantId}/notices`),
+      // Tenancy is primary; notices are best-effort (a failure there doesn't
+      // blank the page).
+      const [tenancy, noticeData] = await Promise.all([
+        apiGet<TenancyData>(`/api/resident/tenancy/${tenantId}`).catch(() => null),
+        apiGet<{ notices?: typeof notices }>(`/api/resident/tenancy/${tenantId}/notices`).catch(() => null),
       ]);
-      if (res.ok) setData((await res.json()) as TenancyData);
-      if (nRes.ok) {
-        const nd = await nRes.json();
-        setNotices(nd.notices || []);
-      }
+      if (tenancy) setData(tenancy);
+      if (noticeData) setNotices(noticeData.notices || []);
     } finally {
       setLoading(false);
     }
@@ -126,12 +126,7 @@ export default function TenancyDetail() {
     if (sending || desc.trim().length < 3) return;
     setSending(true);
     try {
-      const res = await fetch(`/api/resident/tenancy/${tenantId}/issue`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ description: desc.trim() }),
-      });
-      if (!res.ok) throw new Error(await readApiError(res, 'Could not submit'));
+      await apiPost(`/api/resident/tenancy/${tenantId}/issue`, { description: desc.trim() });
       toast.success('Issue reported');
       setDesc('');
       setIssueOpen(false);
@@ -192,18 +187,12 @@ export default function TenancyDetail() {
     }
     setPgBusy(true);
     try {
-      const res = await fetch('/api/reviews', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ownerId: tenant.ownerId,
-          propertyId: tenant.propertyId,
-          rating: pgRating,
-          text: pgText.trim() || undefined,
-        }),
+      await apiPost('/api/reviews', {
+        ownerId: tenant.ownerId,
+        propertyId: tenant.propertyId,
+        rating: pgRating,
+        text: pgText.trim() || undefined,
       });
-      const d = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(d.error || 'Could not submit review');
       toast.success('Thanks for reviewing your PG!');
       setPgOpen(false);
       setPgText('');

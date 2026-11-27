@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { getPhotoViewUrl } from '@/lib/client/uploader';
+import { apiGet } from '@/lib/client/api';
 import { ImageIcon, Images, X } from 'lucide-react';
 import { IconBubble } from '@/components/brand/Icon3D';
 import type { Timestampish } from '@/types';
@@ -70,11 +71,8 @@ export function TenantPhotoGallery({ tenantId }: { tenantId: string }) {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`/api/photos?tenantId=${encodeURIComponent(tenantId)}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (!cancelled) setPhotos(data.photos || []);
-        }
+        const data = await apiGet<{ photos?: typeof photos }>(`/api/photos?tenantId=${encodeURIComponent(tenantId)}`);
+        if (!cancelled) setPhotos(data.photos || []);
       } catch {
         /* non-fatal */
       } finally {

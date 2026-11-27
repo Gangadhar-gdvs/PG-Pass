@@ -1,8 +1,11 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import { useOwnerSession } from '@/hooks/useOwner';
-import { formatCurrency, formatDateIN, errorMessage, readApiError, todayIST } from '@/lib/utils';
+import { useAsyncData, fetchJson } from '@/hooks/useAsyncData';
+import { apiPost, apiDelete } from '@/lib/client/api';
+import { LoadError } from '@/components/ui/load-error';
+import { formatCurrency, formatDateIN, errorMessage, todayIST } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dropdown } from '@/components/ui/dropdown';
@@ -42,11 +45,6 @@ const visualFor = (category: string) => CAT_VISUAL[category] || CAT_VISUAL.other
 
 export default function ExpensesPage() {
   const { ownerId } = useOwnerSession();
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
-  // Staff without the expenses permission get 403 — show that, not an empty ledger.
-  const [denied, setDenied] = useState(false);
 
   const [category, setCategory] = useState('utilities');
   const [amount, setAmount] = useState('');
@@ -55,38 +53,24 @@ export default function ExpensesPage() {
   const [date, setDate] = useState(() => todayIST());
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  // Optimistically-removed ids, hidden until the next reload reconciles the list.
+  const [removed, setRemoved] = useState<Set<string>>(new Set());
 
-  // `quiet` re-syncs list + server month total without the loading skeleton.
-  const load = useCallback(async (opts?: { quiet?: boolean }) => {
-    if (!opts?.quiet) setLoading(true);
-    try {
-      const res = await fetch('/api/expenses');
-      if (res.ok) {
-        const data = await res.json();
-        setExpenses(data.expenses || []);
-        setTotal(data.total || 0);
-        setDenied(false);
-      } else if (res.status === 403) {
-        setDenied(true);
-      }
-    } catch {
-      /* non-fatal */
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  // Loads list + server month total through the shared hook: a 403 surfaces as
+  // `denied` ("no access"), any other failure as `error` (message + Retry) — no
+  // more silently-empty ledger on a network/500 error.
+  const { data, loading, error, denied, reload } = useAsyncData(
+    () => fetchJson<{ expenses?: Expense[]; total?: number }>('/api/expenses'),
+    [ownerId],
+    { enabled: !!ownerId }
+  );
+  const load = () => {
+    setRemoved(new Set());
+    reload();
+  };
 
-  useEffect(() => {
-    if (!ownerId) return;
-    // Defer so setState runs after commit, not in the effect body (cascading-render lint rule).
-    let active = true;
-    queueMicrotask(() => {
-      if (active) load();
-    });
-    return () => {
-      active = false;
-    };
-  }, [ownerId, load]);
+  const expenses = (data?.expenses ?? []).filter((e) => !removed.has(e.id));
+  const total = data?.total ?? 0;
 
   const addExpense = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,19 +82,12 @@ export default function ExpensesPage() {
     }
     setSaving(true);
     try {
-      const res = await fetch('/api/expenses', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ category, amountRupees: rupees, vendor, note, date }),
-      });
-      if (!res.ok) {
-        throw new Error(await readApiError(res, 'Could not save expense'));
-      }
+      await apiPost('/api/expenses', { category, amountRupees: rupees, vendor, note, date });
       toast.success('Expense recorded');
       setAmount('');
       setVendor('');
       setNote('');
-      await load();
+      load();
     } catch (err: unknown) {
       toast.error(errorMessage(err, 'Could not save expense'));
     } finally {
@@ -122,13 +99,12 @@ export default function ExpensesPage() {
     if (busyId) return;
     setBusyId(id);
     try {
-      const res = await fetch(`/api/expenses/${id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error(await readApiError(res, 'Could not delete'));
-      setExpenses((list) => list.filter((e) => e.id !== id));
+      await apiDelete(`/api/expenses/${id}`);
+      setRemoved((prev) => new Set(prev).add(id));
       toast.success('Expense removed');
-      // The "This Month" total is server-computed — refresh it so it reflects
-      // the deletion immediately (previously it stayed stale until reload).
-      void load({ quiet: true });
+      // The "This Month" total is server-computed — reload so it (and the list)
+      // reflect the deletion immediately (previously it stayed stale until reload).
+      reload();
     } catch (e: unknown) {
       toast.error(errorMessage(e, 'Could not delete'));
     } finally {
@@ -158,6 +134,15 @@ export default function ExpensesPage() {
             description="Your staff account doesn't include expense access. Ask the PG owner to grant the Expenses permission."
           />
         </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-5">
+        <PageHeader icon="wallet-orange" tint="peach" title="Expenses" subtitle="PG spending ledger" />
+        <LoadError message={error} onRetry={reload} />
       </div>
     );
   }

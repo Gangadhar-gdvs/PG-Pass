@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withErrorHandler, AppError } from '@/lib/server/api/withErrorHandler';
 import { withAuth, AuthContext } from '@/lib/server/api/withAuth';
-import { adminDb } from '@/lib/server/firebase-admin';
 import { staffService } from '@/lib/server/services/staff.service';
 import { ownersService } from '@/lib/server/services/owners.service';
 import { recordEvent } from '@/lib/server/services/systemLogs.service';
-import { ownerProfileSchema } from '@/lib/validation';
 import { ACCOUNT_STATUS } from '@/lib/constants/status';
 import type { AccountStatus } from '@/types';
 import { ADMIN_PERMISSIONS } from '@/lib/constants/permissions';
@@ -47,35 +45,9 @@ export const POST = withErrorHandler(
           const { ownerId, profile } = body;
           if (!ownerId || !profile) throw new AppError(400, 'ownerId and profile are required');
 
-          // Merge onto the existing profile so admin can patch a subset of fields.
-          const snap = await adminDb.collection('owners').doc(ownerId).get();
-          if (!snap.exists) throw new AppError(404, 'Owner not found');
-          const cur = snap.data()!;
-          const merged = {
-            name: profile.name ?? cur.name,
-            phone: profile.phone ?? cur.phone,
-            pgName: profile.pgName ?? cur.pgName,
-            address: profile.address ?? cur.pgAddress ?? cur.address,
-            upiId: profile.upiId ?? cur.upiId,
-            upiMerchantName: profile.upiMerchantName ?? cur.upiMerchantName,
-            pgCategory: profile.pgCategory ?? cur.pgCategory,
-            foodPlan: profile.foodPlan ?? cur.foodPlan,
-            foodCuisine: profile.foodCuisine ?? cur.foodCuisine,
-            noticePeriodDays: profile.noticePeriodDays ?? cur.noticePeriodDays,
-            city: profile.city ?? cur.city,
-            area: profile.area ?? cur.area,
-            isListed: profile.isListed ?? cur.isListed,
-            rentDueDay: profile.rentDueDay ?? cur.rentDueDay,
-            lateFeePerDayPaise: profile.lateFeePerDayPaise ?? cur.lateFeePerDayPaise,
-            lateFeeGraceDays: profile.lateFeeGraceDays ?? cur.lateFeeGraceDays,
-            pgAmenities: profile.pgAmenities ?? cur.pgAmenities,
-            totalFloors: profile.totalFloors ?? cur.totalFloors,
-          };
-          // Validate the MERGED result with the same schema the owner route uses
-          // (phone/UPI regex, name min-length, rentDueDay/late-fee ranges, etc.)
-          // so the admin act-as-owner path can't write invalid profile data.
-          const validated = ownerProfileSchema.parse(merged);
-          const updated = await ownersService.upsertProfile(ownerId, validated);
+          // Service owns the read-merge-validate-upsert (partial profile merged
+          // over the current doc, validated with the same schema as the owner route).
+          const updated = await ownersService.adminMergeUpdate(ownerId, profile);
           await recordEvent({
             category: 'account',
             message: 'Admin updated owner profile',

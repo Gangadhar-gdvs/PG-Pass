@@ -7,7 +7,8 @@ import { useTenants } from '@/hooks/useTenants';
 import {
   subscribeToOwnerRentRecords,
 } from '@/lib/firestore';
-import { getCurrentPeriod, formatCurrency, getWhatsAppLink, errorMessage, depositPaidRupees, readApiError, apiErrorMessage, todayIST } from '@/lib/utils';
+import { getCurrentPeriod, formatCurrency, getWhatsAppLink, errorMessage, depositPaidRupees, todayIST } from '@/lib/utils';
+import { apiGet, apiPost, apiPatch } from '@/lib/client/api';
 import { Bed, Owner, RentRecord } from '@/types';
 import { StatsBar, StatsRow } from '@/components/owner/StatsBar';
 import {
@@ -321,9 +322,7 @@ export default function OwnerDashboardPage() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch('/api/rent/defaulters');
-        if (!res.ok) return;
-        const data = await res.json();
+        const data = await apiGet<{ defaulters?: typeof defaulters }>('/api/rent/defaulters');
         if (!cancelled) setDefaulters(data.defaulters || []);
       } catch {
         /* non-fatal */
@@ -340,9 +339,7 @@ export default function OwnerDashboardPage() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch('/api/deposits/refunds');
-        if (!res.ok) return;
-        const data = await res.json();
+        const data = await apiGet<{ refunds?: typeof pendingRefunds }>('/api/deposits/refunds');
         if (!cancelled) setPendingRefunds(data.refunds || []);
       } catch {
         /* non-fatal */
@@ -359,9 +356,7 @@ export default function OwnerDashboardPage() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch('/api/owners/join-requests');
-        if (!res.ok) return;
-        const data = await res.json();
+        const data = await apiGet<{ requests?: typeof joinRequests }>('/api/owners/join-requests');
         if (!cancelled) setJoinRequests(data.requests || []);
       } catch {
         /* non-fatal */
@@ -378,11 +373,7 @@ export default function OwnerDashboardPage() {
   const acceptJoinRequest = async (req: { id: string; residentName: string; residentPhone: string }) => {
     setPrefillTenant({ name: req.residentName, phone: req.residentPhone });
     try {
-      await fetch('/api/owners/join-requests', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId: req.id, action: 'approved' }),
-      });
+      await apiPost('/api/owners/join-requests', { requestId: req.id, action: 'approved' });
       setJoinRequests((list) => list.filter((r) => r.id !== req.id));
       toast.success('Approved — now tap a vacant bed to add this resident');
     } catch {
@@ -392,11 +383,7 @@ export default function OwnerDashboardPage() {
 
   const declineJoinRequest = async (id: string) => {
     try {
-      await fetch('/api/owners/join-requests', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId: id, action: 'declined' }),
-      });
+      await apiPost('/api/owners/join-requests', { requestId: id, action: 'declined' });
       setJoinRequests((list) => list.filter((r) => r.id !== id));
     } catch {
       toast.error('Could not decline');
@@ -407,14 +394,7 @@ export default function OwnerDashboardPage() {
     if (refundBusyId) return;
     setRefundBusyId(depositId);
     try {
-      const res = await fetch(`/api/deposits/refunds/${depositId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      });
-      if (!res.ok) {
-        throw new Error(await readApiError(res, 'Could not update refund'));
-      }
+      await apiPatch(`/api/deposits/refunds/${depositId}`, {});
       toast.success('Refund marked as paid out');
       setPendingRefunds((list) => list.filter((r) => r.id !== depositId));
     } catch (e: unknown) {
@@ -430,13 +410,10 @@ export default function OwnerDashboardPage() {
     setActionBusy(true);
     try {
       if (record?.id && !record.id.startsWith('temp_')) {
-        const res = await fetch(`/api/rent/${record.id}/confirm`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ paymentReference: 'Manual confirmation' }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(apiErrorMessage(data, 'Confirmation failed'));
+        const data = await apiPost<{ record: { receiptNumber: number } }>(
+          `/api/rent/${record.id}/confirm`,
+          { paymentReference: 'Manual confirmation' }
+        );
         toast.success(`Bed ${bed.bedLabel} marked Paid! Receipt REC-${String(data.record.receiptNumber).padStart(5, '0')} issued.`);
         if (activeBedDrawer?.id === bed.id) {
           setActiveBedDrawer({ ...activeBedDrawer, status: 'paid' });
@@ -466,13 +443,10 @@ export default function OwnerDashboardPage() {
     }
     setActionBusy(true);
     try {
-      const res = await fetch('/api/rent/bulk-confirm', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recordIds: ids }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(apiErrorMessage(data, 'Bulk confirm failed'));
+      const data = await apiPost<{ confirmed?: unknown[]; failed?: unknown[] }>(
+        '/api/rent/bulk-confirm',
+        { recordIds: ids }
+      );
       const okCount = data.confirmed?.length || 0;
       const failCount = data.failed?.length || 0;
       toast.success(
@@ -496,13 +470,9 @@ export default function OwnerDashboardPage() {
     }
     setActionBusy(true);
     try {
-      const res = await fetch(`/api/rent/${record.id}/partial`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amountRupees: rupees }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(apiErrorMessage(data, 'Could not record payment'));
+      const data = await apiPost<{
+        record?: { amountPaidPaise?: number; amountDuePaise?: number; status?: string };
+      }>(`/api/rent/${record.id}/partial`, { amountRupees: rupees });
       const paid = (data.record?.amountPaidPaise ?? 0) / 100;
       const due = (data.record?.amountDuePaise ?? 0) / 100;
       if (data.record?.status === 'paid') {
@@ -529,13 +499,7 @@ export default function OwnerDashboardPage() {
     const { bed, record } = reverseTarget;
     setReverseBusy(true);
     try {
-      const res = await fetch(`/api/rent/${record.id}/reverse`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reversalReason: reason }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(apiErrorMessage(data, 'Reversal failed'));
+      await apiPost(`/api/rent/${record.id}/reverse`, { reversalReason: reason });
 
       toast.success(`Payment reversed. Bed ${bed.bedLabel} is now pending.`);
       if (activeBedDrawer?.id === bed.id) {
@@ -556,13 +520,10 @@ export default function OwnerDashboardPage() {
 
     setActionBusy(true);
     try {
-      const res = await fetch(`/api/rent/${record.id}/confirm`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ paymentReference: record.paymentReference }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(apiErrorMessage(data, 'Could not confirm payment'));
+      const data = await apiPost<{ record: { receiptNumber: number } }>(
+        `/api/rent/${record.id}/confirm`,
+        { paymentReference: record.paymentReference }
+      );
 
       toast.success(`Payment approved for ${bed.tenantName}! Receipt REC-${String(data.record.receiptNumber).padStart(5, '0')} issued.`);
       setProofModalRecord(null);
@@ -582,15 +543,9 @@ export default function OwnerDashboardPage() {
 
     setActionBusy(true);
     try {
-      const res = await fetch(`/api/tenants/${confirmVacateBed.tenantId}/moveout`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          moveOutDate: todayIST(),
-        }),
+      await apiPost(`/api/tenants/${confirmVacateBed.tenantId}/moveout`, {
+        moveOutDate: todayIST(),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(apiErrorMessage(data, 'Could not vacate bed'));
 
       toast.success(`Bed ${confirmVacateBed.bedLabel} is now vacant`);
       setConfirmVacateBed(null);
@@ -637,7 +592,7 @@ export default function OwnerDashboardPage() {
   if (!owner) {
     return (
       <PropertySetupWizard
-        initialOwnerPhone={phoneNumber || '9876543210'}
+        initialOwnerPhone={phoneNumber || ''}
         onComplete={(newOwner) => {
           setOwner(newOwner);
           // First-time onboarding just created the owner profile AND the initial
@@ -670,7 +625,7 @@ export default function OwnerDashboardPage() {
           }
         />
         <PropertySetupWizard
-          initialOwnerPhone={phoneNumber || owner.phone || '9876543210'}
+          initialOwnerPhone={phoneNumber || owner.phone || ''}
           existingOwner={owner}
           onCancel={() => setShowSetupWizard(false)}
           onComplete={(newOwner) => {
