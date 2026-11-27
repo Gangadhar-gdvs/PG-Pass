@@ -20,7 +20,8 @@ export interface DashboardSummary {
 interface StatsBarProps {
   beds: Bed[];
   rentRecords: RentRecord[];
-  onRemindAll: () => void;
+  /** Omit to hide the reminder buttons (e.g. staff without the Rent permission). */
+  onRemindAll?: () => void;
   // Optional one-button "email reminders from the owner's Gmail".
   onEmailReminders?: () => void;
   emailReminding?: boolean;
@@ -30,6 +31,8 @@ interface StatsBarProps {
   summary?: DashboardSummary | null;
   /** Label for the selected billing period chip ("This Month", "Oct 2026"). */
   periodLabel?: string;
+  /** Staff without resident/rent access: money rows show "—". */
+  restricted?: boolean;
 }
 
 export interface DashboardStats {
@@ -138,6 +141,7 @@ export function StatsRow({
   inventoryHref,
   residentsHref,
   collectionHref,
+  restricted = false,
 }: {
   beds: Bed[];
   rentRecords: RentRecord[];
@@ -147,6 +151,8 @@ export function StatsRow({
   inventoryHref?: string;
   residentsHref?: string;
   collectionHref?: string;
+  /** Staff without resident/rent access: show "—" (hidden), never a fake 0. */
+  restricted?: boolean;
 }) {
   const { totalBeds, totalCollected } = computeDashboardStats(beds, rentRecords, summary);
   // Rooms are counted from the live bed window; mark the figure as a floor
@@ -164,13 +170,21 @@ export function StatsRow({
         href={inventoryHref}
       />
       <StatTile icon="bed-teal" tint="sky" label="Total Beds" value={totalBeds} href={inventoryHref} />
-      <StatTile icon="users" tint="indigo" label="Residents" value={residentCount} href={residentsHref} />
+      <StatTile
+        icon="users"
+        tint="indigo"
+        label="Residents"
+        value={restricted ? '—' : residentCount}
+        caption={restricted ? 'Hidden' : undefined}
+        href={restricted ? undefined : residentsHref}
+      />
       <StatTile
         icon="rupee"
         tint="mint"
         label={collectionLabel}
-        value={formatCurrency(totalCollected)}
-        href={collectionHref}
+        value={restricted ? '—' : formatCurrency(totalCollected)}
+        caption={restricted ? 'Hidden' : undefined}
+        href={restricted ? undefined : collectionHref}
       />
     </div>
   );
@@ -212,6 +226,7 @@ export function StatsBar({
   emailReminding,
   summary,
   periodLabel = 'This Month',
+  restricted = false,
 }: StatsBarProps) {
   const {
     totalBeds,
@@ -251,15 +266,15 @@ export function StatsBar({
             icon="wallet-sm"
             tint="violet"
             label="Total Collection"
-            value={formatCurrency(totalCollected)}
-            sub={`${paidCount} paid · ${collectRate}% collected`}
+            value={restricted ? '—' : formatCurrency(totalCollected)}
+            sub={restricted ? 'Hidden for your account' : `${paidCount} paid · ${collectRate}% collected`}
           />
           <OverviewRow
             icon="alert"
             tint="peach"
             label="Pending Dues"
-            value={formatCurrency(totalPending)}
-            sub={`${pendingCount} due`}
+            value={restricted ? '—' : formatCurrency(totalPending)}
+            sub={restricted ? 'Hidden for your account' : `${pendingCount} due`}
           />
           <OverviewRow icon="bed" tint="sky" label="Vacant Beds" value={vacantBeds} />
           {verifyCount > 0 && (
@@ -268,7 +283,7 @@ export function StatsBar({
         </div>
       </div>
 
-      {pendingCount > 0 && (
+      {pendingCount > 0 && onRemindAll && (
         <div className="mt-4 grid grid-cols-1 gap-2.5 border-t border-line pt-4 @md:grid-cols-2">
           <Button className="w-full" onClick={onRemindAll}>
             <Send className="h-4 w-4" />

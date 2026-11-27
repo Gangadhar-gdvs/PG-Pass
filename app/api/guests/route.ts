@@ -31,7 +31,7 @@ export const GET = withErrorHandler(
       const guests = await guestsService.list(ownerId, status || undefined);
       return NextResponse.json({ guests });
     },
-    { roles: ['owner', 'staff'], feature: PG_FEATURES.GUESTS }
+    { roles: ['owner', 'staff'], feature: PG_FEATURES.GUESTS, permission: STAFF_PERMISSIONS.MANAGE_GUESTS }
   )
 );
 

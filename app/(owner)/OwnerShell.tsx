@@ -34,6 +34,7 @@ import { BottomTabBar, type TabItem } from '@/components/ui/bottom-tab-bar';
 import { IdleLogout } from '@/components/auth/IdleLogout';
 import { Logo } from '@/components/brand/Logo';
 import { Icon3D } from '@/components/brand/Icon3D';
+import { canAccessPage } from '@/lib/constants/navAccess';
 
 const navLinks: TabItem[] = [
   { href: '/dashboard', label: 'Bed Inventory', icon: LayoutDashboard, icon3d: 'bed', tint: 'sky' },
@@ -56,10 +57,6 @@ const navLinks: TabItem[] = [
 
 const byHref = (href: string) => navLinks.find((l) => l.href === href)!;
 
-// Pages a staff/warden must not see — these mutate owner-only data (profile,
-// subscription, staff roster) and are already blocked server-side. Hiding them
-// from the nav keeps the staff console to day-to-day operations only.
-const OWNER_ONLY_HREFS = new Set(['/settings', '/billing', '/staff', '/reports', '/utilities']);
 
 export function OwnerShell({
   session,
@@ -73,8 +70,10 @@ export function OwnerShell({
   const pathname = usePathname();
 
   const isStaff = session.role === 'staff';
+  // Menus only show pages this user can actually open: owners see everything;
+  // staff see what their permissions allow (same gates as the API + rules).
   const visibleFor = <T extends { href: string }>(items: T[]) =>
-    isStaff ? items.filter((i) => !OWNER_ONLY_HREFS.has(i.href)) : items;
+    items.filter((i) => canAccessPage(i.href, session.role, session.permissions));
 
   const signOut = async () => {
     await logout();
@@ -192,11 +191,11 @@ export function OwnerShell({
 
         {/* Bottom navigation — Home · Residents · (+) · Stats · More, like the refs. */}
         <BottomTabBar
-          primary={[
+          primary={visibleFor([
             { href: '/dashboard', label: 'Home', icon: LayoutDashboard },
             { href: '/tenants', label: 'Residents', icon: Users },
             { href: '/analytics', label: 'Stats', icon: BarChart3 },
-          ]}
+          ])}
           center={{
             label: 'Quick Actions',
             icon: Plus,

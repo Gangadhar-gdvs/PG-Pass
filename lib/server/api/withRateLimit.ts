@@ -12,6 +12,8 @@ export interface RateLimitOptions {
   key?: 'ip' | 'uid';
   maxRequests?: number;
   windowSeconds?: number;
+  /** Separate budget on the same route (e.g. 'refresh' vs the default login bucket). */
+  bucket?: string;
 }
 
 /**
@@ -86,7 +88,8 @@ export function withRateLimit<C>(
     }
 
     const routePath = req.nextUrl?.pathname || 'default';
-    const rateLimitKey = `rl:${routePath.replace(/\//g, '_')}:${identifier}`;
+    const bucketPart = options.bucket ? `:${options.bucket.replace(/[^a-z0-9_-]/gi, '')}` : '';
+    const rateLimitKey = `rl:${routePath.replace(/\//g, '_')}${bucketPart}:${identifier}`;
 
     // 1. Layer 2: In-memory rate limiting (standard tier)
     if (tier === 'standard') {

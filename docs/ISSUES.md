@@ -396,12 +396,19 @@ App bugs
   (today + next period via `shiftPeriodBy`, which also fixes the 31-Jan `setMonth(+1)` → March skip), expenses,
   reports (+export), analytics, defaulters, send-reminders, resident export and the admin metrics lookup all use
   IST. (Backup route's date key left to the backup work.) Tests: IST boundary at 18:30 UTC incl. month/year rollover.
-- 🟡 **R-A7 Login rate limit shared with background session refreshes.** All logins and every fresh page's
-  background `mode:'refresh'` POST share `/api/auth/session`'s 10/min per-IP cap. *Test side — resolved:* the E2E
-  helper now clears the emulator-only counter before each UI login (suite green). *Product side — awaiting owner
-  decision:* on shared IPs (PG Wi-Fi, carrier NAT) a few open tabs can push real sign-ins into 429 for a minute.
-  Proposed: a separate limiter for refreshes (valid ID token + this device's session id required), keeping 10/min
-  for explicit logins. Not applied — the auth-limit change needs the owner's go-ahead.
+- 🟢 **R-A7 Login rate limit shared with background session refreshes.** *Root cause:* the limiter keyed only on
+  route + IP, so every page's background `mode:'refresh'` POST spent the same 10/min budget as real sign-ins — a few
+  tabs on shared PG Wi-Fi / carrier NAT could block sign-ins for a minute. *Fix (owner-approved):* `/api/auth/session`
+  peeks the mode and uses two budgets — explicit logins keep the strict Firestore-backed 10/min per IP; refreshes get
+  their own in-memory 60/min bucket (`withRateLimit({ bucket })`). Refresh still can't mint a session without a valid
+  ID token + this device's session id. *Verified live:* 15 refreshes → no 429, sign-in then 200; 11th sign-in/min → 429.
+- 🟢 **Staff menus show only what they can open (owner-approved).** Sidebar, bottom tabs, More + quick-action sheets
+  and the dashboard's actions/links/reminder buttons are filtered by the staff member's permissions, resolved
+  server-side in the owner layout (`session.permissions`). One access map, `lib/constants/navAccess.ts`
+  (`STAFF_PAGE_ACCESS`), mirrors the API + rules gates; pages missing from it are hidden from staff (deny by
+  default), and a unit test fails if a new owner page has no entry. Support is owner-only (staff can't post).
+  `GET /api/guests` now also requires `manage_guests` (matching the rules). Restricted staff see "—" / "Hidden"
+  instead of fake ₹0 / 0 figures. Tests: `navAccess.test.ts` (7) + E2E menu assertions for both staff profiles.
 Firestore rules (from `tests/rules`)
 - 🟢 **R-S1** `pg_reviews` was `get: if true`. Root cause: the rule exposed raw docs publicly. Fix: no client
   SDK code reads it, so `allow read, write: if false`; `/api/reviews` serves the filtered DTO (no hidden reviews, no uids).

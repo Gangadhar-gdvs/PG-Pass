@@ -63,6 +63,8 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { copyText } from '@/lib/client/clipboard';
+import { canAccessPage, hasAnyPermission } from '@/lib/constants/navAccess';
+import { STAFF_PERMISSIONS } from '@/lib/constants/permissions';
 
 /** Loading state shaped like the owner home (hero · stats · period · panels · rooms). */
 function OwnerHomeSkeleton() {
@@ -82,7 +84,12 @@ function OwnerHomeSkeleton() {
 }
 
 export default function OwnerDashboardPage() {
-  const { ownerId, phoneNumber, properties, selectedPropertyId, role } = useOwnerSession();
+  const { ownerId, phoneNumber, properties, selectedPropertyId, role, permissions } = useOwnerSession();
+  // Staff only see actions their permissions allow (the API enforces the same).
+  const canPage = (href: string) => canAccessPage(href, role, permissions);
+  const canTenants = hasAnyPermission(role, permissions, [STAFF_PERMISSIONS.MANAGE_TENANTS]);
+  const canBeds = hasAnyPermission(role, permissions, [STAFF_PERMISSIONS.MANAGE_BEDS]);
+  const canRent = hasAnyPermission(role, permissions, [STAFF_PERMISSIONS.COLLECT_RENT]);
 
   // IMPORTANT backward-compat rule: only filter by property when the owner
   // actually has >1 property. Legacy single-PG data has no `propertyId` field,
@@ -753,16 +760,18 @@ export default function OwnerDashboardPage() {
   };
 
   // Quick actions only reuse existing handlers / routes.
-  const quickActions: QuickAction[] = [
-    { label: 'Add Resident', icon: 'users', tint: 'violet', onClick: handleAddResident },
-    { label: 'Add Room / Bed', icon: 'bed', tint: 'sky', onClick: () => setShowSetupWizard(true) },
-    { label: 'Bank CSV', icon: 'rupee', tint: 'mint', onClick: () => setShowBankReconciler(true) },
-    { label: 'Maintenance', icon: 'wrench-orange', tint: 'peach', href: '/maintenance' },
-    { label: 'Send Reminders', icon: 'bell-purple', tint: 'indigo', onClick: () => setShowReminderModal(true) },
-    isStaff
-      ? { label: 'View Analytics', icon: 'chart', tint: 'sky', href: '/analytics' }
-      : { label: 'View Reports', icon: 'report', tint: 'sky', href: '/reports' },
-  ];
+  const quickActions: QuickAction[] = (
+    [
+      canTenants && { label: 'Add Resident', icon: 'users', tint: 'violet', onClick: handleAddResident },
+      canBeds && { label: 'Add Room / Bed', icon: 'bed', tint: 'sky', onClick: () => setShowSetupWizard(true) },
+      canRent && { label: 'Bank CSV', icon: 'rupee', tint: 'mint', onClick: () => setShowBankReconciler(true) },
+      canPage('/maintenance') && { label: 'Maintenance', icon: 'wrench-orange', tint: 'peach', href: '/maintenance' },
+      canRent && { label: 'Send Reminders', icon: 'bell-purple', tint: 'indigo', onClick: () => setShowReminderModal(true) },
+      isStaff
+        ? canPage('/analytics') && { label: 'View Analytics', icon: 'chart', tint: 'sky', href: '/analytics' }
+        : { label: 'View Reports', icon: 'report', tint: 'sky', href: '/reports' },
+    ] as Array<QuickAction | false>
+  ).filter((a): a is QuickAction => Boolean(a));
 
   const periodArrowClass =
     'grid h-11 w-11 shrink-0 place-items-center rounded-full border border-white bg-white text-brand-700 shadow-[0_8px_18px_-10px_rgba(70,40,160,0.45)] transition-colors hover:bg-brand-50 press';
@@ -792,17 +801,21 @@ export default function OwnerDashboardPage() {
         {/* From sm up the pills stay left of the building art; on phones they
             wrap freely (a narrower box would stack them three rows deep). */}
         <div className="flex flex-wrap items-center gap-2 sm:max-w-[60%]">
-          <HeroAction onClick={handleAddResident}>
-            <UserPlus /> Add Resident
-          </HeroAction>
-          {beds.length > 0 && (
+          {canTenants && (
+            <HeroAction onClick={handleAddResident}>
+              <UserPlus /> Add Resident
+            </HeroAction>
+          )}
+          {canBeds && beds.length > 0 && (
             <HeroAction tone="glass" onClick={() => setShowSetupWizard(true)}>
               <Building /> Room Setup
             </HeroAction>
           )}
-          <HeroAction tone="glass" onClick={() => setShowBankReconciler(true)}>
-            <FileSpreadsheet /> Bank CSV
-          </HeroAction>
+          {canRent && (
+            <HeroAction tone="glass" onClick={() => setShowBankReconciler(true)}>
+              <FileSpreadsheet /> Bank CSV
+            </HeroAction>
+          )}
         </div>
       </HeroHeader>
 
@@ -841,8 +854,9 @@ export default function OwnerDashboardPage() {
         residentCount={residentCount}
         collectionLabel={periodLabel}
         inventoryHref="#bed-inventory"
-        residentsHref="/tenants"
-        collectionHref="/analytics"
+        residentsHref={canPage('/tenants') ? '/tenants' : undefined}
+        restricted={noResidentAccess}
+        collectionHref={canPage('/analytics') ? '/analytics' : undefined}
       />
 
       {/* Resident join requests (from public PG discovery) */}
@@ -1043,8 +1057,9 @@ export default function OwnerDashboardPage() {
         <StatsBar
           beds={beds}
           rentRecords={rentRecords}
-          onRemindAll={() => setShowReminderModal(true)}
-          onEmailReminders={handleEmailReminders}
+          restricted={noResidentAccess}
+          onRemindAll={canRent ? () => setShowReminderModal(true) : undefined}
+          onEmailReminders={canRent ? handleEmailReminders : undefined}
           emailReminding={emailReminding}
           summary={summary}
           periodLabel={periodLabel}

@@ -1,6 +1,7 @@
 import React from 'react';
 import { redirect } from 'next/navigation';
 import { getServerUser } from '@/lib/server/auth/session';
+import { getStaffPermissions } from '@/lib/server/auth/entitlements';
 import { OwnerShell } from './OwnerShell';
 
 /**
@@ -30,6 +31,9 @@ export default async function OwnerLayout({
     ownerId: user.ownerId || user.uid,
     email: user.email,
     phoneNumber: user.phoneNumber,
+    // Staff permissions drive which menu items are shown (server-enforced
+    // anyway); resolved here so menus render correctly on first paint.
+    permissions: user.role === 'staff' ? await getStaffPermissions(user.uid) : undefined,
   };
 
   return <OwnerShell session={session}>{children}</OwnerShell>;

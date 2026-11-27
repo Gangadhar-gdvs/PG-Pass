@@ -30,9 +30,8 @@ type Role = 'owner' | 'staff' | 'admin' | 'tenant' | 'resident';
 // - mode 'refresh' → background re-sync (useAuth). Never takes over: if this
 //                    device was already superseded it responds 401 so the tab
 //                    logs itself out instead of silently reclaiming the session.
-export const POST = withErrorHandler(
-  withRateLimit(
-    async (req: NextRequest) => {
+// The handler itself; wrapped below with a mode-specific rate limit.
+const postSession = async (req: NextRequest) => {
       let body: { idToken?: string; mode?: 'login' | 'refresh'; takeover?: boolean; device?: string };
       try {
         body = await req.json();
@@ -143,10 +142,35 @@ export const POST = withErrorHandler(
       response.cookies.set({ name: SESSION_ID_COOKIE_NAME, value: sessionId, ...cookieBase });
 
       return response;
-    },
-    { tier: 'sensitive', key: 'ip', maxRequests: 10, windowSeconds: 60 }
-  )
-);
+};
+
+// Rate limits (R-A7). Explicit sign-ins keep the strict, Firestore-backed
+// 10/min-per-IP budget (consistent across server instances). Background
+// refreshes (`useAuth`, one per fresh page) get their OWN budget so a few open
+// tabs on shared PG Wi-Fi / carrier NAT can't lock real sign-ins out. Refresh
+// can't mint a session without a valid ID token AND this device's current
+// session id, so a looser per-instance limit is safe there.
+const loginLimited = withRateLimit(postSession, { tier: 'sensitive', key: 'ip', maxRequests: 10, windowSeconds: 60 });
+const refreshLimited = withRateLimit(postSession, {
+  tier: 'standard',
+  key: 'ip',
+  maxRequests: 60,
+  windowSeconds: 60,
+  bucket: 'refresh',
+});
+
+export const POST = withErrorHandler(async (req: NextRequest) => {
+  // Peek at the mode on a clone so the handler can still read the body. The
+  // handler treats anything but 'login' as a refresh; unreadable bodies take the
+  // strict bucket (the handler then rejects them with 400).
+  let mode: string | undefined;
+  try {
+    mode = ((await req.clone().json()) as { mode?: string } | null)?.mode;
+  } catch {
+    mode = 'login';
+  }
+  return mode === 'login' ? loginLimited(req, undefined) : refreshLimited(req, undefined);
+});
 
 // DELETE: Sign out. Clears cookies on THIS device and, by revoking the active
 // session registration + Firebase refresh tokens, signs the account out of all

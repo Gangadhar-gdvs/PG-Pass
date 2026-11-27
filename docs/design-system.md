@@ -204,6 +204,8 @@ states; `shield-orbit` for security/privacy; `bell-cta` for reminders/CTA.
   padding), labelled icons with a violet underline marker, and a 56px gradient centre button that
   stays inside the bar. Content pads `pb-[calc(6rem+env(safe-area-inset-bottom))]`.
 - **Desktop (md+):** floating glass sidebar; its identity block links to `/profile`.
+- **Staff menus** are filtered by permission via `canAccessPage()` (`lib/constants/navAccess.ts`). When adding an
+  owner page, add its rule to `STAFF_PAGE_ACCESS` (a unit test enforces this).
 - **Sign-in screens** (`AuthShell`, admin login) must fit one phone screen with no scrolling
   (checked at 390×664 and 360×640): headline + form on phones; description, bullets and 3D scene
   from `md` up; size with `100dvh`, not `100vh`.

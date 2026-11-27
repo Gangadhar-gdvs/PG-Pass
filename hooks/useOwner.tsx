@@ -16,6 +16,8 @@ export interface OwnerSession {
   ownerId: string;
   email?: string;
   phoneNumber?: string;
+  /** Staff only: granted permissions (menus hide what they can't open). */
+  permissions?: string[];
 }
 
 interface OwnerContextValue extends OwnerSession {
