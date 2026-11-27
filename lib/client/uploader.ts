@@ -186,7 +186,7 @@ export async function getPhotoViewUrl(
 
   const res = await fetch(`/api/photos/${photoId}/url${query}`);
   if (!res.ok) {
-    throw new Error('Could not load photo URL');
+    throw new Error(await readApiError(res, 'Could not load photo URL'));
   }
   const data = await res.json();
   return data.presignedUrl;

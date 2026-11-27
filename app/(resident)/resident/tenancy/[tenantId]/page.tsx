@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { formatCurrency, formatDateIN, errorMessage, tsToDate } from '@/lib/utils';
+import { formatCurrency, formatDateIN, errorMessage, tsToDate, readApiError, todayIST } from '@/lib/utils';
 import { StatCardSkeleton, PanelSkeleton } from '@/components/ui/skeletons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -91,10 +91,7 @@ export default function TenancyDetail() {
   const [pgOpen, setPgOpen] = useState(false);
   const [pgBusy, setPgBusy] = useState(false);
   // Today's local date (YYYY-MM-DD), read once — used only for due-date display.
-  const [today] = useState(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  });
+  const [today] = useState(() => todayIST());
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -134,7 +131,7 @@ export default function TenancyDetail() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ description: desc.trim() }),
       });
-      if (!res.ok) throw new Error('Could not submit');
+      if (!res.ok) throw new Error(await readApiError(res, 'Could not submit'));
       toast.success('Issue reported');
       setDesc('');
       setIssueOpen(false);

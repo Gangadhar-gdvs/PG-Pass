@@ -38,18 +38,17 @@ test('an unknown pass link never unlocks', async ({ page }) => {
   await expect(lockHeading(page)).toBeVisible();
 });
 
-// BUG (reported, app code not changed): TenantPortalView reads `data.message`
-// but API errors are `{ error, code, requestId }` (withErrorHandler), so every
-// failure shows the generic "Incorrect verification PIN": residents never see
-// "N attempt(s) remaining", the 15-minute lockout notice, or "link not found or
-// has expired". Same `.message` vs `.error` mismatch in ~18 owner-console call
-// sites (dashboard rent actions, AddTenantModal, …). Remove `fixme` once fixed.
-test.fixme('portal shows the server error: attempts remaining / link not found', async ({ page }) => {
+// Regression for R-A3 (fixed): API errors are `{ error, code, requestId }`; the
+// portal used to read `data.message` and always showed the generic "Incorrect
+// verification PIN". Clients now read errors through apiErrorMessage/readApiError.
+test('portal shows the server error: attempts remaining / link not found', async ({ page }) => {
+  // The app's alert — Next.js also renders an empty role="alert" route announcer.
+  const appAlert = page.locator('[role="alert"]:not(#__next-route-announcer__)');
   await page.goto(`/t/${PORTAL_TOKEN}`);
   await enterPin(page, WRONG_PIN);
-  await expect(page.getByRole('alert')).toContainText(/Incorrect PIN\. \d attempt\(s\) remaining/);
+  await expect(appAlert).toContainText(/Incorrect PIN\. \d attempt\(s\) remaining/);
 
   await page.goto('/t/not-a-real-token-0000000000000000000000000000');
   await enterPin(page, PORTAL_PIN);
-  await expect(page.getByRole('alert')).toContainText(/not found|expired/i);
+  await expect(appAlert).toContainText(/not found|expired/i);
 });

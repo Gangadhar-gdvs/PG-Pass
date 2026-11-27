@@ -10,7 +10,7 @@ import { Drawer } from '@/components/ui/drawer';
 import { IconBubble, Icon3D, type Icon3DName, type Tint } from '@/components/brand/Icon3D';
 import { UserRound } from 'lucide-react';
 import { validatePhone, sanitizeText } from '@/lib/security';
-import { errorMessage, apiErrorMessage } from '@/lib/utils';
+import { errorMessage, apiErrorMessage, todayIST } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
 /** Glass form section with a small 3D icon header (local to this drawer). */
@@ -72,9 +72,7 @@ export function AddTenantModal({
       if (prefillPhone) setPhone(prefillPhone);
     });
   }, [isOpen, prefillName, prefillPhone]);
-  const [moveInDate, setMoveInDate] = useState(
-    new Date().toISOString().split('T')[0]
-  );
+  const [moveInDate, setMoveInDate] = useState(() => todayIST());
   // Prefill from the bed's configured rent when it has one; otherwise leave empty
   // so the owner enters the amount (no hidden default value).
   const [rent, setRent] = useState(bed.monthlyRent ? String(bed.monthlyRent) : '');

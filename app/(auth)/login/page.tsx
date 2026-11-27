@@ -13,7 +13,7 @@ import {
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { reportClientError } from '@/lib/client/logger';
-import { errorMessage } from '@/lib/utils';
+import { errorMessage, apiErrorMessage } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { InfoBanner } from '@/components/ui/dashboard-kit';
@@ -21,6 +21,10 @@ import { AuthShell, AuthLoader } from '@/components/brand/AuthShell';
 import { Icon3D } from '@/components/brand/Icon3D';
 import toast from 'react-hot-toast';
 import { useConfirm } from '@/components/ui/confirm-dialog';
+
+/** A failure reported by our own session endpoint (or the takeover prompt) —
+ *  its message is already user-facing, so show it instead of a generic one. */
+class SessionError extends Error {}
 
 /** Narrow an unknown caught value to the Firebase auth error `code` string. */
 function authErrorCode(e: unknown): string {
@@ -80,15 +84,15 @@ function LoginFormContent() {
         });
         if (!proceed) {
           // User chose to stay logged out here; the other device remains active.
-          throw new Error('Sign-in cancelled — the other device is still active.');
+          throw new SessionError('Sign-in cancelled — the other device is still active.');
         }
         return establishSession(user, true); // retry, taking over the session
       }
     }
 
     if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data.error || 'Failed to establish server session');
+      const data = await res.json().catch(() => null);
+      throw new SessionError(apiErrorMessage(data, 'We could not start your session. Please try again.'));
     }
 
     // Route by the server-verified role, NOT by `from`. The owner login is a
@@ -144,6 +148,8 @@ function LoginFormContent() {
         setError('Sign-in was cancelled.');
       } else if (code === 'auth/network-request-failed') {
         setError('Network error. Please check your internet connection.');
+      } else if (err instanceof SessionError) {
+        setError(err.message);
       } else {
         setError('Unable to sign in with Google. Please try again or use your email.');
       }
@@ -198,6 +204,8 @@ function LoginFormContent() {
         msg = 'An account with this email already exists. Please sign in instead.';
       } else if (code === 'auth/network-request-failed') {
         msg = 'Network connection error. Please check your internet connection.';
+      } else if (err instanceof SessionError) {
+        msg = err.message; // e.g. "Too many requests. Please try again later."
       }
       setError(msg);
     } finally {

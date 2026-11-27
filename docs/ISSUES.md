@@ -335,7 +335,7 @@ super-admin; ONE backend for mobile/website/admin.
   - ⚪ **Utilities/inventory follow-ups (blueprint scope beyond the MVP, not defects):** bill evidence
     photo upload + resident dispute flow; asset issue/return movements + stock alerts; meter rollover
     maximum (the "reset" option assumes a new meter starting at 0).
-- 🟡 **Phase 5 — hardening (STARTED).** Done so far:
+- 🟢 **Phase 5 — hardening (DONE for the MVP).** Done:
   - **New security tests (+18):** `adminPermissions` (super/staff rule, admins.manage
     super-only, suspended blocked), `noticeVisibility` (cross-audience/room/expiry
     isolation), `secrets` (AES-GCM round-trip + tamper rejection), `csvExport`
@@ -352,46 +352,97 @@ super-admin; ONE backend for mobile/website/admin.
     ALL the resident's own data (profile + tenancies + rent/deposits/tickets) as a
     JSON download, strictly caller-scoped, rate-limited, no tokens/other-residents.
     "Download my data" button on the resident home (privacy control).
-  - ⚪ **Firestore rules-unit tests BLOCKED:** `@firebase/rules-unit-testing@5`
-    peer-requires `firebase@^12` but the app uses `firebase@13` → ERESOLVE. Not
-    forced (would risk a broken dep). Isolation is instead covered by the
-    service-layer integration tests above (the actual enforcement layer).
+  - 🟢 **Firestore rules-unit tests — UNBLOCKED & BUILT.** `@firebase/rules-unit-testing@6` supports
+    `firebase@13`. `tests/rules` (226 tests: every `match`, all client writes denied, owner/staff-permission/
+    admin read matrix, revoked staff, owner B) + a mutation check. `npm run test:rules` / `test:rules:running`.
   - 🟢 **Restore procedure + RPO/RTO documented** in `docs/runbook.md` §3 (decrypt
     → separate project → import → verify → cut over; RPO≈24h, RTO≈hours). Flagged
     as not-yet-exercised end-to-end — must run on synthetic data before a real pilot.
-  - Still TODO (needs user/infra): Playwright **E2E** golden paths; actually
-    RUNNING the restore on live/synthetic data to confirm RTO.
-- Gate after Phase 3+4+5-partial: lint 0 · typecheck 0 · **86 tests** · build ✓.
+  - 🟢 **Playwright E2E golden paths — BUILT** (`npm run test:e2e`, system Chrome, 20 tests: owner sign-in,
+    add resident, mark paid, notices/maintenance, resident portal PIN, admin console, role gating, staff
+    permissions). Green on repeated runs.
+  - 🟢 **Restore drill — RUN** (`npm run restore:drill`; format v2 incl. Auth users): round trip verified field
+    by field; timings in `docs/runbook.md` §3. A production-sized drill on real infra is still advised before
+    a real pilot (noted in the runbook).
+- Gate after Phase 3+4+5 (27 Nov 2026): lint 0 · typecheck 0 · **183 unit** · **226 rules** · **20 E2E** · build ✓.
   New server-only Firestore rules + indexes for notices/staff_tasks/visitors.
 
 ## Found by the new rules / E2E / restore-drill suites (27 Nov 2026)
 App bugs
-- 🔴 **R-A1 Admin console 401s right after sign-in** — the auth listener calls `/api/admin/me` + `/api/admin/overview`
-  before the session cookie exists → "Couldn't load platform telemetry" until Retry/reload. (`e2e/admin.spec.ts` fixme)
-- 🔴 **R-A2 Admin directory search crashes the page** on owner docs without `pgName`/`name`/`phone` (e.g. a fresh
-  sign-up whose doc only holds session fields). (`e2e` fixme)
-- 🔴 **R-A3 Server error messages dropped app-wide** — clients read `data.message`, the API returns `{ error, code,
-  requestId }`. Portal never shows "N attempts remaining"/lockout/expired; ~18 owner-console call sites affected. (`e2e` fixme)
-- 🔴 **R-A4** Residents page shows an "Open portal" link to `/t/undefined` for tenants without a stored token.
-- 🔴 **R-A5** Default move-in / expense dates use the UTC day (yesterday before 05:30 IST).
-- 🔴 **R-A6** `createTenant` derives the first rent period from the UTC month (wrong month 00:00–05:30 IST on the 1st).
+- 🟢 **R-A1 Admin console 401s right after sign-in** — *Root cause:* Firebase fires `onAuthStateChanged` inside
+  `signInWithEmailAndPassword`, so the listener fetched `/api/admin/me` + `/overview` before `POST /api/auth/session`
+  set the cookie. *Fix:* `app/admin/page.tsx` flags a form sign-in in a ref (read synchronously by the listener); the
+  listener only shows the loading state and the form handler loads once, after the session exists (no double load).
+  Regression: `e2e/admin.spec.ts` "…immediately after form sign-in (no reload)".
+- 🟢 **R-A2 Admin directory search crashes the page** — *Root cause:* the filter called `.toLowerCase()` on
+  `pgName`/`name`/`phone` that a pre-onboarding owner doc doesn't have, and the overview returned raw owner docs.
+  *Fix:* `adminOverview.service` `toAdminOwner()` DTO (string defaults, `setupPending` flag, strips
+  `currentSessionId`/`currentSessionDevice`/`gmail`); null-safe filter + "Setup pending" label in the console.
+  Regression: `e2e/admin.spec.ts` "…survives an owner without a PG profile".
+- 🟢 **R-A3 Server error messages dropped app-wide** — *Root cause:* clients read `data.message`; `withErrorHandler`
+  returns `{ error, code, requestId }`. *Fix:* shared `apiErrorMessage(body, fallback)` / `readApiError(res, fallback)`
+  in `lib/utils.ts` (`error` → `message` → fallback; strips validation field paths and session internals) used at
+  every call site (portal PIN unlock, dashboard rent actions, AddTenantModal, staff, billing, settings, uploads,
+  resident login, admin, …); constant `throw new Error('failed')` sites now surface the server message; the owner
+  login shows session-endpoint errors (e.g. rate limit) instead of a generic one; `errorMessage()` turns browser
+  "Failed to fetch" into a connection hint. Tests: `istAndApiErrors.test.ts`; e2e "portal shows the server error…".
+- 🟢 **R-A4** "Open portal" → `/t/undefined` — *Fix:* residents page renders an inert, labelled "no pass link yet"
+  control and a disabled Copy when `token` is missing; admin Copy URL is disabled too (dashboard drawer was
+  already guarded).
+- 🟢 **R-A5** UTC date defaults — *Fix:* `todayIST()` / `currentPeriodIST()` / `addDaysToIsoDate()` in `lib/utils.ts`
+  (fixed +05:30, no DST) used for every date-input default (move-in, expense, guest check-in/out, move-out, reports
+  month, task/tenancy "today", receipt date); `formatDateIN` formats stored `YYYY-MM-DD` without a time-zone shift.
+- 🟢 **R-A6** UTC rent period on the server — *Fix:* `getCurrentPeriod()` is now IST; `createTenant`, the metrics cron
+  (today + next period via `shiftPeriodBy`, which also fixes the 31-Jan `setMonth(+1)` → March skip), expenses,
+  reports (+export), analytics, defaulters, send-reminders, resident export and the admin metrics lookup all use
+  IST. (Backup route's date key left to the backup work.) Tests: IST boundary at 18:30 UTC incl. month/year rollover.
+- 🟡 **R-A7 Login rate limit shared with background session refreshes.** All logins and every fresh page's
+  background `mode:'refresh'` POST share `/api/auth/session`'s 10/min per-IP cap. *Test side — resolved:* the E2E
+  helper now clears the emulator-only counter before each UI login (suite green). *Product side — awaiting owner
+  decision:* on shared IPs (PG Wi-Fi, carrier NAT) a few open tabs can push real sign-ins into 429 for a minute.
+  Proposed: a separate limiter for refreshes (valid ID token + this device's session id required), keeping 10/min
+  for explicit logins. Not applied — the auth-limit change needs the owner's go-ahead.
 Firestore rules (from `tests/rules`)
-- 🔴 **R-S1** `pg_reviews` is `get: if true` — hidden reviews, reviewer uids, reviews of PGs with reviews disabled are readable.
-- 🔴 **R-S2** `property_photos` public reads expose owner/uploader uids (low).
-- 🔴 **R-S3** Staff can read everything their owner can — rules ignore per-staff permissions (tenants incl. phone +
-  raw portal token, rent, deposits, expenses, utility bills, assets). With the token + last-4 PIN a staff member can
-  open any resident portal. (Revisits accepted decision C2.)
-- 🔴 **R-S4** Admins can't `get` single `audit_logs` / `admin_notifications` / `support_flags` docs (list-size check
-  applied to single reads; fails closed).
-- 🔴 **R-S5** A revoked staff member's ID token keeps read access until refresh (≤1 h).
-Backup / restore (from the drill)
-- 🔴 **R-B1** Nightly backup covers only 6 collections — missing properties, staff, residents, expenses,
-  maintenance_tickets, notices, support_threads(+messages), utility_bills, assets, portal_tokens (losing portal_tokens
-  breaks every resident link), …
-- 🔴 **R-B2** Firebase Auth users + custom claims are not backed up at all.
-- 🔴 **R-B3** `BACKUP_ENCRYPTION_KEY` is padded/truncated by the route and never validated in `lib/env.ts`.
-- 🔴 **R-B4** A document field literally named `_id` overrides the document id on restore; the route should use the
-  shared, tested `lib/server/backup/format.ts`.
+- 🟢 **R-S1** `pg_reviews` was `get: if true`. Root cause: the rule exposed raw docs publicly. Fix: no client
+  SDK code reads it, so `allow read, write: if false`; `/api/reviews` serves the filtered DTO (no hidden reviews, no uids).
+- 🟢 **R-S2** `property_photos` public reads exposed owner/uploader uids. Fix: same — client reads denied; the
+  gallery/discovery APIs already return a DTO without `ownerId`/`uploadedBy`.
+- 🟢 **R-S3** Staff read everything their owner could. Root cause: `canReadOwnerScope` trusted the `role/ownerId`
+  claims only. Fix: staff must also have a live `staff/{uid}` doc (same ownerId, accountStatus active) and hold a
+  matching permission: tenants/rent_records/deposits → `manage_tenants|collect_rent`, movein_photos →
+  `manage_tenants|manage_photos`, maintenance_tickets → `manage_maintenance`, expenses/utility_bills →
+  `manage_expenses`, assets → `manage_beds`, guest_stays → `manage_guests`; beds/properties/staff_ratings/owners →
+  any active staff; owner_notifications → owner+admin only. One extra billed read (the staff doc) per staff
+  request; owners/admins unchanged. Still open at the API layer (not rules): GET `/api/tenants`, `/api/expenses`,
+  `/api/deposits`, `/api/rent`, `/api/assets` check role only, not the staff permission.
+- 🟢 **R-S4** Admin single-doc reads of `audit_logs` / `admin_notifications` / `support_flags` were denied. Root cause:
+  `boundedList()` applied to `get`. Fix: `allow get: if isAdmin(); allow list: if isAdmin() && boundedList()`.
+- 🟢 **R-S5** Revoked/suspended staff kept reading until their ID token refreshed. Fix: the rule checks the staff doc's
+  `accountStatus` (and ownerId) on every request, so `revokeStaff`/suspend take effect immediately.
+  Tests: `tests/rules` 226 (per-permission matrix for every owner-scoped collection, revoked/suspended/moved/doc-less
+  staff, owner B, admin get vs list, reviews/photos denied); mutation check turns it red.
+- 🟢 **R-S3b API side of the staff gap.** The rules fix didn't cover the API: `GET /api/tenants`, `/api/tenants/[id]`,
+  `/api/rent`, `/api/rent/defaulters`, `/api/deposits/[tenantId]`, `/api/deposits/refunds` checked role only
+  (`/api/tenants` includes the portal token); `/api/expenses` and `/api/assets(/[id])` likewise. *Fix:* new
+  `anyPermission` option in `withAuth` (mirrors `isStaffWith` in the rules) — tenant/rent/deposit reads need
+  `manage_tenants` or `collect_rent`, expenses `manage_expenses`, assets `manage_beds`. Owners/admins unchanged.
+- 🟢 **R-S3c Misleading errors for limited staff.** Denied listeners were treated as outages: full-page "Couldn't load
+  your dashboard… connection issue", "check your connection" on Residents, an empty ₹0 ledger on Expenses (403).
+  *Fix:* permission-denied is distinguished — the dashboard renders with an info banner (bed inventory still
+  visible); Residents and Expenses show "No access — ask the owner for the … permission".
+- 🟢 **R-B1** Nightly backup covered 6 collections. Fix: `BACKUP_COLLECTIONS` = all 31 business collections +
+  `support_threads/*/messages` (exported per parent, incl. parent-less threads); only rate_limits /
+  idempotency_keys / portal_lockouts / system_logs are excluded, with reasons. A unit test scans `lib/server` +
+  `app/api` for written collections and fails on any unclassified one.
+- 🟢 **R-B2** Auth users weren't backed up. Fix: `auth-users` artifact (uid, email, phone, name, disabled, claims,
+  providers, metadata, hash/salt when available); `importAuthUsers()` re-creates them. Passwords restore only with
+  the project's hash parameters (not readable via Admin SDK) — runbook §3 step 3 says how to recover.
+- 🟢 **R-B3** Key was padded/truncated, never validated. Fix: exactly 64 hex chars enforced; `lib/env.ts` logs a
+  clear startup error, the cron refuses (500 + `error` event, key never logged); format code never pads.
+- 🟢 **R-B4** `_id` field could hijack the doc id; route had its own copy of the format. Fix: route uses
+  `lib/server/backup/format.ts` (format v2: header with version + count, `{path,data}` envelopes, typed values,
+  manifest with sha256; v1 still decodable). `tests/unit/backupFormat.test.ts` (9) runs the real route; restore drill
+  re-run (default, `--collections=all`, 20k-doc synthetic) — results in runbook §3.
 - ⚪ Restores larger than the free tier's 20,000 writes/day can't finish in one day at ₹0 — needs a temporary paid
   upgrade (owner approval, AGENTS §8) or a multi-day restore. Documented in the runbook.
 

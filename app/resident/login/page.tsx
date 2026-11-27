@@ -76,7 +76,7 @@ export default function ResidentLoginPage() {
         return mintSession(idToken, true);
       }
     }
-    if (!res.ok) throw new Error('Could not start session');
+    if (!res.ok) throw new Error(await readApiError(res, 'Could not start your session. Please try again.'));
   };
 
   const handleGoogle = async () => {

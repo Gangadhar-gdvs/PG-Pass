@@ -12,7 +12,7 @@ import { ProgressBar } from '@/components/ui/progress-bar';
 import { GlyphTile, IconBubble } from '@/components/brand/Icon3D';
 import { Camera, Trash2, ImagePlus } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { errorMessage } from '@/lib/utils';
+import { errorMessage, readApiError } from '@/lib/utils';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 
 interface GalleryPhoto {
@@ -115,11 +115,11 @@ export function PgPhotoGallery({ propertyId }: { propertyId?: string }) {
     if (!ok) return;
     try {
       const res = await fetch(`/api/properties/photos/${id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Delete failed');
+      if (!res.ok) throw new Error(await readApiError(res, 'Could not remove photo'));
       setPhotos((list) => list.filter((p) => p.id !== id));
       toast.success('Photo removed');
-    } catch {
-      toast.error('Could not remove photo');
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, 'Could not remove photo'));
     }
   };
 

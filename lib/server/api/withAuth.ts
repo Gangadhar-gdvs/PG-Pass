@@ -4,7 +4,7 @@ import { adminAuth, adminDb } from '../firebase-admin';
 import { AppError, RouteHandler, RouteContext } from './withErrorHandler';
 import { SESSION_COOKIE_NAME, SESSION_ID_COOKIE_NAME } from '@/lib/constants/limits';
 import { isSessionCurrent } from '../auth/sessionRegistry';
-import { staffHasPermission, pgFeatureEnabled, getAdminEntitlements, adminHasPermission } from '../auth/entitlements';
+import { staffHasPermission, getStaffPermissions, pgFeatureEnabled, getAdminEntitlements, adminHasPermission } from '../auth/entitlements';
 import { StaffPermission, PgFeature, AdminPermission, AdminRole, ADMIN_PERMISSIONS } from '@/lib/constants/permissions';
 
 export type UserRole = 'owner' | 'staff' | 'admin' | 'tenant' | 'resident';
@@ -26,6 +26,10 @@ export interface WithAuthOptions {
   roles?: Array<'owner' | 'staff' | 'admin' | 'tenant' | 'resident'>;
   // When set, a STAFF caller must hold this permission (owner/admin bypass).
   permission?: StaffPermission;
+  // When set, a STAFF caller must hold AT LEAST ONE of these (owner/admin
+  // bypass). Mirrors `isStaffWith(ownerId, [...])` in firestore.rules so the
+  // API and the client read rules grant exactly the same data.
+  anyPermission?: StaffPermission[];
   // When set, the PG (owner scope) must have this feature enabled by the admin.
   // Applies to owner + staff callers; admins bypass.
   feature?: PgFeature;
@@ -147,6 +151,12 @@ export function withAuth<C extends RouteContext = RouteContext>(
       const ok = await staffHasPermission(uid, options.permission);
       if (!ok) {
         throw new AppError(403, 'You do not have permission to perform this action', 'PERMISSION_DENIED');
+      }
+    }
+    if (options.anyPermission?.length && !isAdmin && role === 'staff') {
+      const granted = await getStaffPermissions(uid);
+      if (!options.anyPermission.some((p) => granted.includes(p))) {
+        throw new AppError(403, 'You do not have permission to view this', 'PERMISSION_DENIED');
       }
     }
 

@@ -8,7 +8,7 @@ import { Drawer } from '@/components/ui/drawer';
 import { InfoBanner, KeyValue } from '@/components/ui/dashboard-kit';
 import { IconBubble, type Icon3DName, type Tint } from '@/components/brand/Icon3D';
 import { CalendarDays, Moon, UserRound, Wallet } from 'lucide-react';
-import { formatCurrency, errorMessage, apiErrorMessage } from '@/lib/utils';
+import { formatCurrency, errorMessage, apiErrorMessage, todayIST, addDaysToIsoDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
 function nightsBetween(a: string, b: string): number {
@@ -55,12 +55,12 @@ export function CheckInGuestModal({
   // Read the clock in lazy useState initializers (run once at mount, exempt from
   // the render-purity rule) rather than during render. `checkIn`/`checkOut` seed
   // from today/tomorrow; `today` is also the min for the date inputs.
-  const [today] = useState(() => new Date().toISOString().slice(0, 10));
+  const [today] = useState(() => todayIST());
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [checkIn, setCheckIn] = useState(() => new Date().toISOString().slice(0, 10));
+  const [checkIn, setCheckIn] = useState(() => todayIST());
   const [checkOut, setCheckOut] = useState(() =>
-    new Date(Date.now() + 86400000).toISOString().slice(0, 10)
+    addDaysToIsoDate(todayIST(), 1)
   );
   const [mode, setMode] = useState<'per_night' | 'flat'>('per_night');
   const [rate, setRate] = useState('500');

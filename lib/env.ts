@@ -33,7 +33,14 @@ const serverEnvSchema = z.object({
   B2_BACKUP_BUCKET: z.string().optional(),
   B2_BACKUP_KEY_ID: z.string().optional(),
   B2_BACKUP_APP_KEY: z.string().optional(),
-  BACKUP_ENCRYPTION_KEY: z.string().optional(),
+  // AES-256 key for the nightly backup: exactly 32 bytes as 64 hex characters
+  // (`openssl rand -hex 32`). Never padded/truncated. A malformed value does NOT
+  // crash the app; it makes the backup cron refuse to run (see BACKUP_KEY_RE
+  // below and backupKeyStatus in lib/server/backup/format.ts). Empty = unset.
+  BACKUP_ENCRYPTION_KEY: z
+    .string()
+    .optional()
+    .transform((val) => (val === '' ? undefined : val)),
   // Owner "send rent reminders from my own Gmail" (Gmail API via OAuth). All
   // three must be set to enable; otherwise the feature is hidden and reminders
   // fall back to the free WhatsApp flow. SECRETS_ENCRYPTION_KEY (32-byte, any
@@ -73,6 +80,17 @@ export const publicEnv = publicEnvSchema.parse({
 export const serverEnv = isServer
   ? serverEnvSchema.parse(process.env)
   : ({} as z.infer<typeof serverEnvSchema>);
+
+/** Mirrors lib/server/backup/format.ts BACKUP_KEY_RE (tests assert they agree). */
+export const BACKUP_KEY_RE = /^[0-9a-fA-F]{64}$/;
+
+// Fail clearly, server-side, once per process — without taking the app down.
+if (isServer && serverEnv.BACKUP_ENCRYPTION_KEY !== undefined && !BACKUP_KEY_RE.test(serverEnv.BACKUP_ENCRYPTION_KEY)) {
+  console.error(
+    '[env] BACKUP_ENCRYPTION_KEY is set but is not exactly 64 hex characters (32 bytes). ' +
+      'Nightly backups will refuse to run until it is fixed (generate one with `openssl rand -hex 32`).'
+  );
+}
 
 export const env = {
   ...publicEnv,

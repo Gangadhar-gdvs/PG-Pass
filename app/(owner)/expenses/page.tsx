@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useOwnerSession } from '@/hooks/useOwner';
-import { formatCurrency, formatDateIN, errorMessage, readApiError } from '@/lib/utils';
+import { formatCurrency, formatDateIN, errorMessage, readApiError, todayIST } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dropdown } from '@/components/ui/dropdown';
@@ -45,12 +45,14 @@ export default function ExpensesPage() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  // Staff without the expenses permission get 403 — show that, not an empty ledger.
+  const [denied, setDenied] = useState(false);
 
   const [category, setCategory] = useState('utilities');
   const [amount, setAmount] = useState('');
   const [vendor, setVendor] = useState('');
   const [note, setNote] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(() => todayIST());
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -63,6 +65,9 @@ export default function ExpensesPage() {
         const data = await res.json();
         setExpenses(data.expenses || []);
         setTotal(data.total || 0);
+        setDenied(false);
+      } else if (res.status === 403) {
+        setDenied(true);
       }
     } catch {
       /* non-fatal */
@@ -118,7 +123,7 @@ export default function ExpensesPage() {
     setBusyId(id);
     try {
       const res = await fetch(`/api/expenses/${id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Could not delete');
+      if (!res.ok) throw new Error(await readApiError(res, 'Could not delete'));
       setExpenses((list) => list.filter((e) => e.id !== id));
       toast.success('Expense removed');
       // The "This Month" total is server-computed — refresh it so it reflects
@@ -140,6 +145,22 @@ export default function ExpensesPage() {
       return acc;
     }, {})
   ).sort((a, b) => b[1] - a[1]);
+
+  if (denied) {
+    return (
+      <div className="space-y-5">
+        <PageHeader icon="wallet-orange" tint="peach" title="Expenses" subtitle="PG spending ledger" />
+        <div className="app-card">
+          <EmptyState
+            icon3d="wallet-orange"
+            tint="peach"
+            title="No access to expenses"
+            description="Your staff account doesn't include expense access. Ask the PG owner to grant the Expenses permission."
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">

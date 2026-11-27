@@ -7,7 +7,7 @@ import { useTenants } from '@/hooks/useTenants';
 import {
   subscribeToOwnerRentRecords,
 } from '@/lib/firestore';
-import { getCurrentPeriod, formatCurrency, getWhatsAppLink, errorMessage, depositPaidRupees, readApiError, apiErrorMessage } from '@/lib/utils';
+import { getCurrentPeriod, formatCurrency, getWhatsAppLink, errorMessage, depositPaidRupees, readApiError, apiErrorMessage, todayIST } from '@/lib/utils';
 import { Bed, Owner, RentRecord } from '@/types';
 import { StatsBar, StatsRow } from '@/components/owner/StatsBar';
 import {
@@ -124,6 +124,9 @@ export default function OwnerDashboardPage() {
   }, [owner]);
   const [rentRecords, setRentRecords] = useState<RentRecord[]>([]);
   const [rentError, setRentError] = useState(false);
+  // Staff without resident/rent permission: listeners are denied by the rules —
+  // that's expected, not a connection failure.
+  const [rentDenied, setRentDenied] = useState(false);
   // Accurate whole-PG totals (server aggregation) — correct even when the live
   // bed window is capped at 100. Refreshed when beds/payments change.
   const [summary, setSummary] = useState<import('@/components/owner/StatsBar').DashboardSummary | null>(null);
@@ -258,9 +261,10 @@ export default function OwnerDashboardPage() {
       (records) => {
         setRentRecords(records);
         setRentError(false);
+        setRentDenied(false);
       },
       propertyFilter,
-      () => setRentError(true)
+      (err) => (err.code === 'permission-denied' ? setRentDenied(true) : setRentError(true))
     );
     return unsub;
   }, [ownerId, selectedPeriod, propertyFilter]);
@@ -575,7 +579,7 @@ export default function OwnerDashboardPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          moveOutDate: new Date().toISOString().split('T')[0],
+          moveOutDate: todayIST(),
         }),
       });
       const data = await res.json();
@@ -596,7 +600,8 @@ export default function OwnerDashboardPage() {
   }
 
   // ---------------- LOAD FAILURE (never spin forever) ----------------
-  if (ownerError || bedsError || tenantsError || rentError) {
+  const noResidentAccess = tenantsError === 'permission-denied' || rentDenied;
+  if (ownerError || bedsError || (tenantsError && tenantsError !== 'permission-denied') || rentError) {
     return (
       <div className="mx-auto max-w-xl py-6">
         <div className="app-card">
@@ -800,6 +805,15 @@ export default function OwnerDashboardPage() {
           </HeroAction>
         </div>
       </HeroHeader>
+
+      {noResidentAccess && (
+        <InfoBanner
+          tone="info"
+          icon="users"
+          title="Resident & rent details are hidden for your account"
+          description="You can see the bed inventory. Ask the PG owner to grant the Residents or Rent permission to see residents, dues and payments."
+        />
+      )}
 
       {/* Empty Inventory Onboarding Banner */}
       {beds.length === 0 && (

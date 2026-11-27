@@ -11,7 +11,7 @@ import { ListSkeleton, StatGridSkeleton } from '@/components/ui/skeletons';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Plus, LogOut, LogIn, Phone, UserRound } from 'lucide-react';
 import type { Visitor } from '@/types';
-import { errorMessage, tsToDate } from '@/lib/utils';
+import { errorMessage, tsToDate, readApiError } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
 function timeLabel(v: unknown): string {
@@ -98,10 +98,10 @@ export default function OwnerVisitorsPage() {
     setBusyId(id);
     try {
       const res = await fetch(`/api/visitors/${id}/checkout`, { method: 'POST' });
-      if (!res.ok) throw new Error('failed');
+      if (!res.ok) throw new Error(await readApiError(res, 'Could not check out'));
       setVisitors((prev) => prev.map((v) => (v.id === id ? { ...v, status: 'out' } : v)));
-    } catch {
-      toast.error('Could not check out');
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, 'Could not check out'));
     } finally {
       setBusyId(null);
     }

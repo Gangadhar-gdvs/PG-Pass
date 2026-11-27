@@ -26,7 +26,7 @@ export const GET = withErrorHandler(
       );
       return NextResponse.json({ records });
     },
-    { roles: ['owner', 'staff'] }
+    { roles: ['owner', 'staff'], anyPermission: [STAFF_PERMISSIONS.MANAGE_TENANTS, STAFF_PERMISSIONS.COLLECT_RENT] }
   )
 );
 

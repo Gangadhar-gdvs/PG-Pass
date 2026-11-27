@@ -16,7 +16,7 @@ export const GET = withErrorHandler(
       const total = expenses.reduce((s, e) => s + (e.amountPaise || 0), 0);
       return NextResponse.json({ expenses, total, period });
     },
-    { roles: ['owner', 'staff'], feature: PG_FEATURES.EXPENSES }
+    { roles: ['owner', 'staff'], feature: PG_FEATURES.EXPENSES, permission: STAFF_PERMISSIONS.MANAGE_EXPENSES }
   )
 );
 

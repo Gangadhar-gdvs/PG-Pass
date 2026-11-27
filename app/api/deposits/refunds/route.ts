@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withErrorHandler } from '@/lib/server/api/withErrorHandler';
 import { withAuth, AuthContext } from '@/lib/server/api/withAuth';
 import { depositsService } from '@/lib/server/services/deposits.service';
+import { STAFF_PERMISSIONS } from '@/lib/constants/permissions';
 
 // Pending (not-yet-paid-out) security-deposit refunds for the owner.
 export const GET = withErrorHandler(
@@ -16,6 +17,6 @@ export const GET = withErrorHandler(
         return NextResponse.json({ refunds: [] });
       }
     },
-    { roles: ['owner', 'staff'] }
+    { roles: ['owner', 'staff'], anyPermission: [STAFF_PERMISSIONS.MANAGE_TENANTS, STAFF_PERMISSIONS.COLLECT_RENT] }
   )
 );

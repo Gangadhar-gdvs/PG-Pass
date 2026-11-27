@@ -11,7 +11,7 @@ import { ListSkeleton, StatGridSkeleton } from '@/components/ui/skeletons';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Plus, Check, Trash2, CalendarDays, UserRound } from 'lucide-react';
 import type { StaffTask } from '@/types';
-import { formatDateIN, errorMessage, tsToDate } from '@/lib/utils';
+import { formatDateIN, errorMessage, tsToDate, readApiError, todayIST } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
 interface StaffLite {
@@ -19,10 +19,9 @@ interface StaffLite {
   name: string;
 }
 
-/** Local YYYY-MM-DD (display only — used to flag overdue / due-today chips). */
+/** Today in IST (YYYY-MM-DD) — due dates are IST calendar dates. */
 function localToday(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return todayIST();
 }
 
 export default function OwnerTasksPage() {
@@ -114,10 +113,10 @@ export default function OwnerTasksPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: next }),
       });
-      if (!res.ok) throw new Error('failed');
+      if (!res.ok) throw new Error(await readApiError(res, 'Could not update task'));
       setTasks((prev) => prev.map((x) => (x.id === t.id ? { ...x, status: next } : x)));
-    } catch {
-      toast.error('Could not update task');
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, 'Could not update task'));
     } finally {
       setBusyId(null);
     }
@@ -126,10 +125,10 @@ export default function OwnerTasksPage() {
   const remove = async (id: string) => {
     try {
       const res = await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('failed');
+      if (!res.ok) throw new Error(await readApiError(res, 'Could not remove task'));
       setTasks((prev) => prev.filter((x) => x.id !== id));
-    } catch {
-      toast.error('Could not remove task');
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, 'Could not remove task'));
     }
   };
 

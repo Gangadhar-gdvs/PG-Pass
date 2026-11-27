@@ -1,12 +1,10 @@
 'use client';
 
+import { readApiError } from '@/lib/utils';
 import { useEffect, useState } from 'react';
 import { compressImage } from './imageCompress';
 
-async function readError(res: Response, fallback: string): Promise<string> {
-  const e = await res.json().catch(() => ({}));
-  return (e && (e.error || e.message)) || fallback;
-}
+const readError = readApiError;
 
 /** Current owner's profile picture (short-lived URL) or null. */
 export async function fetchOwnerAvatarUrl(): Promise<string | null> {

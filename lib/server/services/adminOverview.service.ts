@@ -34,6 +34,9 @@ export interface AdminStaffSummary {
 
 export interface SuperAdminPgOverview {
   owner: Owner;
+  /** Owner doc exists but onboarding never finished (no PG name yet) — e.g. a
+   *  fresh sign-up whose doc only holds session fields. */
+  setupPending: boolean;
   totalBeds: number;
   occupiedBeds: number;
   paidBeds: number;
@@ -104,6 +107,32 @@ async function getPlatformTotals(): Promise<{
   };
 }
 
+// Owner-doc fields that must never leave the server, even to an admin: the
+// single-session id (half of a session hijack) and the encrypted Gmail token.
+const OWNER_PRIVATE_FIELDS = ['currentSessionId', 'currentSessionDevice', 'gmail'] as const;
+
+/**
+ * Explicit admin DTO for an owner doc. Docs written before onboarding finishes
+ * (sessionRegistry creates `owners/{uid}` on first login) lack pgName/name/
+ * phone — default them to '' so every consumer can call string methods safely,
+ * and flag the entry as `setupPending` for the console to label.
+ */
+export function toAdminOwner(raw: Record<string, unknown> & { id: string }): { owner: Owner; setupPending: boolean } {
+  const rest: Record<string, unknown> = { ...raw };
+  for (const k of OWNER_PRIVATE_FIELDS) delete rest[k];
+  const str = (v: unknown) => (typeof v === 'string' ? v : '');
+  const owner = {
+    ...rest,
+    id: raw.id,
+    name: str(raw.name),
+    pgName: str(raw.pgName),
+    phone: str(raw.phone),
+    pgAddress: str(raw.pgAddress),
+    upiId: str(raw.upiId),
+  } as Owner;
+  return { owner, setupPending: !owner.pgName.trim() };
+}
+
 /**
  * Paginated super-admin overview.
  *
@@ -137,7 +166,7 @@ export async function getPlatformOverview(
     })(),
   ]);
 
-  const owners = ownersPage.docs.map((d) => ({ ...d.data(), id: d.id } as Owner));
+  const owners = ownersPage.docs.map((d) => toAdminOwner({ ...d.data(), id: d.id }).owner);
   const nextCursor =
     owners.length === safeSize ? owners[owners.length - 1].id : null;
 
@@ -205,6 +234,7 @@ export async function getPlatformOverview(
 
     return {
       owner,
+      setupPending: !owner.pgName.trim(),
       totalBeds: pgBeds.length,
       occupiedBeds,
       paidBeds,
@@ -269,7 +299,7 @@ export async function getPgAdminDetail(ownerId: string) {
     snap.docs.map((d: QueryDocumentSnapshot) => ({ ...d.data(), id: d.id }) as DocRow);
 
   return {
-    owner: ownerSnap.exists ? { ...ownerSnap.data(), id: ownerSnap.id } : null,
+    owner: ownerSnap.exists ? toAdminOwner({ ...ownerSnap.data(), id: ownerSnap.id }).owner : null,
     rentRecords: map(recordsSnap).sort((a, b) => (b.period || '').localeCompare(a.period || '')),
     deposits: map(depositsSnap).sort(byCreatedDesc),
     // Surface soft-deleted expenses too (admin history), flagged.

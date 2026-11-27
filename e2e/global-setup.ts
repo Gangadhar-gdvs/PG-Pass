@@ -11,6 +11,7 @@ import {
   PASSWORD,
   PROJECT_ID,
   RESIDENT_ACCOUNT,
+  STAFF,
   TENANTS,
   TICKET,
   currentPeriodIST,
@@ -79,6 +80,13 @@ export default async function globalSetup() {
       { uid: OWNER.uid, email: OWNER.email, displayName: OWNER.name, claims: null },
       { uid: ADMIN.uid, email: ADMIN.email, displayName: ADMIN.name, claims: { admin: true } },
       { uid: RESIDENT_ACCOUNT.uid, email: RESIDENT_ACCOUNT.email, displayName: RESIDENT_ACCOUNT.name, claims: { role: 'resident' } },
+      // staff.service.ts mints exactly these claims
+      ...Object.values(STAFF).map((st) => ({
+        uid: st.uid,
+        email: st.email,
+        displayName: st.name,
+        claims: { role: 'staff', ownerId: OWNER.uid, suspended: false },
+      })),
     ];
     for (const u of users) {
       await auth.deleteUser(u.uid).catch(() => {});
@@ -118,6 +126,21 @@ export default async function globalSetup() {
       createdAt: now,
       updatedAt: now,
     });
+    for (const st of Object.values(STAFF)) {
+      batch.set(db.doc(`staff/${st.uid}`), {
+        id: st.uid,
+        ownerId: OWNER.uid,
+        name: st.name,
+        email: st.email,
+        phone: '9000055555',
+        role: 'warden',
+        accountStatus: 'active',
+        permissions: [...st.permissions],
+        invitedBy: OWNER.uid,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
     batch.set(db.doc(`residents/${RESIDENT_ACCOUNT.uid}`), {
       id: RESIDENT_ACCOUNT.uid,
       name: RESIDENT_ACCOUNT.name,

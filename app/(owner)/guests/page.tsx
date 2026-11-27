@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useOwnerSession } from '@/hooks/useOwner';
 import { useBeds } from '@/hooks/useBeds';
-import { formatCurrency, formatDateIN, errorMessage } from '@/lib/utils';
+import { formatCurrency, formatDateIN, errorMessage, readApiError } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -56,7 +56,7 @@ export default function GuestsPage() {
     setBusyId(id);
     try {
       const res = await fetch(`/api/guests/${id}/checkout`, { method: 'POST' });
-      if (!res.ok) throw new Error('Checkout failed');
+      if (!res.ok) throw new Error(await readApiError(res, 'Checkout failed'));
       toast.success('Guest checked out · bed freed');
       await load();
     } catch (e: unknown) {

@@ -1,5 +1,7 @@
 import path from 'node:path';
 import { expect, type Page } from '@playwright/test';
+import { getApps, initializeApp } from 'firebase-admin/app';
+import { FieldPath, getFirestore } from 'firebase-admin/firestore';
 
 /**
  * E2E-only identities and data. Everything is namespaced `e2e-*` so the suite
@@ -23,6 +25,26 @@ export const RESIDENT_ACCOUNT = {
   name: 'Ravi Resident',
   phone: '9000033333',
 };
+
+/**
+ * Staff of the e2e owner. `staffDefault` holds DEFAULT_STAFF_PERMISSIONS (what a
+ * freshly invited warden gets); `staffMaintenance` only manage_maintenance — the
+ * rules must keep resident/rent data away from them (R-S3).
+ */
+export const STAFF = {
+  staffDefault: {
+    uid: 'e2e-staff-1',
+    email: 'e2e.staff@pgpass-e2e.test',
+    name: 'Suresh Warden',
+    permissions: ['collect_rent', 'manage_tenants', 'manage_beds', 'manage_guests', 'manage_maintenance'],
+  },
+  staffMaintenance: {
+    uid: 'e2e-staff-2',
+    email: 'e2e.maint@pgpass-e2e.test',
+    name: 'Mohan Fixit',
+    permissions: ['manage_maintenance'],
+  },
+} as const;
 
 /** Seeded beds (4 total: 2 occupied, 2 vacant). */
 export const BEDS = [
@@ -66,6 +88,7 @@ export async function signInViaForm(
   page: Page,
   opts: { email: string; password?: string; emailLabel?: RegExp; passwordLabel?: RegExp; submit?: RegExp }
 ) {
+  await resetLoginRateLimit();
   await page.getByLabel(opts.emailLabel ?? /^email address/i).fill(opts.email);
   await page.getByLabel(opts.passwordLabel ?? /^password/i).fill(opts.password ?? PASSWORD);
   await page.getByRole('button', { name: opts.submit ?? /^sign in$/i }).click();
@@ -77,4 +100,27 @@ export async function signInViaForm(
     })
     .toBe(true);
   if (await takeover.isVisible().catch(() => false)) await takeover.click();
+}
+
+/**
+ * The app's Firestore-backed limiter allows 10 POST /api/auth/session per minute
+ * per client IP, and every local request is keyed as 127.0.0.1 — so the suite's
+ * logins plus each new page's background session refresh share one bucket.
+ * Reset that bucket (emulator only) right before each UI login so a login is
+ * never starved by earlier refreshes. (See the report: the same shared-IP bucket
+ * also bites real users behind carrier-grade NAT.)
+ */
+export async function resetLoginRateLimit() {
+  process.env.FIRESTORE_EMULATOR_HOST ||= '127.0.0.1:8080';
+  if (!/^(127\.0\.0\.1|localhost|\[::1\]):\d+$/.test(process.env.FIRESTORE_EMULATOR_HOST)) {
+    throw new Error('resetLoginRateLimit: FIRESTORE_EMULATOR_HOST must be a local emulator');
+  }
+  const app = getApps().find((a) => a.name === 'e2e-ratelimit') ?? initializeApp({ projectId: PROJECT_ID }, 'e2e-ratelimit');
+  const prefix = 'rl:_api_auth_session:';
+  const snap = await getFirestore(app)
+    .collection('rate_limits')
+    .where(FieldPath.documentId(), '>=', prefix)
+    .where(FieldPath.documentId(), '<', `${prefix}\uf8ff`)
+    .get();
+  await Promise.all(snap.docs.map((d) => d.ref.delete()));
 }

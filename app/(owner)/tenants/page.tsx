@@ -34,6 +34,28 @@ import { copyText } from '@/lib/client/clipboard';
 const roundLink =
   'inline-grid h-11 w-11 sm:h-9 sm:w-9 shrink-0 place-items-center rounded-full transition-colors press';
 const roundSoft = `${roundLink} bg-brand-50 text-brand-700 hover:bg-brand-100`;
+
+/** "Open portal" — rendered inert (no href) when the resident has no stored pass token. */
+function PortalLink({ token, iconClassName }: { token?: string; iconClassName: string }) {
+  if (!token) {
+    return (
+      <span
+        role="link"
+        aria-disabled="true"
+        aria-label="Open portal (no pass link yet)"
+        title="This resident has no pass link yet"
+        className={`${roundSoft} cursor-not-allowed opacity-45 hover:bg-brand-50`}
+      >
+        <ExternalLink className={iconClassName} />
+      </span>
+    );
+  }
+  return (
+    <a href={`/t/${token}`} target="_blank" rel="noopener noreferrer" title="Open portal" aria-label="Open portal" className={roundSoft}>
+      <ExternalLink className={iconClassName} />
+    </a>
+  );
+}
 const roundSuccess = `${roundLink} bg-success-bg text-success-ink hover:bg-success-line`;
 
 const moveInLabel = (t: Tenant) =>
@@ -86,7 +108,7 @@ export default function TenantsPage() {
 
   const handleCopyLink = (token?: string) => {
     if (!token) {
-      toast.error('No portal token generated for this resident');
+      toast.error('This resident has no pass link yet.');
       return;
     }
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : config.app.url;
@@ -168,22 +190,15 @@ export default function TenantsPage() {
         <div className="flex items-center justify-center gap-1.5">
           <button
             type="button"
-            title="Copy resident link"
+            title={t.token ? 'Copy resident link' : 'This resident has no pass link yet'}
             onClick={() => handleCopyLink(t.token)}
-            className="inline-flex h-9 items-center gap-1.5 rounded-full bg-brand-50 px-3.5 text-xs font-bold text-brand-700 transition-colors hover:bg-brand-100 cursor-pointer press"
+            disabled={!t.token}
+            className="inline-flex h-9 items-center gap-1.5 rounded-full bg-brand-50 px-3.5 text-xs font-bold text-brand-700 transition-colors hover:bg-brand-100 cursor-pointer press disabled:cursor-not-allowed disabled:opacity-45"
           >
             <Copy className="h-3.5 w-3.5" />
-            <span>Copy</span>
+            <span>{t.token ? 'Copy' : 'No link'}</span>
           </button>
-          <a
-            href={`/t/${t.token}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            title="Open portal"
-            className={roundSoft}
-          >
-            <ExternalLink className="h-3.5 w-3.5" />
-          </a>
+          <PortalLink token={t.token} iconClassName="h-3.5 w-3.5" />
         </div>
       ),
     },
@@ -250,6 +265,14 @@ export default function TenantsPage() {
       {/* Directory */}
       {loading ? (
         <ListSkeleton rows={6} />
+      ) : error === 'permission-denied' ? (
+        <div className="app-card">
+          <EmptyState
+            icon3d="users"
+            title="No access to residents"
+            description="Your staff account doesn't include resident or rent access. Ask the PG owner to grant the Residents or Rent permission."
+          />
+        </div>
       ) : error ? (
         <div className="app-card">
           <EmptyState
@@ -320,23 +343,15 @@ export default function TenantsPage() {
                   <div className="mt-3 flex items-center gap-2">
                     <button
                       type="button"
-                      title="Copy resident link"
+                      title={t.token ? 'Copy resident link' : 'This resident has no pass link yet'}
                       onClick={() => handleCopyLink(t.token)}
-                      className="inline-flex h-11 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-full bg-brand-50 px-3 text-[13px] font-bold text-brand-700 transition-colors hover:bg-brand-100 cursor-pointer press"
+                      disabled={!t.token}
+                      className="inline-flex h-11 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-full bg-brand-50 px-3 text-[13px] font-bold text-brand-700 transition-colors hover:bg-brand-100 cursor-pointer press disabled:cursor-not-allowed disabled:opacity-45"
                     >
                       <Copy className="h-4 w-4 shrink-0" />
-                      <span className="truncate">Copy</span>
+                      <span className="truncate">{t.token ? 'Copy' : 'No pass link'}</span>
                     </button>
-                    <a
-                      href={`/t/${t.token}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      title="Open portal"
-                      aria-label="Open portal"
-                      className={roundSoft}
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                    </a>
+                    <PortalLink token={t.token} iconClassName="h-4 w-4" />
                     <a href={`tel:${t.phone}`} title="Call" aria-label="Call" className={roundSoft}>
                       <Phone className="h-4 w-4" />
                     </a>

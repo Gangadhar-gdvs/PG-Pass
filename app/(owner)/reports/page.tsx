@@ -1,5 +1,6 @@
 'use client';
 
+import { currentPeriodIST } from '@/lib/utils';
 import React, { useState, useEffect, useCallback } from 'react';
 import { useOwnerSession } from '@/hooks/useOwner';
 import { PageHeader, StatTile, SectionCard } from '@/components/ui/dashboard-kit';
@@ -23,7 +24,8 @@ function shiftPeriod(period: string, delta: number): string {
 
 export default function OwnerReportsPage() {
   const { ownerId } = useOwnerSession();
-  const [period, setPeriod] = useState(() => new Date().toISOString().slice(0, 7));
+  const [period, setPeriod] = useState(() => currentPeriodIST());
+  const [thisPeriod] = useState(() => currentPeriodIST());
   const [summary, setSummary] = useState<Summary | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -76,7 +78,7 @@ export default function OwnerReportsPage() {
       <button
         type="button"
         onClick={() => setPeriod((p) => shiftPeriod(p, 1))}
-        disabled={period >= new Date().toISOString().slice(0, 7)}
+        disabled={period >= thisPeriod}
         aria-label="Next month"
         className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-brand-700 transition-colors hover:bg-brand-50 press disabled:pointer-events-none disabled:opacity-30"
       >

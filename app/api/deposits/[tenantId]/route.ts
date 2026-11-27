@@ -18,7 +18,7 @@ export const GET = withErrorHandler(
       const entries = await depositsService.listDeposits(ownerId, tenantId);
       return NextResponse.json({ entries });
     },
-    { roles: ['owner', 'staff'] }
+    { roles: ['owner', 'staff'], anyPermission: [STAFF_PERMISSIONS.MANAGE_TENANTS, STAFF_PERMISSIONS.COLLECT_RENT] }
   )
 );
 

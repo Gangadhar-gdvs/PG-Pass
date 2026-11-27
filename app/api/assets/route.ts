@@ -17,7 +17,7 @@ export const GET = withErrorHandler(
       const { assets, summary } = await assetsService.list(ownerId, propertyId);
       return NextResponse.json({ assets, summary });
     },
-    { roles: ['owner', 'staff'] }
+    { roles: ['owner', 'staff'], permission: STAFF_PERMISSIONS.MANAGE_BEDS }
   )
 );
 

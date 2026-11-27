@@ -3,6 +3,7 @@ import { withErrorHandler } from '@/lib/server/api/withErrorHandler';
 import { withAuth, AuthContext } from '@/lib/server/api/withAuth';
 import { withRateLimit } from '@/lib/server/api/withRateLimit';
 import { tenantsService } from '@/lib/server/services/tenants.service';
+import { STAFF_PERMISSIONS } from '@/lib/constants/permissions';
 
 export const GET = withErrorHandler(
   withAuth(
@@ -15,7 +16,7 @@ export const GET = withErrorHandler(
       const tenant = await tenantsService.getTenant(id, ownerId);
       return NextResponse.json(tenant);
     },
-    { roles: ['owner', 'staff'] }
+    { roles: ['owner', 'staff'], anyPermission: [STAFF_PERMISSIONS.MANAGE_TENANTS, STAFF_PERMISSIONS.COLLECT_RENT] }
   )
 );
 

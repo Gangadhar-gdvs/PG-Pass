@@ -20,7 +20,7 @@ import {
 import { IconBubble } from '@/components/brand/Icon3D';
 import { Illustration } from '@/components/brand/Illustration';
 import { Logo } from '@/components/brand/Logo';
-import { formatCurrency, getWhatsAppLink } from '@/lib/utils';
+import { formatCurrency, getWhatsAppLink, apiErrorMessage } from '@/lib/utils';
 import type { RentRecord } from '@/types';
 import toast from 'react-hot-toast';
 
@@ -100,14 +100,14 @@ export function TenantPortalView({ token }: TenantPortalViewProps) {
         body: JSON.stringify({ pin }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
 
       if (!res.ok) {
         if (res.status === 429) {
           setIsLockedOut(true);
         }
         if (!isAuto) {
-          setErrorMsg(data.message || 'Incorrect verification PIN');
+          setErrorMsg(apiErrorMessage(data, 'Incorrect verification PIN'));
         }
         localStorage.removeItem(storageKey);
         return false;

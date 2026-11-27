@@ -12,7 +12,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { IconBubble } from '@/components/brand/Icon3D';
 import { Megaphone, Plus, Trash2, Pin, CalendarDays, Eye, Users } from 'lucide-react';
 import type { Notice } from '@/types';
-import { formatDateIN, errorMessage, tsToDate } from '@/lib/utils';
+import { formatDateIN, errorMessage, tsToDate, readApiError } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
 export default function OwnerNoticesPage() {
@@ -85,11 +85,11 @@ export default function OwnerNoticesPage() {
   const remove = async (id: string) => {
     try {
       const res = await fetch(`/api/notices/${id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('failed');
+      if (!res.ok) throw new Error(await readApiError(res, 'Could not remove notice'));
       toast.success('Notice removed');
       setNotices((prev) => prev.filter((n) => n.id !== id));
-    } catch {
-      toast.error('Could not remove notice');
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, 'Could not remove notice'));
     }
   };
 

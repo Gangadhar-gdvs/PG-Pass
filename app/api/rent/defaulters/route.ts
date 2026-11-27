@@ -3,6 +3,7 @@ import { withErrorHandler } from '@/lib/server/api/withErrorHandler';
 import { withAuth, AuthContext } from '@/lib/server/api/withAuth';
 import { rentService } from '@/lib/server/services/rent.service';
 import { todayIST } from '@/lib/utils';
+import { STAFF_PERMISSIONS } from '@/lib/constants/permissions';
 
 // Defaulter / aging report for the owner dashboard: overdue unpaid rent records
 // ranked by days overdue, with accrued late fee and outstanding amount.
@@ -19,6 +20,6 @@ export const GET = withErrorHandler(
         return NextResponse.json({ defaulters: [] });
       }
     },
-    { roles: ['owner', 'staff'] }
+    { roles: ['owner', 'staff'], anyPermission: [STAFF_PERMISSIONS.MANAGE_TENANTS, STAFF_PERMISSIONS.COLLECT_RENT] }
   )
 );

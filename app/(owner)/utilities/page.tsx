@@ -22,7 +22,7 @@ import {
   StatTile,
 } from '@/components/ui/dashboard-kit';
 import { type Icon3DName, type Tint } from '@/components/brand/Icon3D';
-import { errorMessage, formatDateIN } from '@/lib/utils';
+import { errorMessage, formatDateIN, readApiError } from '@/lib/utils';
 import {
   UTILITY_RULE_LABELS,
   UTILITY_TYPE_LABELS,
@@ -94,10 +94,8 @@ interface UtilityPreview {
   overlaps: Array<{ id: string; label: string }>;
 }
 
-async function readError(res: Response, fallback: string): Promise<string> {
-  const body = await res.json().catch(() => ({}));
-  return body.error || body.message || fallback;
-}
+// Server errors are `{ error, code, requestId }` — shared extractor (R-A3).
+const readError = readApiError;
 
 const paiseToInput = (p: number) => (p % 100 === 0 ? String(p / 100) : (p / 100).toFixed(2));
 

@@ -23,7 +23,7 @@ export const GET = withErrorHandler(
       );
       return NextResponse.json({ tenants });
     },
-    { roles: ['owner', 'staff'] }
+    { roles: ['owner', 'staff'], anyPermission: [STAFF_PERMISSIONS.MANAGE_TENANTS, STAFF_PERMISSIONS.COLLECT_RENT] }
   )
 );
 

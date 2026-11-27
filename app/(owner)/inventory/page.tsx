@@ -13,7 +13,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { CardListSkeleton, StatGridSkeleton } from '@/components/ui/skeletons';
 import { ActivityRow, FilterChips, InfoBanner, PageHeader, SectionCard, StatTile } from '@/components/ui/dashboard-kit';
 import { type Icon3DName, type Tint } from '@/components/brand/Icon3D';
-import { errorMessage, formatDateIN } from '@/lib/utils';
+import { errorMessage, formatDateIN, readApiError } from '@/lib/utils';
 import {
   ASSET_CATEGORY_LABELS,
   ASSET_CONDITION_LABELS,
@@ -57,10 +57,8 @@ const EMPTY_SUMMARY: AssetSummary = {
   warrantyExpiringSoon: 0,
 };
 
-async function readError(res: Response, fallback: string): Promise<string> {
-  const body = await res.json().catch(() => ({}));
-  return body.error || body.message || fallback;
-}
+// Server errors are `{ error, code, requestId }` — shared extractor (R-A3).
+const readError = readApiError;
 
 function historyText(h: AssetHistoryEntry): { title: string; icon: Icon3DName; tint: Tint } {
   switch (h.action) {

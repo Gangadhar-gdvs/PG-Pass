@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { InfoBanner } from '@/components/ui/dashboard-kit';
 import { IconTile } from '@/components/brand/Icon3D';
 import toast from 'react-hot-toast';
-import { errorMessage } from '@/lib/utils';
+import { errorMessage, readApiError } from '@/lib/utils';
 
 interface GmailStatus {
   available: boolean;
@@ -52,7 +52,7 @@ export function GmailConnectCard() {
     setBusy(true);
     try {
       const res = await fetch('/api/owners/gmail', { method: 'DELETE' });
-      if (!res.ok) throw new Error('failed');
+      if (!res.ok) throw new Error(await readApiError(res, 'Could not disconnect'));
       toast.success('Gmail disconnected');
       setStatus((s) => (s ? { ...s, connected: false, email: undefined } : s));
     } catch (e: unknown) {

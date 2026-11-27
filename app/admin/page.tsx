@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Lock,
   Mail,
@@ -38,7 +38,7 @@ import { Button } from '@/components/ui/button';
 import { Input, SearchInput } from '@/components/ui/input';
 import { Dropdown } from '@/components/ui/dropdown';
 import { Drawer } from '@/components/ui/drawer';
-import { formatCurrency, errorMessage, apiErrorMessage } from '@/lib/utils';
+import { formatCurrency, errorMessage, apiErrorMessage, readApiError } from '@/lib/utils';
 import type { SuperAdminPgOverview } from '@/lib/server/services/adminOverview.service';
 import type { SubscriptionRequest } from '@/types';
 import { config } from '@/lib/config';
@@ -125,15 +125,26 @@ function LegendRow({ dot, label, value }: { dot: string; label: string; value: R
 }
 
 /** Small violet "Copy URL" pill for a resident's portal link. */
-function CopyLinkButton({ onClick, className = '' }: { onClick: () => void; className?: string }) {
+function CopyLinkButton({
+  onClick,
+  className = '',
+  disabled = false,
+}: {
+  onClick: () => void;
+  className?: string;
+  /** No stored pass token → there is no link to copy (never build /t/undefined). */
+  disabled?: boolean;
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full bg-brand-100 px-3.5 text-xs font-bold text-brand-700 transition-colors hover:bg-brand-200/70 press ${className}`}
+      disabled={disabled}
+      title={disabled ? 'This resident has no pass link yet' : undefined}
+      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full bg-brand-100 px-3.5 text-xs font-bold text-brand-700 transition-colors hover:bg-brand-200/70 press disabled:cursor-not-allowed disabled:opacity-45 ${className}`}
     >
       <Copy className="h-3.5 w-3.5" aria-hidden="true" />
-      <span>Copy URL</span>
+      <span>{disabled ? 'No link' : 'Copy URL'}</span>
     </button>
   );
 }
@@ -260,6 +271,11 @@ export default function SuperAdminPortalPage() {
 
   // Platform Telemetry Data
   const [loadingStats, setLoadingStats] = useState(false);
+  // True while handleAuthSubmit is signing in. Firebase fires onAuthStateChanged
+  // DURING signInWithEmailAndPassword — before POST /api/auth/session has set the
+  // session cookie — so the listener must not load admin data then (it 401s).
+  // The form handler loads it once the session exists (R-A1).
+  const formSignInRef = useRef(false);
   const [stats, setStats] = useState<{
     allPgs: SuperAdminPgOverview[];
     platformTotalPgs: number;
@@ -398,7 +414,7 @@ export default function SuperAdminPortalPage() {
     try {
       const res = await fetch('/api/admin/overview');
       if (!res.ok) {
-        throw new Error('Failed to load platform telemetry');
+        throw new Error(await readApiError(res, 'Could not load platform telemetry'));
       }
       const data = await res.json();
       setStats(data);
@@ -416,6 +432,10 @@ export default function SuperAdminPortalPage() {
   // treating the session as an admin session.
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      // Captured synchronously: Firebase invokes this listener from inside
+      // signInWithEmailAndPassword, so a form sign-in is still flagged here even
+      // if handleAuthSubmit finishes before the awaits below (no double load).
+      const formInFlight = formSignInRef.current;
       setCurrentUser(user);
       if (user) {
         // Force-refresh so a claim granted after the user last signed in (via
@@ -428,7 +448,12 @@ export default function SuperAdminPortalPage() {
           admin = false;
         }
         setIsAdmin(admin);
-        if (admin) {
+        if (admin && formInFlight) {
+          // Form sign-in in progress: show the loading state (not the error
+          // banner) until handleAuthSubmit has the session cookie and loads —
+          // unless the handler already finished (then it has loaded).
+          if (formSignInRef.current) setLoadingStats(true);
+        } else if (admin) {
           await loadMe();
           await loadPlatformData();
         } else {
@@ -453,7 +478,7 @@ export default function SuperAdminPortalPage() {
     setLoadingMore(true);
     try {
       const res = await fetch(`/api/admin/overview?cursor=${encodeURIComponent(stats.nextCursor)}`);
-      if (!res.ok) throw new Error('Failed to load more PGs');
+      if (!res.ok) throw new Error(await readApiError(res, 'Could not load more PGs'));
       const data = await res.json();
       setStats((prev) =>
         prev
@@ -471,6 +496,7 @@ export default function SuperAdminPortalPage() {
     e.preventDefault();
     setAuthError('');
     setSubmitting(true);
+    formSignInRef.current = true;
 
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
@@ -498,10 +524,15 @@ export default function SuperAdminPortalPage() {
         body: JSON.stringify({ idToken, mode: 'login' }),
       });
       if (!res.ok) {
-        throw new Error('Failed to establish secure session cookie');
+        throw new Error(await readApiError(res, 'Could not start a secure admin session. Please try again.'));
       }
       setIsAdmin(true);
       toast.success('Admin authenticated successfully');
+      // The session cookie now exists — load the console exactly once here
+      // (the auth listener skipped it while the sign-in was in flight).
+      formSignInRef.current = false;
+      await loadMe();
+      await loadPlatformData();
     } catch (err: unknown) {
       console.error(err);
       const code =
@@ -524,7 +555,9 @@ export default function SuperAdminPortalPage() {
       }
       setAuthError(msg);
       toast.error(msg);
+      setLoadingStats(false);
     } finally {
+      formSignInRef.current = false;
       setSubmitting(false);
     }
   };
@@ -684,14 +717,14 @@ export default function SuperAdminPortalPage() {
   // ---------------- AUTHENTICATED ADMIN DASHBOARD ----------------
   const allPgs = stats?.allPgs || [];
   const filteredPgs = allPgs.filter((pg) => {
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      pg.owner.pgName.toLowerCase().includes(q) ||
-      pg.owner.name.toLowerCase().includes(q) ||
-      pg.owner.phone.includes(q)
-    );
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return true;
+    // Null-safe: an owner doc can predate onboarding (no pgName/name/phone).
+    return [pg.owner.pgName, pg.owner.name, pg.owner.phone, pg.owner.email, pg.setupPending ? 'setup pending' : '']
+      .some((v) => typeof v === 'string' && v.toLowerCase().includes(q));
   });
+  const pgTitle = (pg: { owner: { pgName?: string }; setupPending?: boolean }) =>
+    pg.owner.pgName?.trim() || 'Setup pending';
 
   const selectedPg = allPgs.find((p) => p.owner.id === selectedPgId) || allPgs[0];
 
@@ -724,7 +757,7 @@ export default function SuperAdminPortalPage() {
       key: 'token',
       header: 'Portal Link',
       align: 'center',
-      render: (t) => <CopyLinkButton onClick={() => handleCopyLink(t.token)} className="h-9" />,
+      render: (t) => <CopyLinkButton onClick={() => handleCopyLink(t.token)} disabled={!t.token} className="h-9" />,
     },
   ];
 
@@ -1235,9 +1268,14 @@ export default function SuperAdminPortalPage() {
                             >
                               <IconBubble icon="building" tint={isSelected ? 'violet' : 'slate'} size={42} />
                               <div className="min-w-0 flex-1">
-                                <span className="block truncate text-[14px] font-bold text-ink">{pg.owner.pgName}</span>
+                                <span className="flex min-w-0 items-center gap-1.5">
+                                  <span className={`truncate text-[14px] font-bold ${pg.setupPending ? 'text-muted' : 'text-ink'}`}>
+                                    {pgTitle(pg)}
+                                  </span>
+                                </span>
                                 <span className="block truncate text-xs font-medium text-muted">
-                                  {pg.owner.name} · {pg.owner.phone}
+                                  {[pg.owner.name, pg.owner.phone || pg.owner.email].filter(Boolean).join(' · ') ||
+                                    'Owner has not finished onboarding'}
                                 </span>
                                 <span className="mt-1 flex items-center gap-1.5 text-[11.5px] font-semibold font-mono-numbers">
                                   <span className="text-ink-2">{pg.beds.length} beds</span>
@@ -1276,8 +1314,9 @@ export default function SuperAdminPortalPage() {
                               <div className="min-w-0">
                                 <div className="flex flex-wrap items-center gap-2">
                                   <h2 className="text-lg font-extrabold tracking-[-0.02em] text-ink sm:text-xl">
-                                    {selectedPg.owner.pgName}
+                                    {pgTitle(selectedPg)}
                                   </h2>
+                                  {selectedPg.setupPending && <Badge variant="pending">Setup pending</Badge>}
                                   <Badge variant="neutral" className="font-mono">
                                     ID: {selectedPg.owner.id.slice(0, 8)}
                                   </Badge>
@@ -1286,8 +1325,8 @@ export default function SuperAdminPortalPage() {
                                   </Badge>
                                 </div>
                                 <p className="mt-1 text-[13px] font-medium leading-relaxed text-ink-2">
-                                  Owner: {selectedPg.owner.name} · Phone:{' '}
-                                  <span className="font-mono-numbers">{selectedPg.owner.phone}</span> · UPI:{' '}
+                                  Owner: {selectedPg.owner.name || '—'} · Phone:{' '}
+                                  <span className="font-mono-numbers">{selectedPg.owner.phone || '—'}</span> · UPI:{' '}
                                   {selectedPg.owner.upiId || 'None'}
                                 </p>
                                 {selectedPg.owner.pgAddress && (
@@ -1405,7 +1444,7 @@ export default function SuperAdminPortalPage() {
                                         <span className="text-xs font-medium text-muted"> /month</span>
                                       </div>
                                     </div>
-                                    <CopyLinkButton onClick={() => handleCopyLink(t.token)} className="h-11" />
+                                    <CopyLinkButton onClick={() => handleCopyLink(t.token)} disabled={!t.token} className="h-11" />
                                   </div>
                                 ))}
                               </div>
