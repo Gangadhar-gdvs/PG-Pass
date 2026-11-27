@@ -9,7 +9,7 @@ import {
   PORTAL_TOKEN_TTL_DAYS,
 } from '@/lib/constants/limits';
 import { generatePortalToken, hashToken } from '../security/tokens';
-import { rentDueDate, tsToMillis, getCurrentPeriod } from '@/lib/utils';
+import { rentDueDate, tsToMillis, getCurrentPeriod, normalizePhone } from '@/lib/utils';
 import { env } from '@/lib/env';
 import { Timestamp } from 'firebase-admin/firestore';
 
@@ -104,7 +104,14 @@ export class TenantsService {
     const bedRef = adminDb.collection('beds').doc(input.bedId);
     const portalTokenRef = adminDb.collection('portal_tokens').doc(tokenHash);
 
-    const phoneCleaned = input.phone.replace(/\D/g, '');
+    // Store the CANONICAL 10-digit key (normalizePhone) so a resident account —
+    // whose phone is also stored as 10 digits — always matches on the
+    // `tenants.where('phone','==',resident.phone)` lookup. Previously this kept
+    // ALL digits (`replace(/\D/g,'')`), so a tenant entered with a country code
+    // (e.g. "91…", 12 digits) would never match a 10-digit resident → the
+    // resident saw none of their tenancies. The normal UI already sends 10
+    // digits; this hardens non-UI/legacy callers too.
+    const phoneCleaned = normalizePhone(input.phone);
     const phoneLast4 = phoneCleaned.slice(-4);
     const depositPaid = input.depositPaidPaise ?? 0;
 

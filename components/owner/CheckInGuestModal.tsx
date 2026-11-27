@@ -4,6 +4,7 @@ import React, { useState, useMemo } from 'react';
 import { Bed } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PhoneInput } from '@/components/ui/phone-input';
 import { Drawer } from '@/components/ui/drawer';
 import { InfoBanner, KeyValue } from '@/components/ui/dashboard-kit';
 import { IconBubble, type Icon3DName, type Tint } from '@/components/brand/Icon3D';
@@ -124,7 +125,7 @@ export function CheckInGuestModal({
       <form id="guest-form" onSubmit={submit} className="space-y-3.5 stagger">
         <FormSection icon="user-add" tint="sky" title="Guest">
           <Input label="Guest Name" value={name} onChange={(e) => setName(e.target.value)} leading={<UserRound />} required disabled={loading} />
-          <Input label="Phone (optional)" type="tel" inputMode="numeric" value={phone} onChange={(e) => setPhone(e.target.value)} className="font-mono-numbers" disabled={loading} />
+          <PhoneInput label="Phone (optional)" value={phone} onChange={setPhone} disabled={loading} />
         </FormSection>
 
         <FormSection icon="calendar" tint="violet" title="Stay dates">

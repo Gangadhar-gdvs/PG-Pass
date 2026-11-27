@@ -6,7 +6,7 @@ import { useBeds } from '@/hooks/useBeds';
 import { useAsyncData, fetchJson } from '@/hooks/useAsyncData';
 import { apiPost } from '@/lib/client/api';
 import { LoadError } from '@/components/ui/load-error';
-import { formatCurrency, formatDateIN, errorMessage } from '@/lib/utils';
+import { formatCurrency, formatDateIN, errorMessage, telHref } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -174,7 +174,7 @@ export default function GuestsPage() {
                         <div className="mt-3 flex items-center gap-2">
                           {g.phone && (
                             <a
-                              href={`tel:${g.phone}`}
+                              href={telHref(g.phone)}
                               className="inline-grid h-11 w-11 shrink-0 place-items-center rounded-full bg-brand-50 text-brand-700 transition-colors hover:bg-brand-100 press"
                               aria-label="Call guest"
                             >

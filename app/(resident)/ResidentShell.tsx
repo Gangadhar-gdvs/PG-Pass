@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
+import { useSessionExpiryRedirect } from '@/hooks/useSessionExpiryRedirect';
 import { BottomTabBar } from '@/components/ui/bottom-tab-bar';
 import { IdleLogout } from '@/components/auth/IdleLogout';
 import { Avatar } from '@/components/ui/avatar';
@@ -16,6 +17,9 @@ export function ResidentShell({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  // A 401 from any API call (expired/revoked session) reloads → server layout
+  // redirects to /resident/login instead of the resident being stuck.
+  useSessionExpiryRedirect();
   // Only Home gets the app bar; other pages show their own sticky PageHeader.
   const isHome = pathname === '/resident/home';
   const [profileOpen, setProfileOpen] = useState(false);

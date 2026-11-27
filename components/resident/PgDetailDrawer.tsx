@@ -10,7 +10,7 @@ import { KeyValue, SectionHeader } from '@/components/ui/dashboard-kit';
 import { Icon3D, IconTile } from '@/components/brand/Icon3D';
 import { Star, MapPin, Phone, CheckCircle2 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { errorMessage } from '@/lib/utils';
+import { errorMessage, telHref } from '@/lib/utils';
 import { apiGet, apiPost } from '@/lib/client/api';
 
 interface DetailPhoto {
@@ -235,7 +235,7 @@ export function PgDetailDrawer({
                     label="Contact"
                     value={
                       <a
-                        href={`tel:${detail.contact.phone}`}
+                        href={telHref(detail.contact.phone)}
                         className="inline-flex min-h-[44px] items-center gap-1.5 text-brand-700"
                       >
                         <Phone className="h-4 w-4" /> {detail.contact.phone}

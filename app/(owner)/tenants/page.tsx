@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useOwnerSession } from '@/hooks/useOwner';
 import { useTenants } from '@/hooks/useTenants';
 import { useBeds } from '@/hooks/useBeds';
-import { formatCurrency, getWhatsAppLink, depositPaidRupees } from '@/lib/utils';
+import { formatCurrency, getWhatsAppLink, depositPaidRupees, telHref } from '@/lib/utils';
 import { config } from '@/lib/config';
 import { Tenant } from '@/types';
 import {
@@ -208,7 +208,7 @@ export default function TenantsPage() {
       align: 'right',
       render: (t) => (
         <div className="flex items-center justify-end gap-1.5">
-          <a href={`tel:${t.phone}`} title="Call" className={roundSoft}>
+          <a href={telHref(t.phone)} title="Call" className={roundSoft}>
             <Phone className="h-4 w-4" />
           </a>
           <a
@@ -352,7 +352,7 @@ export default function TenantsPage() {
                       <span className="truncate">{t.token ? 'Copy' : 'No pass link'}</span>
                     </button>
                     <PortalLink token={t.token} iconClassName="h-4 w-4" />
-                    <a href={`tel:${t.phone}`} title="Call" aria-label="Call" className={roundSoft}>
+                    <a href={telHref(t.phone)} title="Call" aria-label="Call" className={roundSoft}>
                       <Phone className="h-4 w-4" />
                     </a>
                     <a

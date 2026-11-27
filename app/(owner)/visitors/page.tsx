@@ -10,9 +10,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
+import { PhoneInput } from '@/components/ui/phone-input';
 import { ListSkeleton, StatGridSkeleton } from '@/components/ui/skeletons';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Plus, LogOut, LogIn, Phone, UserRound } from 'lucide-react';
+import { Plus, LogOut, LogIn, UserRound } from 'lucide-react';
 import type { Visitor } from '@/types';
 import { errorMessage, tsToDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -146,14 +147,10 @@ export default function OwnerVisitorsPage() {
             <Input label="Purpose (optional)" placeholder="e.g. Delivery" value={purpose} onChange={(e) => setPurpose(e.target.value)} disabled={posting} />
             <Input label="Visiting (optional)" placeholder="Resident name" value={visiting} onChange={(e) => setVisiting(e.target.value)} disabled={posting} />
           </div>
-          <Input
+          <PhoneInput
             label="Phone (optional)"
-            type="tel"
-            inputMode="numeric"
-            placeholder="10-digit mobile"
-            leading={<Phone />}
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
+            onChange={setPhone}
             disabled={posting}
           />
           <div className="flex justify-end">

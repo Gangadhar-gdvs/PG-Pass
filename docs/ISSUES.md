@@ -540,6 +540,28 @@ Full write-up in `docs/EXPLORATION-FINDINGS.md` §F. Fixes:
 - 🟢 Verified fine (no change): tablet data-tables/bed-grid (sidebar-aware), `t/[token]`+`portal/[token]`
   (`TenantPortalView` fully responsive), reports/analytics charts at 320px. Gate: tsc 0 · lint 0 · 198 tests · build ✓.
 
+## Adversarial re-audit of the session's work (27 Nov 2026)
+Re-checked everything built this session for real-world edge cases / production bugs. Found + fixed:
+- 🟢 **401 session-expiry was unhandled (dead interceptor).** `apiClient` defined `SessionExpiredError` +
+  `addResponseInterceptor` but nothing used them — an expired/revoked session only toasted and left the
+  user stuck. New `useSessionExpiryRedirect` (Owner + Resident shells) reloads once on a 401 → the
+  server-gated layout redirects to the correct login. Loop-guarded; 403 excluded; no conflict with
+  `useAuth`'s raw session refresh.
+- 🟢 **tenant.phone stored full digits while resident.phone stores 10 → `myTenancies` exact-match could
+  miss tenancies** for a country-code tenant. Now `normalizePhone()` on write (`tenants.service`). Normal
+  UI already sent 10 digits (no active bug); this hardens non-UI/legacy callers.
+- 🟢 **Phone inputs capped to 10 digits.** `CheckInGuestModal` + `visitors` used a raw `<Input>` with no
+  cap; both now use the shared `PhoneInput` (10-digit cap + fixed `+91`). Matches the "enter 10, backend
+  owns +91" model (storage is 10-digit; +91 added at WhatsApp/SMS/display).
+- 🟢 **Verified sound (no change):** `useAsyncData` run-id guard; optimistic overlays survive a failed
+  post-mutation reload; drawer/dialog focus trap is compatible with the portaled `Dropdown`; bodyless
+  `apiPost` matches body-less routes. Gate: tsc 0 · lint 0 · 198 tests · build ✓.
+- 🟢 **Fixed: `tel:` hrefs now use E.164 `+91`.** All 7 `tel:` links (tenants ×2, dashboard tenant +
+  emergency contact, guests, portal, PgDetailDrawer) used the bare 10-digit number — dials fine locally
+  but could misdial when roaming / region-set-abroad / in a VoIP dialer. New `telHref()` helper in
+  `lib/utils` builds `tel:+91XXXXXXXXXX` (strips to the last 10 digits, returns `''` for a non-10-digit
+  number so the link is inert rather than dialing garbage). Tests: `sharedHelpers.test.ts` (+2 → 200 total).
+
 ## Follow-ups (explicitly deferred, not forgotten)
 - 🟢 **#6 avatar image upload — BUILT.** Private storage (never a public URL): client compresses to
   ≤512px WebP (EXIF stripped) → presigned PUT into `pending/{ownerId}/avatar/` → `POST /api/owners/avatar`

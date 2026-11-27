@@ -5,10 +5,16 @@ UI/responsive surface, plus a dedicated sweep for the **"forever loading instead
 of a proper error/screen"** class of bug.
 
 Context: this is a mature codebase. `docs/ISSUES.md` already logs a large number
-of fixed issues. This document records **NEW / still-open** findings only, so the
-list is actionable rather than a re-statement of what's already green.
+of fixed issues. This document recorded the NEW findings from a full exploration
+and has since been worked to completion.
 
-Status legend: 🔴 open · 🟡 needs decision · 🟢 verified-fine (noted for completeness)
+**STATUS (final): every actionable finding below is 🟢 DONE or ⚪ deliberately
+deferred with a logged reason. Nothing is 🔴 open.** Gate at last update:
+tsc 0 · lint 0 · 198 unit tests · build ✓. The only things left are external /
+manual (a production-sized restore drill on real infra, and an on-device visual
+eyeball of the UI changes) — neither is code-side.
+
+Status legend: 🔴 open · 🟡 accepted-decision · 🟢 done / verified-fine · ⚪ deferred (reason logged)
 Priority: P0 (broken/data) · P1 (bad UX) · P2 (polish) · P3 (nice-to-have)
 
 ---
@@ -26,12 +32,13 @@ The team already engineered against this. Documented here so it's not re-audited
   `loading=false` + `error='timeout'` if no snapshot arrives, plus an error
   callback. This is the core "never spin forever" guard. Good.
 - 🟢 **Dashboard** explicitly renders a "Couldn't load your dashboard" screen
-  with a **Retry** button (`dashboard/page.tsx:611`) and distinguishes
-  permission-denied (restricted staff) from outages. Good.
+  with a **Retry** button and distinguishes permission-denied (restricted staff)
+  from outages. Good.
 - 🟢 Most pages clear `setLoading(false)` in a `finally` block (safe).
 
-### Still-open items in this class
-(see section C for the itemised list)
+### Status
+All silent-failure / error-branch items in this class are now resolved —
+see section C.
 
 ---
 
@@ -50,7 +57,8 @@ The team already engineered against this. Documented here so it's not re-audited
   normalizer; `getWhatsAppLink` uses it.
 - 🟢 **`components/ui/load-error.tsx`** — shared `<LoadError onRetry>` + `<NoAccess>`.
 - 🟢 **`app/(owner)/tasks/page.tsx`** — reference adoption (silent-failure fixed).
-- 🟢 **Tests:** `tests/unit/sharedHelpers.test.ts` (7). Gate: lint 0 · tsc 0 · 197 unit.
+- 🟢 **Tests:** `tests/unit/sharedHelpers.test.ts` (7). Gate at this step: lint 0 ·
+  tsc 0 · 197 unit (the suite later grew to 198 with the UTR regression test).
 
 ### Silent-failure rollout — DONE (11 pages)
 - 🟢 All migrated to `useAsyncData`/`fetchJson` + `LoadError` (or an equivalent
@@ -65,13 +73,40 @@ The team already engineered against this. Documented here so it's not re-audited
 - 🟢 Replaced the 6 exact `replace(/\D/g,'').slice(-10)` sites with `normalizePhone`:
   `rent.service` (resident lookup), `visitors.service`, `guests.service`,
   `residents.service` (`cleanPhone` now delegates), `AddTenantModal` (emergency
-  contact), + `settings` (earlier). Gate: tsc 0 · lint 0 · 197 tests.
-- ⚪ **Deliberately NOT changed (different semantics, would alter data/behaviour):**
-  `tenants.service:107/148` + `staff.service:87` store FULL digits (then
-  `phoneLast4`), not a 10-digit key; `security.ts`/`upi.ts`/`sms.service` do their
-  own country-code-aware slicing; `TenantPortalView:222` is a 4-digit OTP slice.
-  Note: tenant phone stores full digits while the resident LINK uses last-10 — a
-  pre-existing inconsistency, logged here, left as-is to avoid changing matching.
+  contact), + `settings` (earlier). Gate at this step: tsc 0 · lint 0 · 197 tests
+  (later 198).
+- 🟢 **FIXED (adversarial-audit follow-up): tenant.phone now stores the 10-digit key.**
+  `tenants.service` previously stored FULL digits (`replace(/\D/g,'')`, no slice)
+  while `resident.phone` stores last-10, and `myTenancies` matches them with an
+  EXACT Firestore `where('phone','==',…)` — so a tenant entered with a country
+  code (12 digits) would never match a 10-digit resident → the resident saw NONE
+  of their tenancies. Now `tenant.phone = normalizePhone(input.phone)`. The normal
+  UI already sent 10 digits (so no active bug), but this hardens non-UI/legacy/admin
+  callers. `staff.service:87` left (staff aren't matched to resident accounts);
+  `emergencyContactPhone` left full-digit (a dial-only field, not a lookup key).
+- ⚪ **Deliberately NOT changed (different semantics):** `security.ts`/`upi.ts`/
+  `sms.service` do their own country-code-aware slicing; `TenantPortalView:222` is a
+  4-digit OTP slice.
+
+### Adversarial re-audit of this session's work (hardening)
+- 🟢 **401 handling was dead code → now wired.** `apiClient` defined
+  `SessionExpiredError` + `addResponseInterceptor` but nothing used them, so an
+  expired/revoked session only showed "session expired" toasts and left the user
+  stuck. New `useSessionExpiryRedirect` (wired into Owner + Resident shells) reloads
+  once on a 401 → the server-gated layout redirects to the correct role login.
+  Guarded against loops (one-shot flag cleared on the next 2xx); 403 is NOT treated
+  as expiry; `useAuth`'s session refresh stays raw `fetch` so there's no conflict.
+- 🟢 **Phone input capped to 10 digits everywhere.** `CheckInGuestModal` + `visitors`
+  used a raw `<Input type="tel">` with no cap (a user could type a country code /
+  >10 digits); both now use the shared `PhoneInput` (strips to 10, fixed `+91`
+  prefix). Storage stays 10-digit; `+91` is added only at point of use (WhatsApp/
+  SMS/display) — matching the "enter 10, backend owns +91" model.
+- 🟢 **Verified sound (no fix needed):** `useAsyncData` run-id guard prevents stale
+  overwrites; optimistic overlays stay correct even when the post-mutation reload
+  fails (deleted item stays hidden, only a server-computed total can briefly lag);
+  the drawer/dialog focus trap is compatible with the portaled `Dropdown` (its
+  options are arrow-navigated / `tabIndex=-1`, Tab closes it); bodyless `apiPost`
+  (guest/visitor checkout) matches routes that don't read a body.
 
 ### StatusBadge adoption — DONE where it's a CLEAN refactor
 - 🟢 **maintenance** — deleted the local `STATUS_META` map; ticket badge + step-
@@ -87,82 +122,100 @@ The team already engineered against this. Documented here so it's not re-audited
   badges carry extra flags (`deleted`→"Revoked", `setupPending`). Left as-is;
   forcing them through StatusBadge would change labels/colours, not simplify.
 
-### Remaining rollout (mechanical — not yet done)
-- 🔴 Migrate the 105 raw `fetch('/api/…')` sites to `apiGet/apiPost/…` (incremental;
-  both styles coexist safely).
-- 🔴 Move the ~15 service-bypassing API routes onto their `*.service.ts`.
+### fetch → apiClient migration — DONE (110 → 27 calls)
+- 🟢 All eligible `fetch('/api/…')` calls now go through `lib/client/api.ts`
+  (`apiGet/apiPost/apiPatch/apiPut/apiDelete`) across ~30 files (owner/resident
+  pages, dashboard, admin console + admin components, and the owner/tenant
+  components). ~15 now-dead `readApiError`/`apiErrorMessage` imports removed.
+- ⚪ The **27 remaining raw `fetch` calls are deliberately raw** (migrating would
+  change behaviour): auth/session (login×2, useAuth, IdleLogout, admin+dashboard
+  session POSTs — 409 SESSION_SUPERSEDED, no redirect-on-401); uploads
+  (uploader, ownerAvatar — presigned PUTs); logger beacon; analytics (reads
+  403 + FEATURE_DISABLED + requestId header); TenantPortalView (429 lockout);
+  useOwner background reload; dashboard send-reminders (reads body code on
+  non-ok); support/AdminSupportPanel markRead + WhatsAppReminderModal (best-effort).
 
-## C. "Forever loading" & silent-failure — still-open items
+### Service-layer refactor — DONE (6 routes + 2 bugs fixed)
+- 🟢 Moved Firestore access out of routes into services: `resident/me` →
+  `residentsService.myTenanciesEnriched()`; `rent/[id]/claim` →
+  `rentService.claimPayment()`; `admin/features` → new `adminPgService`;
+  `admin/manage` (updateOwner) → `ownersService.adminMergeUpdate()`;
+  `admin/accounts` → new `adminAccountsService` (+ added the missing PATCH handler
+  that the PG-panel suspend button needs); `admin/claims` →
+  `adminUsersService.grantSuperAdmin()`. All 6 now 0 direct `adminDb`.
+- 🟢 **Bug fixed: UTR lock never released on rejection** — claim locked under
+  `hashUtr()` (SHA-256) but `rejectClaim` deleted a plaintext key → rejected
+  claims stayed locked forever. Now both use `hashUtr`. Regression test in
+  `tokens.test.ts`.
+- 🟢 **Bug fixed: admin suspend-from-PG-panel was 405** — client PATCHed a route
+  that had only POST with a different schema. Added the matching PATCH handler.
+- ⚪ **Deliberately left route-level:** cron (metrics/cleanup/backup — cross-
+  collection batch jobs), auth/session + health + flags (infra), and the already-
+  thin portal/unlock, send-reminders, subscriptions, resident/tenancy routes.
 
-- 🔴 **P1 — ~10 owner pages silently swallow load failures (no error, no retry).**
-  `tasks`, `expenses`, `notices`, `maintenance`, `staff`, `billing`, `reports`,
-  `guests`, `settings`, `visitors` all follow the same shape:
-  ```
-  try { const res = await fetch(...); if (res.ok) setData(...) }
-  catch { /* non-fatal */ }
-  finally { setLoading(false) }
-  ```
-  On a 500 / network error / permission-denied the page does NOT spin forever
-  (good — `finally` clears it) but it renders an **empty page with no message
-  and no Retry** — the owner can't tell "nothing here" from "load failed."
-  This is the inverse of the forever-loading bug and just as confusing.
-  Evidence: `tasks/page.tsx:43-59`. Only `dashboard`, `analytics`, `utilities`,
-  `profile`, `inventory` have a real error branch.
-  **Fix:** a shared `useAsyncData(loader)` hook (see section D) returning
-  `{data, loading, error, reload}` + a standard `<LoadError onRetry/>` block,
-  adopted by all list pages. Fixes DRY + error UX in one change.
+## C. "Forever loading" & silent-failure — ALL RESOLVED
 
-- 🔴 **P1 — Resident home hides server errors.** `resident/home/page.tsx:30-38`
-  on a non-ok `/api/resident/me` sets `loading=false` with empty data and renders
-  the "discover a PG" empty state. A resident WITH a tenancy who hits a transient
-  500 is told (implicitly) they have no PG. No error, no retry. Add an error
-  branch distinct from the genuine no-tenancy state.
+- 🟢 **~10 owner pages that silently swallowed load failures — FIXED.** `tasks`,
+  `expenses`, `notices`, `maintenance`, `staff`, `billing`, `reports`, `guests`,
+  `settings`, `visitors` previously rendered a blank page (no message, no retry)
+  on a 500 / network / permission error. All now use `useAsyncData` + `LoadError`
+  (or an equivalent error state) and show a message + Retry.
 
-- 🟡 **P2 — Verify every page's error branch has a Retry.** Dashboard does
-  (`:619`). Confirm `analytics`, `utilities`, `inventory`, `profile`,
-  `TenantPortalView`, `AdminSupportPanel` error states all offer a reload, not a
-  dead-end message. (Spot-checked dashboard = good; others pending a read.)
+- 🟢 **Resident home hiding server errors — FIXED.** `resident/home` now
+  distinguishes a real load error (error + Retry) from the genuine no-tenancy
+  "discover a PG" empty state.
 
-## D. Code duplication / single-source-of-truth gaps (production-grade DRY)
+- 🟢 **Every error branch has a Retry — VERIFIED.** `dashboard`, `analytics`,
+  `utilities`, `inventory`, `profile`, `staff`, `billing`, `settings` all offer a
+  reload. The two without one are by-design: `TenantPortalView` has its own PIN-
+  unlock error flow (incl. 429 lockout), and `AdminSupportPanel` is a chat where
+  errors surface as per-message toasts.
 
-- 🔴 **P1 — Hand-rolled data-loading in 14 files.** The identical
-  `queueMicrotask(() => { if (active) load() })` mount + `setLoading` +
-  swallowed-catch + `finally` block is copy-pasted across every owner list page,
-  the resident tenancy page, `AdminUsersPanel`, and `GmailConnectCard`. No shared
-  abstraction. **Fix: one `useAsyncData`/`useResource` hook** — change loading &
-  error behaviour once, it reflects everywhere (exactly the "update in one place"
-  goal). This is the highest-leverage refactor.
+## D. Code duplication / single-source-of-truth gaps — ALL RESOLVED
 
-- 🔴 **P1 — Phone normalization `str.replace(/\D/g,'').slice(-10)` duplicated in
-  ~19 files** (client + server) with no `normalizePhone()` / `toE164()` helper in
-  `lib/utils`. Risk: one site strips differently → mismatched tenant lookups.
-  Centralize into `lib/phone.ts` and import everywhere.
+- 🟢 **Hand-rolled data-loading in 14 files — FIXED.** The copy-pasted
+  `queueMicrotask(() => { if (active) load() })` + `setLoading` + swallowed-catch +
+  `finally` block is replaced by the shared `useAsyncData` hook (change loading &
+  error behaviour once → reflects everywhere).
 
-- 🔴 **P1 — Rent/guest/ticket status → {label,color} mapping inlined in ~10 UI
-  files** (`BedCard`, `RoomCard`, `StatsBar`, `BedGrid`, `RentStatusCard`,
-  `WhatsAppReminderModal`, admin, visitors, maintenance, utilities…). No shared
-  `statusBadge(status)` / status token map. Risk: inconsistent colours and a
-  label change requires editing 10 files. Centralize into a `statusMeta` map +
-  `<StatusBadge>` component.
+- 🟢 **Phone normalization — FIXED.** `normalizePhone()`/`toIndiaMsisdn()` added to
+  `lib/utils`; the 6 canonical last-10-digit sites now use it (rent/visitors/guests/
+  residents services, AddTenantModal, settings). Country-code-aware and OTP sites
+  are deliberately left (they have different semantics — see note below).
 
-- 🟡 **P2 — Avatar/initials logic in several places.** There IS `components/ui/avatar.tsx`
-  + `lib/utils` initials, but `OwnerShell`, `analytics`, `billing`, `admin` also
-  compute initials inline. Route all through the `Avatar`/`initials()` helper.
+- 🟢 **Status → {label,color} mapping — FIXED where clean.** `lib/statusMeta.ts` +
+  `<StatusBadge>` is the single source of truth; maintenance (deleted its local
+  `STATUS_META`) and staff adopted it. The composite rent/bed badges
+  (`BedCard`/`RoomCard`/`StatsBar`/`RentStatusCard`) are deliberately left — they're
+  a computed composite and were the site of ISSUES.md's C1/M2 fixes (see note below).
+
+- 🟢 **Avatar/initials — NON-ISSUE (verified).** The original finding was imprecise:
+  the `charAt(0)`/`toUpperCase()`/`slice` hits in `OwnerShell`/`analytics`/`billing`/
+  `admin` are for error labels, UTR normalization, plan names and PG-name truncation
+  — NOT avatar initials. Avatar rendering already routes through `components/ui/avatar.tsx`.
 
 - 🟢 **Already shared (good):** `getWhatsAppLink`, `errorMessage`/`apiErrorMessage`/
   `readApiError`, `copyText` (clipboard), `todayIST`/`currentPeriodIST`,
-  `depositPaidRupees`, `ownerPlanTier`, CSV export, upload/`uploader.ts`. The team
-  has been consolidating — these are the remaining gaps, not a greenfield.
+  `depositPaidRupees`, `ownerPlanTier`, CSV export, upload/`uploader.ts`, plus the
+  new `apiClient` + `useAsyncData` + `statusMeta` + `normalizePhone` + `LoadError`.
 
-## E. Other concrete bugs found
+## E. Other concrete bugs found — ALL FIXED
 
-- 🔴 **P1 — Fake placeholder phone can be persisted.** `dashboard/page.tsx:640,673`
-  pass `initialOwnerPhone={phoneNumber || '9876543210'}` into `PropertySetupWizard`,
-  which writes it as the owner's phone (`PropertySetupWizard.tsx:465`
-  `phone: initialOwnerPhone.replace(/\D/g,'').slice(-10)`). For an email-signup
-  owner with no phone, the fake `9876543210` is saved — contradicting ISSUES.md's
-  "nothing fake is ever persisted." **Fix:** pass `''` and make the wizard require
-  a real phone (it already has `PhoneInput`); never default to a fake number.
+- 🟢 **Fake placeholder phone could be persisted — FIXED.** The onboarding wizard
+  used to take `initialOwnerPhone={phoneNumber || '9876543210'}` and write the fake
+  number as the owner's phone for email-signup owners. The wizard now has a required,
+  pre-filled, editable `PhoneInput` (validated `^[6-9]\d{9}$` before submit) and the
+  dashboard passes `''`, never a fake number. (Dashboard now has 0 occurrences of
+  `9876543210`.)
+
+- 🟢 **UTR lock never released on claim rejection — FIXED.** (Found during the
+  service-layer refactor; see section B.) Claim locked under `hashUtr()` but reject
+  deleted a plaintext key → rejected claims stayed locked forever. Both use `hashUtr`
+  now; regression test in `tokens.test.ts`.
+
+- 🟢 **Admin suspend-from-PG-panel returned 405 — FIXED.** (Section B.) The client
+  PATCHed `/api/admin/accounts` which only had a POST with a different schema. Added
+  the matching PATCH handler.
 
 ## G. Architecture: middle layer, interceptors, module organization
 
@@ -177,32 +230,26 @@ The team already engineered against this. Documented here so it's not re-audited
   `withRateLimit`, `withValidation` (zod), `withCronAuth`. These are the
   equivalent of interceptors and are applied per route.
 
-**Gaps (the user is right to probe):**
-- 🔴 **P1 — ~15 API routes bypass the service layer and hit `adminDb` directly:**
-  `resident/me`, `resident/tenancy/[tenantId]`, `rent/[id]/claim`,
-  `rent/send-reminders`, `portal/[token]/unlock`, `flags`, `health`, and most
-  `admin/*` routes (`accounts`, `claims`, `features`, `manage`, `subscriptions`).
-  This means the "update in one place" guarantee leaks — data logic for these
-  lives in the route, not the module's service. **Fix:** move their Firestore
-  reads/writes into the matching `*.service.ts` so every module's data logic has
-  one home. (cron routes legitimately orchestrate across services — lower priority.)
-- 🔴 **P1 — NO client-side API "middle" layer / interceptor.** There are **105
-  raw `fetch('/api/...')` calls** across pages/components, each re-implementing
-  headers, JSON parsing, and error handling. There's no `apiClient` with request/
-  response interceptors (attach headers, normalize errors, handle 401→login,
-  retry on token refresh). **Fix (started):** `hooks/useAsyncData.ts` adds
-  `fetchJson()` — the seed of that layer (throws usable errors, flags 403). Next:
-  promote it to `lib/client/api.ts` with `apiGet/apiPost/apiPatch/apiDelete`
-  + a single place for auth-expiry handling, and migrate the 105 call sites.
-- 🟡 **P2 — Client Firebase listeners are the intended exception.** `useBeds`/
-  `useTenants` + support/admin panels use Firestore `onSnapshot` directly (real-
-  time), which is correct — but that means two data paths (REST for mutations,
-  Firestore listeners for reads). Keep, but document the boundary so it's a
-  deliberate choice, not drift.
+**Gaps found — BOTH RESOLVED:**
+- 🟢 **Service-bypassing routes — FIXED (business/admin routes).** The 6
+  business/admin routes that hit `adminDb` directly now delegate to services
+  (`resident/me`, `rent/[id]/claim`, `admin/features`, `admin/manage`,
+  `admin/accounts`, `admin/claims` — all 0 direct `adminDb`). Cron jobs + infra
+  (session/health/flags) + already-thin routes are intentionally route-level.
+  See section B "Service-layer refactor".
+- 🟢 **Client-side API "middle" layer / interceptor — BUILT + ADOPTED.**
+  `lib/client/api.ts` (`apiGet/apiPost/apiPatch/apiPut/apiDelete` +
+  `addResponseInterceptor`, 401 → SessionExpired, 403 → PermissionDenied) is the
+  single client→`/api` layer. The `fetch` migration took the call sites from 110
+  → 27 (the 27 left are intentionally raw). See section B "fetch → apiClient".
+- 🟡 **P2 (accepted, by-design) — two data paths.** `useBeds`/`useTenants` + support/
+  admin panels use Firestore `onSnapshot` directly (real-time reads) while mutations
+  go through the REST API. This is a deliberate choice (real-time where it matters),
+  not drift — documented here so it stays intentional.
 
-**Verdict:** the backend is genuinely well-structured by module; the two real
-"single source of truth" gaps are (a) routes that skip their service, and (b) the
-missing client API wrapper. Both are now logged with a concrete fix path.
+**Verdict:** the backend was already well-structured by module; the two real
+"single source of truth" gaps (routes skipping their service, and the missing
+client API wrapper) are now both closed.
 
 ## F. Visual / responsive audit — DONE
 Worked each item by auditing the component source (static CSS review):

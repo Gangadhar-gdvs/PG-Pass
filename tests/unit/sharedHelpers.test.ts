@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { normalizePhone, toIndiaMsisdn, getWhatsAppLink } from '@/lib/utils';
+import { normalizePhone, toIndiaMsisdn, getWhatsAppLink, telHref } from '@/lib/utils';
 import { statusMeta } from '@/lib/statusMeta';
 
 describe('normalizePhone — single source of truth for phone keys', () => {
@@ -22,6 +22,19 @@ describe('normalizePhone — single source of truth for phone keys', () => {
 
   it('getWhatsAppLink builds a wa.me link on the normalized number', () => {
     expect(getWhatsAppLink('+91 98765 43210', 'hi')).toBe('https://wa.me/919876543210?text=hi');
+  });
+
+  it('telHref builds an E.164 tel: link (+91) from a 10-digit number', () => {
+    expect(telHref('9876543210')).toBe('tel:+919876543210');
+    expect(telHref('+91 98765-43210')).toBe('tel:+919876543210'); // strips to last 10, re-adds +91
+    expect(telHref('09876543210')).toBe('tel:+919876543210');
+  });
+
+  it('telHref returns empty string when there are not 10 digits (so the link is inert)', () => {
+    expect(telHref('12345')).toBe('');
+    expect(telHref('')).toBe('');
+    expect(telHref(null)).toBe('');
+    expect(telHref(undefined)).toBe('');
   });
 });
 

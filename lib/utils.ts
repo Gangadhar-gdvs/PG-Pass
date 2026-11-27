@@ -256,6 +256,18 @@ export function getWhatsAppLink(phone: string, message: string): string {
   return `https://wa.me/${msisdn}?text=${encodeURIComponent(message)}`;
 }
 
+/**
+ * E.164 `tel:` href for an Indian mobile — `tel:+91XXXXXXXXXX`. Phones are stored
+ * as 10 digits; the explicit `+91` makes the dialer unambiguous everywhere (local
+ * SIM, roaming, dual-SIM, and VoIP/softphone dialers that require E.164), matching
+ * how WhatsApp links already prefix 91. Returns an empty string for a number that
+ * isn't 10 digits so callers can disable the link instead of dialing a bad number.
+ */
+export function telHref(phone: string | null | undefined): string {
+  const ten = normalizePhone(phone);
+  return ten.length === 10 ? `tel:+91${ten}` : '';
+}
+
 export function amountInWords(n: number): string {
   const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
   const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];

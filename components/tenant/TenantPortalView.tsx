@@ -20,7 +20,7 @@ import {
 import { IconBubble } from '@/components/brand/Icon3D';
 import { Illustration } from '@/components/brand/Illustration';
 import { Logo } from '@/components/brand/Logo';
-import { formatCurrency, getWhatsAppLink, apiErrorMessage } from '@/lib/utils';
+import { formatCurrency, getWhatsAppLink, apiErrorMessage, telHref } from '@/lib/utils';
 import type { RentRecord } from '@/types';
 import toast from 'react-hot-toast';
 
@@ -398,7 +398,7 @@ export function TenantPortalView({ token }: TenantPortalViewProps) {
               </div>
               <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0">
                 <a
-                  href={`tel:${portalData.pg.phone}`}
+                  href={telHref(portalData.pg.phone)}
                   className="btn-soft !h-11 !px-4 text-[13px] cursor-pointer"
                 >
                   <Phone className="w-4 h-4 text-brand" />

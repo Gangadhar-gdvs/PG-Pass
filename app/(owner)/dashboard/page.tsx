@@ -7,7 +7,7 @@ import { useTenants } from '@/hooks/useTenants';
 import {
   subscribeToOwnerRentRecords,
 } from '@/lib/firestore';
-import { getCurrentPeriod, formatCurrency, getWhatsAppLink, errorMessage, depositPaidRupees, todayIST } from '@/lib/utils';
+import { getCurrentPeriod, formatCurrency, getWhatsAppLink, errorMessage, depositPaidRupees, todayIST, telHref } from '@/lib/utils';
 import { apiGet, apiPost, apiPatch } from '@/lib/client/api';
 import { Bed, Owner, RentRecord } from '@/types';
 import { StatsBar, StatsRow } from '@/components/owner/StatsBar';
@@ -1246,7 +1246,7 @@ export default function OwnerDashboardPage() {
                     <h4 className="text-[13px] font-bold text-ink-2">Direct actions</h4>
                     <div className="grid grid-cols-2 gap-2.5">
                       <a
-                        href={`tel:${activeBedDrawer.tenantPhone}`}
+                        href={telHref(activeBedDrawer.tenantPhone)}
                         className="btn-soft h-11 text-sm"
                       >
                         <Phone className="h-4 w-4 text-brand" />
@@ -1302,7 +1302,7 @@ export default function OwnerDashboardPage() {
                       </span>
                     </div>
                     <a
-                      href={`tel:${activeTenant.emergencyContactPhone}`}
+                      href={telHref(activeTenant.emergencyContactPhone)}
                       className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-white bg-white text-brand-700 shadow-[0_8px_18px_-10px_rgba(70,40,160,0.45)] transition-colors hover:bg-brand-50 press"
                       aria-label="Call emergency contact"
                     >

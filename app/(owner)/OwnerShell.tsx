@@ -5,6 +5,7 @@ import { useOwnerAvatarUrl } from '@/lib/client/ownerAvatar';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
+import { useSessionExpiryRedirect } from '@/hooks/useSessionExpiryRedirect';
 import { OwnerSessionProvider, OwnerSession } from '@/hooks/useOwner';
 import {
   LayoutDashboard,
@@ -68,6 +69,9 @@ export function OwnerShell({
   const { user, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  // A 401 from any API call (expired/revoked session) reloads → server layout
+  // redirects to the correct login instead of the user being stuck.
+  useSessionExpiryRedirect();
 
   const isStaff = session.role === 'staff';
   // Menus only show pages this user can actually open: owners see everything;
