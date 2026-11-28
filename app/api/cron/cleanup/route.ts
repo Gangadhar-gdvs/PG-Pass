@@ -46,12 +46,17 @@ export const POST = withErrorHandler(
       adminDb.collection('portal_lockouts').where('expiresAt', '<=', Timestamp.fromDate(new Date(now)))
     );
 
-    // 4. Expired rate-limit buckets (belt-and-braces alongside the TTL policy).
+    // 4. Expired rate-limit buckets (replaces Firestore TTL on Spark free tier).
     const purgedRateLimits = await purgeQuery(
       adminDb.collection('rate_limits').where('expiresAt', '<=', Timestamp.fromDate(new Date(now)))
     );
 
-    // 5. Diagnostic system_logs older than 90 days. NOTE: audit_logs are
+    // 5. Expired idempotency keys (replaces Firestore TTL on Spark free tier).
+    const purgedIdempotencyKeys = await purgeQuery(
+      adminDb.collection('idempotency_keys').where('expiresAt', '<=', Timestamp.fromDate(new Date(now)))
+    );
+
+    // 6. Diagnostic system_logs older than 90 days. NOTE: audit_logs are
     //    intentionally NOT purged here — they are immutable financial/security
     //    records with a much longer (or indefinite) retention requirement.
     const purgedSystemLogs = await purgeQuery(
@@ -64,6 +69,7 @@ export const POST = withErrorHandler(
       purgedTokens,
       purgedLockouts,
       purgedRateLimits,
+      purgedIdempotencyKeys,
       purgedSystemLogs,
     });
   })
