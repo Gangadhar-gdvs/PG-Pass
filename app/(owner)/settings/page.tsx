@@ -40,6 +40,10 @@ function SettingsPageInner() {
   const [rentDueDay, setRentDueDay] = useState('5');
   const [lateFeePerDay, setLateFeePerDay] = useState('0');
   const [lateFeeGraceDays, setLateFeeGraceDays] = useState('0');
+  // Public discovery: list this PG in resident search. City/area make it findable.
+  const [isListed, setIsListed] = useState(false);
+  const [city, setCity] = useState('');
+  const [area, setArea] = useState('');
 
   useEffect(() => {
     async function load() {
@@ -49,6 +53,7 @@ function SettingsPageInner() {
         const profile = await fetchJson<{
           pgName?: string; name?: string; address?: string; pgAddress?: string; upiId?: string;
           phone?: string | number; rentDueDay?: number; lateFeePerDayPaise?: number; lateFeeGraceDays?: number;
+          isListed?: boolean; city?: string; area?: string;
         }>('/api/owners');
         setPgName(profile.pgName || '');
         setOwnerName(profile.name || '');
@@ -58,6 +63,9 @@ function SettingsPageInner() {
         setRentDueDay(String(profile.rentDueDay ?? 5));
         setLateFeePerDay(String(Math.round((profile.lateFeePerDayPaise ?? 0) / 100)));
         setLateFeeGraceDays(String(profile.lateFeeGraceDays ?? 0));
+        setIsListed(!!profile.isListed);
+        setCity(profile.city || '');
+        setArea(profile.area || '');
         setLoadError(null);
       } catch (e) {
         setLoadError(errorMessage(e, "Couldn't load your settings. Please try again."));
@@ -96,6 +104,14 @@ function SettingsPageInner() {
       return;
     }
 
+    const cleanCity = sanitizeText(city, 60);
+    const cleanArea = sanitizeText(area, 80);
+    // A listed PG must have a city so residents can actually find it in search.
+    if (isListed && !cleanCity) {
+      toast.error('Add your city to list your PG in resident search.');
+      return;
+    }
+
     setSaving(true);
     try {
       await apiPut('/api/owners', {
@@ -107,6 +123,9 @@ function SettingsPageInner() {
         rentDueDay: Math.min(28, Math.max(1, Number(rentDueDay) || 5)),
         lateFeePerDayPaise: Math.max(0, Math.round((Number(lateFeePerDay) || 0) * 100)),
         lateFeeGraceDays: Math.max(0, Math.min(28, Number(lateFeeGraceDays) || 0)),
+        isListed,
+        city: cleanCity,
+        area: cleanArea,
       });
 
       toast.success('Settings updated successfully');
@@ -255,6 +274,58 @@ function SettingsPageInner() {
           <p className="text-xs font-medium leading-relaxed text-muted">
             Due day applies to newly generated rent records. Set late fee to ₹0 to disable penalties.
           </p>
+        </SectionCard>
+
+        <SectionCard title="Public Listing (Resident Discovery)" icon="building" bodyClassName="space-y-4">
+          <button
+            type="button"
+            onClick={() => setIsListed((v) => !v)}
+            aria-pressed={isListed}
+            disabled={saving}
+            className={`flex w-full items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left transition-colors press ${
+              isListed ? 'border-brand-200 bg-brand-50' : 'border-line-strong bg-white/90 hover:border-brand-200'
+            }`}
+          >
+            <span className="min-w-0">
+              <span className="block text-[14px] font-bold text-ink">List my PG in resident search</span>
+              <span className="mt-0.5 block text-[12.5px] font-medium text-muted">
+                When on, residents can find your PG in the Discover tab and send join requests.
+              </span>
+            </span>
+            {/* Simple switch track */}
+            <span
+              aria-hidden
+              className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+                isListed ? 'bg-[image:var(--grad-brand)]' : 'bg-line-strong'
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${
+                  isListed ? 'left-[22px]' : 'left-0.5'
+                }`}
+              />
+            </span>
+          </button>
+
+          {isListed && (
+            <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-3">
+              <Input
+                label="City"
+                placeholder="Your city"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                disabled={saving}
+                required
+              />
+              <Input
+                label="Area / Locality (optional)"
+                placeholder="Your area / locality"
+                value={area}
+                onChange={(e) => setArea(e.target.value)}
+                disabled={saving}
+              />
+            </div>
+          )}
         </SectionCard>
 
         <InfoBanner

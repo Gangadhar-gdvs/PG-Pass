@@ -25,18 +25,35 @@ const PROTECTED_PREFIXES = [
   '/inventory',
 ];
 
+// Normalize a hostname: strip protocol, path, port, a leading `www.`, trailing
+// slash and case. So `https://Admin-PGPass.vercel.app/`, `admin-pgpass.vercel.app:443`
+// and `admin-pgpass.vercel.app` all compare equal — tolerant of how ADMIN_HOST
+// was entered in the dashboard.
+function normalizeHost(value: string | null | undefined): string {
+  let h = (value || '').trim().toLowerCase();
+  h = h.replace(/^https?:\/\//, ''); // strip protocol if the env included it
+  h = h.split('/')[0]; // strip any path/trailing slash
+  h = h.split(',')[0].trim(); // first of an x-forwarded-host list
+  h = h.split(':')[0]; // strip port
+  h = h.replace(/^www\./, ''); // treat www. and apex as the same site
+  return h;
+}
+
 // Which host serves the ADMIN console. Set `ADMIN_HOST` in the admin deployment
-// (e.g. `pgpass-admin.vercel.app` now, or `admin.yourdomain.com` later). When the
+// (e.g. `admin-pgpass.vercel.app`, or `admin.yourdomain.com` later). When the
 // request's hostname matches, the site root (`/`) maps straight to the admin
 // console and the normal app is hidden. When UNSET, admin stays at `/admin` on
 // the single host (path-based) — so local dev + a single deploy still work.
-const ADMIN_HOST = process.env.ADMIN_HOST?.trim().toLowerCase() || '';
+const ADMIN_HOST = normalizeHost(process.env.ADMIN_HOST);
 
 // Visited-before marker (1 year) — drives "first visit → landing, after → login".
 const VISITED_COOKIE = 'pgp_seen';
 
 function hostOf(request: NextRequest): string {
-  return (request.headers.get('host') || '').split(':')[0].toLowerCase();
+  // Behind a CDN/proxy (Vercel, etc.) the PUBLIC hostname arrives in
+  // `x-forwarded-host`; the `host` header can be an internal platform host. Prefer
+  // the forwarded host so ADMIN_HOST matching works on the real admin domain.
+  return normalizeHost(request.headers.get('x-forwarded-host') || request.headers.get('host'));
 }
 
 export function proxy(request: NextRequest) {
@@ -49,7 +66,18 @@ export function proxy(request: NextRequest) {
   if (isAdminHost) {
     // On the admin host, everything funnels to the admin console. The user's URL
     // bar stays on the admin host (rewrite, not redirect) and never shows /admin.
-    if (!pathname.startsWith('/admin') && !pathname.startsWith('/api')) {
+    //
+    // CRITICAL: never rewrite framework assets/data (`/_next/*`) or API routes.
+    // Rewriting them to `/admin/_next/...` 404s the JS/RSC chunks, so the admin
+    // page's client JS never boots and it's stuck on the "Checking admin
+    // credentials…" spinner — i.e. the login form never appears. (The matcher
+    // already skips `_next/static`, but RSC/data + other `_next/*` requests still
+    // reach here and must be passed through untouched.)
+    if (
+      !pathname.startsWith('/admin') &&
+      !pathname.startsWith('/api') &&
+      !pathname.startsWith('/_next')
+    ) {
       const url = request.nextUrl.clone();
       url.pathname = pathname === '/' ? '/admin' : `/admin${pathname}`;
       return withSecurity(request, NextResponse.rewrite(url));
@@ -108,6 +136,16 @@ export function proxy(request: NextRequest) {
 function withSecurity(request: NextRequest, response: NextResponse): NextResponse {
   const nonce = crypto.randomBytes(16).toString('base64');
   const cspHeader = buildCsp(nonce);
+
+  // TEMP DIAGNOSTIC: lets us SEE why the admin host doesn't match without guessing.
+  // Inspect with: curl -sI https://admin-pgpass.vercel.app/ | grep x-pgp-admin
+  // `seen=<host>` is what the middleware computed from x-forwarded-host/host;
+  // `env=<ADMIN_HOST>` is the normalized env value; `match=<bool>`.
+  const seenHost = hostOf(request);
+  response.headers.set(
+    'x-pgp-admin-debug',
+    `seen=${seenHost} env=${ADMIN_HOST || '(empty)'} match=${ADMIN_HOST !== '' && seenHost === ADMIN_HOST}`
+  );
 
   // Enforce CSP in production; keep Report-Only in dev/staging so new sources
   // can be surfaced via violation reports before they start getting blocked.

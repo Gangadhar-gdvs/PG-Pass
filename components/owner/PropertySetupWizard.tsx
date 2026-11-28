@@ -650,7 +650,7 @@ export function PropertySetupWizard({
 
               <Input
                 label="Complete Property Address & Locality"
-                placeholder="e.g. Plot 42, Hitech City Main Rd, Madhapur, Hyderabad, 500081"
+                placeholder="House/plot no., street, area, city, PIN code"
                 value={pgAddress}
                 onChange={(e) => setPgAddress(e.target.value)}
                 leading={<MapPin />}

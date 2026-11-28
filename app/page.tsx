@@ -10,14 +10,12 @@ import {
   LayoutGrid,
   Menu,
   PlayCircle,
-  Plus,
   Route,
   User,
   X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { BottomTabBar } from '@/components/ui/bottom-tab-bar';
 import { Logo } from '@/components/brand/Logo';
 import { Icon3D, IconBubble, type Icon3DName } from '@/components/brand/Icon3D';
 import { Illustration } from '@/components/brand/Illustration';
@@ -208,6 +206,75 @@ export default function LandingPage() {
           </nav>
         </section>
 
+        {/* ===================== TWO AUDIENCES (OWNERS vs RESIDENTS) ===================== */}
+        <section id="audiences" className="mx-auto max-w-6xl scroll-mt-24 pt-12 sm:pt-16">
+          <div className="text-center">
+            <h2 className="text-[26px] sm:text-[34px] font-extrabold tracking-[-0.03em] text-ink">
+              Built for <span className="text-gradient">both sides</span>
+            </h2>
+            <p className="mx-auto mt-2 max-w-md text-[13.5px] font-medium text-muted">
+              Whether you run a PG or live in one — PGPass has a home for you.
+            </p>
+          </div>
+
+          <div className="mt-8 grid gap-4 md:grid-cols-2">
+            {/* FOR OWNERS */}
+            <div className="app-card relative overflow-hidden rounded-[28px] p-6 sm:p-7">
+              <IconBubble icon="building" tint="violet" size={52} />
+              <h3 className="mt-4 text-[20px] font-extrabold tracking-[-0.02em] text-ink">For PG Owners</h3>
+              <p className="mt-1.5 text-[13.5px] font-medium leading-relaxed text-muted">
+                Run your whole PG from your phone — beds, rent, reminders and receipts.
+              </p>
+              <ul className="mt-4 space-y-2.5">
+                {[
+                  'Visual bed inventory — paid, due & vacant at a glance',
+                  '1-tap WhatsApp / email rent reminders',
+                  'Direct UPI collection — 0% gateway fees',
+                  'Instant HRA receipts & move-in photo vault',
+                ].map((t) => (
+                  <li key={t} className="flex items-start gap-2.5 text-[13.5px] font-medium text-ink-2">
+                    <Icon3D name="check" size={20} className="mt-0.5 shrink-0" />
+                    <span>{t}</span>
+                  </li>
+                ))}
+              </ul>
+              <Link href="/login" className="btn-pill mt-6 w-full !px-5">
+                <ArrowRight className="h-4.5 w-4.5" /> Start managing your PG
+              </Link>
+            </div>
+
+            {/* FOR RESIDENTS */}
+            <div className="app-card relative overflow-hidden rounded-[28px] p-6 sm:p-7">
+              <IconBubble icon="residents" tint="sky" size={52} />
+              <h3 className="mt-4 text-[20px] font-extrabold tracking-[-0.02em] text-ink">For Residents</h3>
+              <p className="mt-1.5 text-[13.5px] font-medium leading-relaxed text-muted">
+                See your rent, pay by UPI and get receipts — no app download needed.
+              </p>
+              <ul className="mt-4 space-y-2.5">
+                {[
+                  'View your rent status & dues anytime',
+                  'Pay directly to your PG via UPI',
+                  'Download HRA rent receipts for tax',
+                  'Find & join a PG from Discover',
+                ].map((t) => (
+                  <li key={t} className="flex items-start gap-2.5 text-[13.5px] font-medium text-ink-2">
+                    <Icon3D name="check" size={20} className="mt-0.5 shrink-0" />
+                    <span>{t}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-6 grid grid-cols-1 gap-2.5 min-[420px]:grid-cols-2">
+                <a href="#resident" className="btn-pill !px-4">
+                  <KeyRound className="h-4.5 w-4.5" /> Open my portal
+                </a>
+                <Link href="/resident/login" className="btn-soft !px-4">
+                  Resident sign-in <ArrowRight className="h-4 w-4" />
+                </Link>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* ===================== FEATURES ===================== */}
         <section id="features" className="mx-auto max-w-6xl scroll-mt-24 pt-6 sm:pt-10">
           <div className="app-card relative overflow-hidden rounded-[30px] p-5 sm:p-8 lg:p-10">
@@ -375,21 +442,9 @@ export default function LandingPage() {
             <Link href="/privacy" className="hover:text-brand-700 transition-colors">Privacy</Link>
             <Link href="/terms" className="hover:text-brand-700 transition-colors">Terms</Link>
             <Link href="/login" className="hover:text-brand-700 transition-colors">Sign in</Link>
-            <Link href="/admin" className="text-faint hover:text-brand-700 transition-colors">Admin</Link>
           </div>
         </div>
       </footer>
-
-      {/* ===================== MOBILE BOTTOM NAV ===================== */}
-      <BottomTabBar
-        primary={[
-          { href: '/', label: 'Home', icon: Home },
-          { href: '/#features', label: 'Features', icon: LayoutGrid },
-          { href: '/#how', label: 'Workflow', icon: Route },
-          { href: '/login', label: 'Account', icon: User },
-        ]}
-        center={{ label: 'Get started', icon: Plus, onClick: () => router.push('/login') }}
-      />
     </div>
   );
 }
