@@ -48,6 +48,8 @@ const serverEnvSchema = z.object({
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   SECRETS_ENCRYPTION_KEY: z.string().optional(),
+  // Separate admin URL (optional). Host that serves the admin console (e.g. admin-pgpass.vercel.app).
+  ADMIN_HOST: z.string().optional(),
   CRON_SECRET: z.string().default('dev-cron-secret'),
   LOG_LEVEL: z.enum(['info', 'warn', 'error', 'debug']).default('info'),
   // Optional transactional email (Resend HTTP API). When RESEND_API_KEY is

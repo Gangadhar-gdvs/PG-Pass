@@ -28,6 +28,7 @@
 *-firebase-adminsdk-*.json
 *firebase-adminsdk*.json
 service-account*.json
+client_secret_*.json
 *.pem
 *.key
 !.env*.example

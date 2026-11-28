@@ -1,7 +1,7 @@
 import 'server-only';
 import { env } from '@/lib/env';
 
-export function buildCsp(nonce: string): string {
+export function buildCsp(_nonce: string): string {
   const b2Host = env.B2_S3_HOST || 'localhost:9000';
   const authDomain = env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || 'localhost';
 
@@ -11,13 +11,21 @@ export function buildCsp(nonce: string): string {
 
   // Allow essential scripts for Next.js hydration chunks, inline initialization,
   // and Firebase Google Sign-In / Auth SDKs.
+  //
+  // IMPORTANT: The nonce is intentionally NOT included in script-src/script-src-elem.
+  // Per the CSP spec, when a nonce-* value is present, browsers IGNORE 'unsafe-inline'
+  // entirely — meaning any inline script without the matching nonce attribute is blocked.
+  // Firebase Auth injects its own inline scripts that cannot be nonce-tagged by us,
+  // so including the nonce here causes CSP violations on every Google sign-in.
+  // The nonce is still generated and passed via the x-nonce request header for
+  // Next.js RSC use, but it must stay out of the CSP header.
+  //
   // We omit 'strict-dynamic' because modern browsers with 'strict-dynamic' ignore
   // host-based allowlists (like apis.google.com and gstatic.com) and block Next.js dynamic chunks.
   const scriptSources = [
     "'self'",
     "'unsafe-inline'",
     "'unsafe-eval'",
-    `'nonce-${nonce}'`,
     'https://apis.google.com',
     'https://www.gstatic.com',
     'https://*.googleapis.com',
