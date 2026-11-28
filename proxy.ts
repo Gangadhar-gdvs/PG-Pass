@@ -137,16 +137,6 @@ function withSecurity(request: NextRequest, response: NextResponse): NextRespons
   const nonce = crypto.randomBytes(16).toString('base64');
   const cspHeader = buildCsp(nonce);
 
-  // TEMP DIAGNOSTIC: lets us SEE why the admin host doesn't match without guessing.
-  // Inspect with: curl -sI https://admin-pgpass.vercel.app/ | grep x-pgp-admin
-  // `seen=<host>` is what the middleware computed from x-forwarded-host/host;
-  // `env=<ADMIN_HOST>` is the normalized env value; `match=<bool>`.
-  const seenHost = hostOf(request);
-  response.headers.set(
-    'x-pgp-admin-debug',
-    `seen=${seenHost} env=${ADMIN_HOST || '(empty)'} match=${ADMIN_HOST !== '' && seenHost === ADMIN_HOST}`
-  );
-
   // Enforce CSP in production; keep Report-Only in dev/staging so new sources
   // can be surfaced via violation reports before they start getting blocked.
   const isStagingOrDev =

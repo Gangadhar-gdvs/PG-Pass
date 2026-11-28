@@ -3,6 +3,38 @@
 import { readApiError } from '../utils';
 import { compressImage } from './imageCompress';
 
+/**
+ * PUT a blob to a presigned direct-to-storage URL (Backblaze B2 / S3), turning
+ * both failure modes into a clear, ACCURATE message:
+ *  - The browser `fetch` to storage throws a TypeError ("Failed to fetch") when
+ *    the storage endpoint blocks the request (CORS not configured) or is
+ *    unreachable. Without this, that TypeError bubbles up to `errorMessage()`,
+ *    which reports the misleading "Couldn't reach PGPass. Check your internet" —
+ *    even though the APP is fine and only the storage upload was blocked.
+ *  - A non-ok response (403/4xx/5xx from storage) reports the HTTP status.
+ * We re-throw a plain Error (not a TypeError) so the message survives
+ * `errorMessage()` instead of being rewritten to the generic network text.
+ */
+export async function putToStorage(uploadUrl: string, blob: Blob): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: { 'Content-Type': blob.type },
+      body: blob,
+    });
+  } catch {
+    throw new Error(
+      "Upload to secure storage was blocked. This is usually a storage (CORS) setup issue, not your internet — please try again, and if it keeps happening, contact support."
+    );
+  }
+  if (!res.ok) {
+    throw new Error(
+      `Upload to secure storage failed (status ${res.status}). Please try again or contact support.`
+    );
+  }
+}
+
 export interface UploadPhotoOptions {
   file: File;
   photoType: 'move_in' | 'move_out' | 'payment_proof' | 'id_proof' | 'agreement';
@@ -64,20 +96,8 @@ export async function uploadPhotoToB2(
   const { uploadUrl, objectKey } = await intentRes.json();
   onProgress?.(60);
 
-  // 3. Direct client PUT to B2
-  const putRes = await fetch(uploadUrl, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': compressed.blob.type,
-    },
-    body: compressed.blob,
-  });
-
-  if (!putRes.ok) {
-    throw new Error(
-      `Direct upload to private storage failed (status ${putRes.status}).`
-    );
-  }
+  // 3. Direct client PUT to B2 (clear, accurate error on CORS/network block)
+  await putToStorage(uploadUrl, compressed.blob);
   onProgress?.(85);
 
   // 4. Confirm upload
@@ -150,12 +170,7 @@ export async function uploadPropertyPhoto(
   const { uploadUrl, objectKey } = await intentRes.json();
   onProgress?.(60);
 
-  const putRes = await fetch(uploadUrl, {
-    method: 'PUT',
-    headers: { 'Content-Type': compressed.blob.type },
-    body: compressed.blob,
-  });
-  if (!putRes.ok) throw new Error(`Upload failed (status ${putRes.status}).`);
+  await putToStorage(uploadUrl, compressed.blob);
   onProgress?.(85);
 
   const confirmRes = await fetch('/api/properties/photos', {

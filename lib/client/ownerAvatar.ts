@@ -3,6 +3,7 @@
 import { readApiError } from '@/lib/utils';
 import { useEffect, useState } from 'react';
 import { compressImage } from './imageCompress';
+import { putToStorage } from './uploader';
 
 const readError = readApiError;
 
@@ -30,12 +31,7 @@ export async function uploadOwnerAvatar(file: File): Promise<string> {
   if (!intentRes.ok) throw new Error(await readError(intentRes, 'Could not start the upload'));
   const { uploadUrl, objectKey } = await intentRes.json();
 
-  const putRes = await fetch(uploadUrl, {
-    method: 'PUT',
-    headers: { 'Content-Type': compressed.blob.type },
-    body: compressed.blob,
-  });
-  if (!putRes.ok) throw new Error(`Upload failed (status ${putRes.status})`);
+  await putToStorage(uploadUrl, compressed.blob);
 
   const confirmRes = await fetch('/api/owners/avatar', {
     method: 'POST',

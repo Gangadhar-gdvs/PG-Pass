@@ -130,4 +130,18 @@ describe('errorMessage network errors', () => {
     expect(errorMessage(new Error('Rent record not found'), 'x')).toBe('Rent record not found');
     expect(errorMessage(undefined, 'Fallback')).toBe('Fallback');
   });
+
+  it('keeps a storage-upload error accurate instead of the generic "internet" text', async () => {
+    const { errorMessage } = await import('@/lib/utils');
+    // putToStorage re-throws a PLAIN Error (not a TypeError) when the direct PUT
+    // to Backblaze/S3 is blocked (CORS) — so the message must survive verbatim,
+    // NOT be rewritten to "Check your internet connection" (the app is fine; only
+    // the storage upload was blocked).
+    const storageErr = new Error(
+      'Upload to secure storage was blocked. This is usually a storage (CORS) setup issue, not your internet — please try again, and if it keeps happening, contact support.'
+    );
+    const msg = errorMessage(storageErr, 'Could not update your photo');
+    expect(msg).toMatch(/storage \(CORS\) setup/i);
+    expect(msg).not.toMatch(/internet connection/);
+  });
 });
